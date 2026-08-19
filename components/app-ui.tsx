@@ -4,22 +4,18 @@ import type { TripStatus } from '@/lib/demo-data';
 
 export function StatusPill({ status }: { status: TripStatus | string }) {
   const colors = useColors();
-  const tone = status.includes('Final') || status.includes('Liber') || status.includes('Aprov')
-    ? { backgroundColor: `${colors.success}22`, color: colors.success }
-    : status.includes('Reje') || status.includes('Devol')
-      ? { backgroundColor: `${colors.error}22`, color: colors.error }
-      : { backgroundColor: `${colors.warning}25`, color: colors.warning };
-  return <View style={{ backgroundColor: tone.backgroundColor }} className="self-start rounded-full px-3 py-1"><Text style={{ color: tone.color }} className="text-xs font-semibold">{status}</Text></View>;
+  const tone = status.includes('Final') || status.includes('Liber') || status.includes('Aprov') ? { backgroundColor: `${colors.success}22`, color: colors.success } : status.includes('Reje') || status.includes('Devol') ? { backgroundColor: `${colors.error}22`, color: colors.error } : { backgroundColor: `${colors.warning}25`, color: colors.warning };
+  return <View style={{ backgroundColor: tone.backgroundColor, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' }}><Text style={{ color: tone.color }} className="text-xs font-semibold">{status}</Text></View>;
 }
 
 export function PrimaryButton({ label, onPress, compact = false }: { label: string; onPress?: () => void; compact?: boolean }) {
   const colors = useColors();
-  return <Pressable onPress={onPress} style={({ pressed }) => [{ backgroundColor: colors.primary, transform: [{ scale: pressed ? 0.98 : 1 }] }]} className={`items-center rounded-2xl ${compact ? 'px-4 py-2.5' : 'px-5 py-4'}`}><Text className="font-bold text-white">{label}</Text></Pressable>;
+  return <Pressable onPress={onPress} style={({ pressed }) => [{ backgroundColor: colors.primary, minHeight: compact ? 40 : 50, paddingHorizontal: compact ? 16 : 20, paddingVertical: compact ? 10 : 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] }]}><Text className="font-bold text-white">{label}</Text></Pressable>;
 }
 
 export function SecondaryButton({ label, onPress }: { label: string; onPress?: () => void }) {
   const colors = useColors();
-  return <Pressable onPress={onPress} style={({ pressed }) => [{ borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]} className="items-center rounded-2xl border bg-surface px-5 py-3.5"><Text className="font-bold text-foreground">{label}</Text></Pressable>;
+  return <Pressable onPress={onPress} style={({ pressed }) => [{ borderColor: colors.border, borderWidth: 1, backgroundColor: colors.surface, minHeight: 50, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 }]}><Text className="font-bold text-foreground">{label}</Text></Pressable>;
 }
 
 export function SectionHeader({ title, action }: { title: string; action?: string }) {

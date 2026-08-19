@@ -17,3 +17,8 @@
 - [x] Implementar preferências de idioma PT/ES e tema automático/claro/escuro
 - [x] Isolar adaptadores de dados para futura integração com Supabase Auth, PostgreSQL e Storage
 - [x] Validar tipos, lint, testes e fluxos principais
+
+- [x] Reconstruir a estrutura visual para uso web desktop responsivo
+- [x] Criar shell desktop com navegação lateral e cabeçalho operacional
+- [x] Adaptar dashboard, viagens, aprovações, operação, despesas e relatórios para telas largas
+- [x] Validar responsividade desktop e mobile após a reconstrução web
