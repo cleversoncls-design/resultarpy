@@ -9,6 +9,7 @@ export type Expense = { id: string; tripId: string; date: string; city: string; 
 export type Vehicle = { id: string; plate: string; brand: string; model: string; year: number; color: string; unitId: string; currentKm: number; lastMaintenanceKm: number; maintenanceIntervalKm: number; extinguisherDue: string; status: FleetStatus; observations?: string };
 export type FleetReservation = { id: string; tripId: string; vehicleId?: string; driver: string; startDate: string; endDate: string; status: 'Aguardando veículo' | 'Reservada' | 'Em viagem' | 'Finalizada'; departureKm?: number; returnKm?: number };
 export type FleetEvent = { id: string; tripId: string; vehicleId: string; type: FleetEventType; description: string; photos: string[]; createdAt: string };
+export type FleetWorkOrder = { id: string; vehicleId: string; km: number; maintenanceDate: string; observation: string; cost: number; status: 'Concluída' | 'Em andamento' };
 
 export const demoUser = { name: 'Mariana Lopes', email: 'mariana.lopes@empresa.com', area: 'Comercial' };
 export const units: Unit[] = [
@@ -35,6 +36,10 @@ export const fleetReservations: FleetReservation[] = [
   { id: 'RES-002', tripId: 'TR-2026-024', driver: 'Carlos Duarte', startDate: '25 ago', endDate: '28 ago', status: 'Aguardando veículo' },
 ];
 export const fleetEvents: FleetEvent[] = [];
+export const fleetWorkOrders: FleetWorkOrder[] = [
+  { id: 'OS-2026-014', vehicleId: 'VEI-001', km: 65000, maintenanceDate: '08 jul 2026', observation: 'Troca de óleo, filtros e revisão do sistema de freios.', cost: 1850, status: 'Concluída' },
+  { id: 'OS-2026-009', vehicleId: 'VEI-003', km: 85000, maintenanceDate: '22 mai 2026', observation: 'Revisão preventiva de suspensão e pneus.', cost: 1240, status: 'Concluída' },
+];
 export const approvalQueue = [
   { id: 'TR-2026-028', traveler: 'Rafael Benítez', destination: 'Asunción', dates: '02–05 set', client: 'Cooperativa Central', amount: 920, area: 'Serviços' },
   { id: 'TR-2026-026', traveler: 'Lucía Ferreira', destination: 'Encarnación', dates: '26–28 ago', client: 'Bioenergia Sul', amount: 480, area: 'Comercial' },

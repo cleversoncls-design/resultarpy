@@ -1,0 +1,23 @@
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { ScreenContainer } from '@/components/screen-container';
+import { PrimaryButton, SectionHeader } from '@/components/app-ui';
+import { formatCurrency, vehicles } from '@/lib/demo-data';
+import { useColors } from '@/hooks/use-colors';
+
+export default function NewWorkOrderScreen() {
+  const colors = useColors();
+  const [vehicleId, setVehicleId] = useState(vehicles[0].id);
+  const [km, setKm] = useState('');
+  const [date, setDate] = useState('');
+  const [observation, setObservation] = useState('');
+  const [cost, setCost] = useState('');
+  const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+  const save = () => {
+    if (!km || !date || !observation || !cost) { Alert.alert('Preencha os dados da manutenção', 'Informe KM, data, observação e custo.'); return; }
+    Alert.alert('Ordem de Serviço registrada', `${selectedVehicle?.brand} ${selectedVehicle?.model} · ${formatCurrency(Number(cost.replace(',', '.')) || 0)}`, [{ text: 'Voltar para Frota', onPress: () => router.replace('/fleet') }]);
+  };
+  return <ScreenContainer edges={['top', 'bottom', 'left', 'right']} className="px-5 pt-4"><View className="w-full max-w-4xl flex-1 self-center"><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}><Pressable onPress={() => router.back()} className="mb-5"><Text className="font-semibold text-primary">‹ Voltar para Frota</Text></Pressable><Text className="text-sm font-medium text-muted">Administrativo · Manutenção</Text><Text className="mt-1 text-3xl font-bold text-foreground">Nova Ordem de Serviço</Text><Text className="mt-2 text-sm leading-5 text-muted">Registre a manutenção realizada para atualizar o histórico e a próxima referência de KM do veículo.</Text><SectionHeader title="Veículo em manutenção" /><View className="rounded-2xl border border-border bg-surface p-5">{vehicles.map((vehicle) => <Pressable key={vehicle.id} onPress={() => setVehicleId(vehicle.id)} style={{ borderColor: vehicle.id === vehicleId ? colors.primary : colors.border, backgroundColor: vehicle.id === vehicleId ? `${colors.primary}10` : colors.background }} className="mb-2 rounded-xl border p-3"><Text className="font-bold text-foreground">{vehicle.brand} {vehicle.model}</Text><Text className="mt-1 text-xs text-muted">{vehicle.plate} · KM atual {vehicle.currentKm.toLocaleString('pt-BR')}</Text></Pressable>)}</View><SectionHeader title="Dados da manutenção" /><View className="rounded-2xl border border-border bg-surface p-5"><Field label="KM do veículo" value={km} onChangeText={setKm} placeholder="Ex.: 75000" keyboardType="numeric" /><Field label="Data da manutenção" value={date} onChangeText={setDate} placeholder="Ex.: 20 ago 2026" /><Field label="Custo da manutenção" value={cost} onChangeText={setCost} placeholder="Ex.: 1850,00" keyboardType="decimal-pad" /><Text className="mb-2 text-xs font-semibold text-muted">Observação</Text><TextInput value={observation} onChangeText={setObservation} multiline placeholder="Descreva os serviços executados, peças trocadas ou recomendações..." placeholderTextColor={colors.muted} className="min-h-[110px] rounded-xl border border-border bg-background px-4 py-3 text-foreground" /></View><PrimaryButton label="Registrar Ordem de Serviço" onPress={save} /></ScrollView></View></ScreenContainer>;
+}
+function Field({ label, value, onChangeText, placeholder, keyboardType }: { label: string; value: string; onChangeText: (value: string) => void; placeholder: string; keyboardType?: 'numeric' | 'decimal-pad' }) { const colors = useColors(); return <View className="mb-4"><Text className="mb-2 text-xs font-semibold text-muted">{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} keyboardType={keyboardType} placeholderTextColor={colors.muted} className="rounded-xl border border-border bg-background px-4 py-3 text-foreground" /></View>; }

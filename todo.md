@@ -40,3 +40,11 @@
 - [x] Implementar alerta de extintor com 30 dias de antecedência
 - [x] Alterar automaticamente o status para ação administrativa quando houver avaria
 - [x] Validar fluxos de administrador e viajante em desktop e mobile
+
+## Ordens de Serviço da Frota
+
+- [x] Criar modelo de Ordem de Serviço vinculada a um veículo
+- [x] Implementar formulário com veículo, KM, data, observação e custo da manutenção
+- [x] Exibir lista de Ordens de Serviço no painel de Frota
+- [x] Atualizar a última manutenção e o status do veículo a partir da Ordem de Serviço
+- [x] Validar tipos, lint, testes e fluxo web desktop
