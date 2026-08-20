@@ -70,3 +70,9 @@
 
 - [x] Permitir abrir o preview com o perfil definido na URL
 - [x] Gerar e validar links diretos para Viajante, Viajante + Aprovador e Administrativo
+
+## Correção dos links de visualização
+
+- [x] Criar rotas de entrada estáveis para Viajante, Aprovador e Administrativo
+- [x] Testar cada link diretamente no preview web desktop
+- [x] Entregar somente links confirmados como funcionais
