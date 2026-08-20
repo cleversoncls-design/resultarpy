@@ -21,7 +21,6 @@ const MAPPING = {
   'gearshape.fill': 'settings',
   'globe': 'language',
   'moon.fill': 'dark-mode',
-  'camera.fill': 'photo-camera',
   'paperplane.fill': 'send',
   'bell.fill': 'notifications',
   'magnifyingglass': 'search',
@@ -29,6 +28,12 @@ const MAPPING = {
   'xmark': 'close',
   'checkmark': 'check',
   'arrow.up.right': 'north-east',
+  'car.fill': 'directions-car',
+  'wrench.and.screwdriver.fill': 'build',
+  'calendar.badge.clock': 'event-available',
+  'exclamationmark.triangle.fill': 'warning',
+  'camera.fill': 'photo-camera',
+  'gauge.medium': 'speed',
 } as IconMapping;
 
 export function IconSymbol({ name, size = 24, color, style }: { name: IconSymbolName; size?: number; color: string | OpaqueColorValue; style?: StyleProp<TextStyle>; weight?: SymbolWeight }) {

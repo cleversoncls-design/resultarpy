@@ -22,3 +22,21 @@
 - [x] Criar shell desktop com navegação lateral e cabeçalho operacional
 - [x] Adaptar dashboard, viagens, aprovações, operação, despesas e relatórios para telas largas
 - [x] Validar responsividade desktop e mobile após a reconstrução web
+
+## Controle de Frota
+
+- [x] Criar modelo de domínio de veículos, reservas, viagens de frota, manutenções, alertas e eventos
+- [x] Reutilizar unidades e viajantes do Controle de Viagens
+- [x] Implementar cadastro de veículos com dados técnicos, unidade, quilometragem, manutenção, extintor e observações
+- [x] Implementar painel administrativo de frota com status Disponível, Reservado, Em viagem, Realizar Manutenção, Em manutenção, Extintor próximo do vencimento e Avaria registrada
+- [x] Implementar reserva de veículo vinculada a viagem aberta que solicitou veículo de frota
+- [x] Implementar associação de veículo disponível e condutor à reserva
+- [x] Implementar início da viagem com data de saída e quilometragem inicial
+- [x] Implementar finalização da viagem com data de retorno e quilometragem final
+- [x] Implementar cálculo de quilometragem percorrida e atualização do KM atual do veículo
+- [x] Implementar registro de multas, avarias e outros eventos com observações e anexos de fotos
+- [x] Implementar alerta preventivo de manutenção com faixa de 3% abaixo e até 3% acima do intervalo configurado
+- [x] Implementar bloqueio manual do veículo como Em manutenção e liberação administrativa
+- [x] Implementar alerta de extintor com 30 dias de antecedência
+- [x] Alterar automaticamente o status para ação administrativa quando houver avaria
+- [x] Validar fluxos de administrador e viajante em desktop e mobile
