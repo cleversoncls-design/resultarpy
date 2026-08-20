@@ -48,3 +48,20 @@
 - [x] Exibir lista de Ordens de Serviço no painel de Frota
 - [x] Atualizar a última manutenção e o status do veículo a partir da Ordem de Serviço
 - [x] Validar tipos, lint, testes e fluxo web desktop
+
+## Separação de permissões da Frota
+
+- [x] Remover Frota da navegação principal do perfil Viajante
+- [x] Manter Frota, veículos, reservas, manutenção e Ordens de Serviço exclusivos do Administrativo
+- [x] Exibir ao Viajante somente o veículo atribuído dentro do detalhe da viagem
+- [x] Restringir ações do Viajante a iniciar, finalizar, informar KM e registrar ocorrências com anexos
+- [x] Validar a navegação e os fluxos separados por perfil
+
+## Matriz de permissões revisada
+
+- [x] Definir Viajante com acesso a viagens próprias, gastos e operação do veículo atribuído
+- [x] Definir Aprovador como extensão do Viajante com acesso adicional às aprovações
+- [x] Definir Administrativo com acesso completo à Frota, operações, relatórios, aprovações e solicitações
+- [x] Permitir ao Administrativo solicitar viagens e veículos pelo mesmo fluxo do Viajante
+- [x] Ajustar dashboard e navegação conforme a matriz de permissões
+- [x] Validar os três perfis em desktop responsivo
