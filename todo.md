@@ -76,3 +76,9 @@
 - [x] Criar rotas de entrada estáveis para Viajante, Aprovador e Administrativo
 - [x] Testar cada link diretamente no preview web desktop
 - [x] Entregar somente links confirmados como funcionais
+
+## Seletor interno de perfis demonstrativos
+
+- [x] Adicionar seletor visível de perfil na interface web
+- [x] Permitir alternar entre Viajante, Viajante + Aprovador e Administrativo sem alterar a URL
+- [x] Atualizar navegação e dashboard imediatamente após a troca de perfil
