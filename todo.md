@@ -65,3 +65,8 @@
 - [x] Permitir ao Administrativo solicitar viagens e veículos pelo mesmo fluxo do Viajante
 - [x] Ajustar dashboard e navegação conforme a matriz de permissões
 - [x] Validar os três perfis em desktop responsivo
+
+## Links de visualização por perfil
+
+- [x] Permitir abrir o preview com o perfil definido na URL
+- [x] Gerar e validar links diretos para Viajante, Viajante + Aprovador e Administrativo
