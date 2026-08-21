@@ -129,3 +129,9 @@
 - [x] Corrigir o valor a faturar para usar o gasto quando for menor ou igual ao limite
 - [x] Corrigir o valor a faturar para usar o limite quando o gasto ultrapassar o teto
 - [x] Corrigir os totais do período e adicionar teste para hospedagem de R$ 86,00 com teto de R$ 80,00
+
+## Recuperação da pré-visualização
+
+- [x] Corrigir rota de entrada de perfil com exportação padrão
+- [x] Registrar rotas de reembolso e faturamento no grupo Tabs
+- [x] Restaurar e validar a pré-visualização web após recompilação
