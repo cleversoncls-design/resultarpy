@@ -31,7 +31,7 @@ export default function HomeScreen() {
         </View>
 
         <SectionHeader title="Visão geral" />
-        <View className={isNarrow ? 'mb-7 flex-col gap-3' : 'mb-7 flex-row gap-3'}><MetricCard label="Em andamento" value="01" accent={colors.primary} /><MetricCard label="Aguardando" value="02" accent={colors.warning} /><MetricCard label="Total no mês" value="R$ 2,8k" accent={colors.success} /></View>
+        <View className={isNarrow ? 'mb-7 flex-col gap-3' : 'mb-7 flex-row gap-3'}><MetricCard label="Em andamento" value="01" accent={colors.primary} /><MetricCard label="Aguardando" value="02" accent={colors.warning} /><MetricCard label="Total no mês" value={formatCurrency(2800)} accent={colors.success} /></View>
 
         <SectionHeader title="Ações rápidas" />
         <View className={isNarrow ? 'mb-7 flex-col gap-3' : 'mb-7 flex-row gap-3'}><View className="flex-1"><PrimaryButton label="Nova viagem" onPress={() => router.push('/new-trip')} /></View><View className="flex-1"><Pressable onPress={() => router.push('/expenses')} style={({ pressed }) => [{ borderColor: colors.border, borderWidth: 1, backgroundColor: colors.surface, minHeight: 50, paddingHorizontal: 16, paddingVertical: 14, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 }]}><IconSymbol name="wallet.pass.fill" size={18} color={colors.primary} /><Text className="ml-2 font-bold text-foreground">Lançar despesa</Text></Pressable></View></View>

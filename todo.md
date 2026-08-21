@@ -148,3 +148,10 @@
 - [x] Aplicar a moeda selecionada na formatação monetária de todo o sistema
 - [x] Persistir a configuração global e refletir a alteração para todos os perfis
 - [x] Validar relatórios, despesas, adiantamentos e dashboards nas três moedas
+
+## Revisão global dos campos monetários
+
+- [x] Mapear valores fixos em R$ ou formatações monetárias fora do formatador global
+- [x] Corrigir dashboard, viagens, despesas, adiantamentos, frota, manutenção e relatórios
+- [x] Validar todos os perfis com a moeda configurada como G$
+- [x] Confirmar que nenhum valor monetário permanece em R$ indevidamente
