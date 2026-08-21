@@ -10,12 +10,12 @@ export function StatusPill({ status }: { status: TripStatus | string }) {
 
 export function PrimaryButton({ label, onPress, compact = false }: { label: string; onPress?: () => void; compact?: boolean }) {
   const colors = useColors();
-  return <Pressable onPress={onPress} style={({ pressed }) => [{ backgroundColor: colors.primary, minHeight: compact ? 40 : 50, paddingHorizontal: compact ? 16 : 20, paddingVertical: compact ? 10 : 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] }]}><Text className="font-bold text-white">{label}</Text></Pressable>;
+  return <Pressable onPress={onPress} style={({ pressed }) => [{ backgroundColor: colors.primary, minHeight: compact ? 40 : 50, paddingHorizontal: compact ? 16 : 20, paddingVertical: compact ? 10 : 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] }]}><Text className="font-bold text-white">{label}</Text></Pressable>;
 }
 
 export function SecondaryButton({ label, onPress }: { label: string; onPress?: () => void }) {
   const colors = useColors();
-  return <Pressable onPress={onPress} style={({ pressed }) => [{ borderColor: colors.border, borderWidth: 1, backgroundColor: colors.surface, minHeight: 50, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 }]}><Text className="font-bold text-foreground">{label}</Text></Pressable>;
+  return <Pressable onPress={onPress} style={({ pressed }) => [{ borderColor: colors.border, borderWidth: 1, backgroundColor: colors.surface, minHeight: 50, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 }]}><Text className="font-bold text-foreground">{label}</Text></Pressable>;
 }
 
 export function SectionHeader({ title, action }: { title: string; action?: string }) {
@@ -24,7 +24,7 @@ export function SectionHeader({ title, action }: { title: string; action?: strin
 
 export function MetricCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
   const colors = useColors();
-  return <View className="flex-1 rounded-2xl border border-border bg-surface p-4"><Text className="text-xs font-medium text-muted">{label}</Text><Text style={{ color: accent ?? colors.foreground }} className="mt-2 text-2xl font-bold">{value}</Text></View>;
+  return <View className="flex-1 rounded-xl border border-border bg-surface p-4"><Text className="text-xs font-medium text-muted">{label}</Text><Text style={{ color: accent ?? colors.foreground }} className="mt-2 text-2xl font-bold">{value}</Text></View>;
 }
 
 export function EmptyState({ title, detail }: { title: string; detail: string }) {

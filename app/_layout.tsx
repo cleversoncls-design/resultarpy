@@ -1,6 +1,6 @@
 import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -10,6 +10,7 @@ import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { DemoRoleProvider } from "@/lib/demo-role";
 import { CurrencyProvider } from "@/lib/currency-provider";
+import { DesktopRouteShell } from "@/components/desktop-route-shell";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -30,7 +31,10 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  const pathname = usePathname();
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
+  const standaloneRoutes = ['/new-trip', '/expenses', '/fleet-reservation', '/maintenance-report', '/new-vehicle', '/new-work-order', '/trip-detail', '/administrativo', '/aprovador', '/viajante'];
+  const useStandaloneShell = Platform.OS === 'web' && standaloneRoutes.some((route) => pathname.startsWith(route));
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
@@ -87,10 +91,7 @@ export default function RootLayout() {
         <CurrencyProvider>
           <TrpcProvider client={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="oauth/callback" />
-              </Stack>
+              {useStandaloneShell ? <DesktopRouteShell><Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack></DesktopRouteShell> : <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack>}
               <StatusBar style="auto" />
             </QueryClientProvider>
           </TrpcProvider>

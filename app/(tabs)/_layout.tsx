@@ -6,9 +6,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
 import { useDemoRole } from '@/lib/demo-role';
 
+function demoRoleLabel(role: string) { return role === 'Administrativo' ? 'Perfil Administrativo' : role === 'Aprovador' ? 'Perfil Aprovador' : 'Perfil Viajante'; }
+
 const navItems = [
   { label: 'Visão geral', path: '/', icon: 'house.fill' as const },
   { label: 'Minhas viagens', path: '/trips', icon: 'airplane' as const },
+  { label: 'Nova solicitação', path: '/new-trip', icon: 'plus' as const },
   { label: 'Aprovações', path: '/approvals', icon: 'checkmark.seal.fill' as const },
   { label: 'Operação', path: '/operations', icon: 'briefcase.fill' as const },
   { label: 'Frota', path: '/fleet', icon: 'car.fill' as const },
@@ -49,35 +52,32 @@ export default function TabLayout() {
 
   return (
     <View style={{ backgroundColor: colors.background }} className="flex-1 flex-row">
-      <View style={{ borderRightColor: colors.border, backgroundColor: colors.surface }} className="w-64 border-r px-5 py-8">
-        <View className="mb-6 flex-row items-center">
-          <View style={{ backgroundColor: colors.primary }} className="h-10 w-10 items-center justify-center rounded-xl">
-            <Text className="font-bold text-white">CV</Text>
+      <View style={{ borderRightColor: colors.border, backgroundColor: colors.surface }} className="w-[252px] border-r px-5 py-6">
+        <View className="mb-7 flex-row items-center px-1">
+          <View style={{ backgroundColor: colors.primary }} className="h-9 w-9 items-center justify-center rounded-xl">
+            <IconSymbol name="airplane" size={18} color="white" />
           </View>
-          <View className="ml-3">
-            <Text className="text-base font-bold text-foreground">Controle de</Text>
-            <Text className="text-base font-bold text-primary">Viagens</Text>
-          </View>
+          <Text className="ml-3 text-base font-bold text-foreground">Controle de Viagens</Text>
         </View>
-        <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]} className="mb-6 rounded-xl border border-border p-3">
+        <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]} className="mb-6 px-1">
           <Text className="text-[10px] font-bold uppercase tracking-widest text-muted">Perfil de teste</Text>
           <Text className="mt-1 text-sm font-bold text-primary">{role}</Text>
           <Text className="mt-1 text-xs text-muted">Clique para trocar a visão</Text>
         </Pressable>
-        <Text className="mb-3 px-3 text-[11px] font-bold uppercase tracking-widest text-muted">Workspace</Text>
+        <Text className="mb-3 px-2 text-[11px] font-bold uppercase tracking-widest text-muted">Workspace</Text>
         {visibleNavItems.map((item) => {
           const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
           return (
-            <Pressable key={item.path} onPress={() => router.push(item.path as never)} style={({ pressed }) => [{ backgroundColor: active ? `${colors.primary}16` : 'transparent', opacity: pressed ? 0.7 : 1 }]} className="mb-1 flex-row items-center rounded-xl px-3 py-3">
-              <IconSymbol name={item.icon} size={20} color={active ? colors.primary : colors.muted} />
-              <Text style={{ color: active ? colors.primary : colors.foreground }} className="ml-3 text-sm font-semibold">{item.label}</Text>
+            <Pressable key={item.path} onPress={() => router.push(item.path as never)} style={({ pressed }) => [{ backgroundColor: active ? colors.primary : 'transparent', opacity: pressed ? 0.7 : 1 }]} className="mb-1 flex-row items-center rounded-xl px-3 py-3">
+              <IconSymbol name={item.icon} size={19} color={active ? 'white' : colors.muted} />
+              <Text style={{ color: active ? 'white' : colors.foreground }} className="ml-3 text-sm font-semibold">{item.label}</Text>
               {item.label === 'Aprovações' ? <View style={{ backgroundColor: colors.warning }} className="ml-auto h-5 min-w-5 items-center justify-center rounded-full px-1"><Text className="text-[10px] font-bold text-white">2</Text></View> : null}
             </Pressable>
           );
         })}
-        <View className="mt-auto rounded-2xl p-4" style={{ backgroundColor: `${colors.primary}12` }}>
-          <Text className="text-xs font-bold text-primary">AMBIENTE CORPORATIVO</Text>
-          <Text className="mt-2 text-xs leading-4 text-muted">Operação centralizada para viagens, gastos e aprovações.</Text>
+        <View className="mt-auto border-t border-border pt-4">
+          <Text className="px-1 text-xs font-semibold text-foreground">{demoRoleLabel(role)}</Text>
+          <Text className="mt-1 px-1 text-xs text-muted">Configurações, idioma e tema no Perfil</Text>
         </View>
       </View>
       <View className="flex-1">{tabs}</View>

@@ -155,3 +155,10 @@
 - [x] Corrigir dashboard, viagens, despesas, adiantamentos, frota, manutenção e relatórios
 - [x] Validar todos os perfis com a moeda configurada como G$
 - [x] Confirmar que nenhum valor monetário permanece em R$ indevidamente
+
+## Variação visual inspirada nas referências
+
+- [x] Criar sidebar clara com navegação ativa em preto e controles de idioma/tema no rodapé
+- [x] Reorganizar dashboard em métricas e cartões de ação no estilo das referências
+- [x] Reestruturar telas administrativas em seções e tabelas mais próximas dos exemplos
+- [x] Validar responsividade, perfis, moeda global e fluxos existentes após a mudança visual
