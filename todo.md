@@ -135,3 +135,9 @@
 - [x] Corrigir rota de entrada de perfil com exportação padrão
 - [x] Registrar rotas de reembolso e faturamento no grupo Tabs
 - [x] Restaurar e validar a pré-visualização web após recompilação
+
+## Correção da regra de reembolso por evento
+
+- [x] Ajustar o valor reembolsável para ser o menor entre gasto informado e limite por evento
+- [x] Garantir que o excedente seja calculado apenas quando o gasto ultrapassar o limite
+- [x] Validar o relatório com eventos abaixo, iguais e acima do limite
