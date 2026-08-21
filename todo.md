@@ -226,3 +226,9 @@
 - [x] Traduzir Minhas viagens, Nova solicitação, Aprovações, Operação e Perfil
 - [ ] Traduzir Relatórios, Reembolso, Frota, Cadastros e detalhes
 - [x] Validar troca para Español sem recarregar e persistência após navegação
+
+## Recuperação do link de preview
+
+- [x] Verificar o estado do servidor e do endereço atual
+- [x] Recuperar ou gerar um novo link de preview funcional
+- [x] Validar o acesso ao novo link em desktop
