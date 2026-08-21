@@ -169,3 +169,10 @@
 - [x] Reposicionar a navegação e o bloco de perfil para reproduzir a hierarquia visual dos exemplos
 - [x] Aplicar cartões de acesso rápido com dimensões, espaçamento e agrupamento visivelmente distintos
 - [x] Validar a nova versão lado a lado em desktop e mobile antes de criar novo checkpoint
+
+## Correção do tema claro
+
+- [x] Mapear superfícies, textos e bordas fixados no tema escuro
+- [x] Corrigir dashboard, sidebar e cartões para respeitar o tema claro
+- [x] Validar contraste e consistência entre claro, escuro e sistema
+- [x] Confirmar que a moeda global e os estados de status permanecem legíveis
