@@ -176,3 +176,9 @@
 - [x] Corrigir dashboard, sidebar e cartões para respeitar o tema claro
 - [x] Validar contraste e consistência entre claro, escuro e sistema
 - [x] Confirmar que a moeda global e os estados de status permanecem legíveis
+
+## Menu com interação visual
+
+- [x] Alinhar cada ícone diretamente ao lado do texto do menu
+- [x] Criar retângulo arredondado para hover e item ativo
+- [x] Validar menu nos temas claro e escuro e em larguras responsivas

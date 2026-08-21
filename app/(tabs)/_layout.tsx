@@ -1,5 +1,6 @@
 import { Tabs, router, usePathname } from 'expo-router';
 import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -24,6 +25,7 @@ export default function TabLayout() {
   const { role } = useDemoRole();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const isCompactWeb = Platform.OS === 'web' && width < 900;
   const canApprove = role === 'Aprovador' || role === 'Administrativo';
   const canAdmin = role === 'Administrativo';
@@ -68,9 +70,9 @@ export default function TabLayout() {
         {visibleNavItems.map((item) => {
           const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
           return (
-            <Pressable key={item.path} onPress={() => router.push(item.path as never)} style={({ pressed }) => [{ backgroundColor: active ? colors.primary : 'transparent', opacity: pressed ? 0.7 : 1 }]} className="mb-1 flex-row items-center rounded-xl px-3 py-3">
-              <IconSymbol name={item.icon} size={19} color={active ? 'white' : colors.muted} />
-              <Text style={{ color: active ? 'white' : colors.foreground }} className="ml-3 text-sm font-semibold">{item.label}</Text>
+            <Pressable key={item.path} onPress={() => router.push(item.path as never)} onHoverIn={() => setHoveredPath(item.path)} onHoverOut={() => setHoveredPath(null)} style={({ pressed }) => [{ backgroundColor: active ? colors.primary : hoveredPath === item.path ? `${colors.primary}12` : 'transparent', borderRadius: 10, flexDirection: 'row', alignItems: 'center', minHeight: 42, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 4, opacity: pressed ? 0.72 : 1 }]}>
+              <IconSymbol name={item.icon} size={19} color={active ? 'white' : hoveredPath === item.path ? colors.primary : colors.muted} />
+              <Text style={{ color: active ? 'white' : hoveredPath === item.path ? colors.primary : colors.foreground, marginLeft: 12, fontSize: 14, fontWeight: '600' }}>{item.label}</Text>
               {item.label === 'Aprovações' ? <View style={{ backgroundColor: colors.warning }} className="ml-auto h-5 min-w-5 items-center justify-center rounded-full px-1"><Text className="text-[10px] font-bold text-white">2</Text></View> : null}
             </Pressable>
           );
