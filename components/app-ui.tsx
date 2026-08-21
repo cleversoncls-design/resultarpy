@@ -1,11 +1,13 @@
 import { Pressable, Text, View } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
 import type { TripStatus } from '@/lib/demo-data';
+import { useLanguage } from '@/lib/language-provider';
 
 export function StatusPill({ status }: { status: TripStatus | string }) {
   const colors = useColors();
+  const { t } = useLanguage();
   const tone = status.includes('Final') || status.includes('Liber') || status.includes('Aprov') ? { backgroundColor: `${colors.success}22`, color: colors.success } : status.includes('Reje') || status.includes('Devol') ? { backgroundColor: `${colors.error}22`, color: colors.error } : { backgroundColor: `${colors.warning}25`, color: colors.warning };
-  return <View style={{ backgroundColor: tone.backgroundColor, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' }}><Text style={{ color: tone.color }} className="text-xs font-semibold">{status}</Text></View>;
+  return <View style={{ backgroundColor: tone.backgroundColor, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' }}><Text style={{ color: tone.color }} className="text-xs font-semibold">{t(status)}</Text></View>;
 }
 
 export function PrimaryButton({ label, onPress, compact = false }: { label: string; onPress?: () => void; compact?: boolean }) {

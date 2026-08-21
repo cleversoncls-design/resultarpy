@@ -2,40 +2,35 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type AppLanguage = 'pt-BR' | 'es-ES';
-
 export const languageOptions: { key: AppLanguage; label: string; flag: string }[] = [
   { key: 'pt-BR', label: 'Português', flag: '🇧🇷' },
   { key: 'es-ES', label: 'Español', flag: '🇪🇸' },
 ];
 
-type LanguageContextValue = {
-  language: AppLanguage;
-  setLanguage: (language: AppLanguage) => void;
+type TranslationKey = string;
+const translations: Record<TranslationKey, string> = {
+  'Controle de Viagens': 'Control de Viajes', 'Em prestação': 'En rendición', 'Aguardando aprovação': 'Pendiente de aprobación', 'Finalizada': 'Finalizada', 'Solicitada': 'Solicitada', 'Aprovada': 'Aprobada', 'Rejeitada': 'Rechazada', 'Devolvida': 'Devuelta', 'Liberado': 'Liberado', 'Pendências do ambiente': 'Pendientes del entorno', 'aprovações aguardando': 'aprobaciones pendientes', 'Solicitações da sua equipe e preparações administrativas.': 'Solicitudes de su equipo y preparaciones administrativas.', 'Perfil de teste': 'Perfil de prueba', 'Clique para trocar a visão': 'Haz clic para cambiar la vista',
+  'Workspace': 'Espacio de trabajo', 'Visão geral': 'Vista general', 'Painel': 'Panel', 'Minhas viagens': 'Mis viajes', 'Nova solicitação': 'Nueva solicitud',
+  'Nova solicitação de viagem': 'Nueva solicitud de viaje', 'Aprovações': 'Aprobaciones', 'Operação': 'Operación', 'Frota': 'Flota', 'Relatório de reembolso': 'Informe de reembolso', 'Relatórios': 'Informes', 'Cadastros': 'Registros',
+  'Preparação': 'Preparación', 'Revisão de fechamento': 'Revisión de cierre', 'Resumo por cliente': 'Resumen por cliente', 'Relatório analítico': 'Informe analítico',
+  'Configurações e preferências': 'Configuración y preferencias', 'Idioma': 'Idioma', 'Aparência': 'Apariencia', 'Sistema': 'Sistema', 'Claro': 'Claro', 'Escuro': 'Oscuro',
+  'Bom dia,': 'Buenos días,', 'Perfil: Administrativo': 'Perfil: Administrativo', 'Perfil: Aprovador': 'Perfil: Aprobador', 'Perfil: Viajante': 'Perfil: Viajero',
+  'Total de viagens': 'Total de viajes', 'Em preparação': 'En preparación', 'Fechamento enviado': 'Cierre enviado', 'Próxima atividade': 'Próxima actividad', 'Ver tudo': 'Ver todo', 'Acesso rápido': 'Acceso rápido',
+  'Acompanhar e criar solicitações': 'Acompañar y crear solicitudes', 'Solicitar uma viagem': 'Solicitar un viaje', 'Aprovar ou rejeitar viagens': 'Aprobar o rechazar viajes', 'Despesas detalhadas': 'Gastos detallados', 'Agrupado por cliente e conceito': 'Agrupado por cliente y concepto', 'Adiantamento, veículo e hotel': 'Anticipo, vehículo y hotel', 'Conferir despesas e finalizar': 'Revisar gastos y finalizar', 'Gestão das tabelas-base': 'Gestión de tablas base',
+  'Controle operacional': 'Control operativo', 'Todas': 'Todas', 'Em andamento': 'En curso', 'Finalizadas': 'Finalizadas', 'Cliente': 'Cliente', 'Adiantamento': 'Anticipo', 'Não solicitado': 'No solicitado', 'Abrir detalhes ›': 'Abrir detalles ›', 'Nenhuma viagem': 'Ningún viaje', 'Criar solicitação': 'Crear solicitud',
+  'Voltar': 'Volver', 'Gestão da equipe': 'Gestión del equipo', 'Revise destino, cliente e adiantamento antes de liberar cada viagem.': 'Revise destino, cliente y anticipo antes de liberar cada viaje.', 'Rejeitar': 'Rechazar', 'Aprovar': 'Aprobar', 'Tudo em dia': 'Todo al día', 'Não há solicitações pendentes para revisão.': 'No hay solicitudes pendientes para revisión.', 'Viagem aprovada': 'Viaje aprobado', 'Viagem rejeitada': 'Viaje rechazado', 'A solicitação avançou para o Administrativo.': 'La solicitud avanzó al área Administrativa.', 'O viajante receberá a solicitação para correção.': 'El viajero recibirá la solicitud para corrección.', 'Destino da viagem': 'Destino del viaje', 'Início': 'Inicio', 'Fim': 'Fin', 'Área responsável': 'Área responsable', 'Unidade de atendimento': 'Unidad de atención', 'Meio de transporte': 'Medio de transporte', 'Veículo da frota': 'Vehículo de la flota', 'Veículo próprio': 'Vehículo propio', 'Ônibus': 'Autobús', 'Passagem aérea': 'Pasaje aéreo', 'Sim': 'Sí', 'Não': 'No', 'estimados': 'estimados', 'Sem adiantamento': 'Sin anticipo', 'Salvar rascunho': 'Guardar borrador', 'Enviar para aprovação': 'Enviar para aprobación', 'Destino obrigatório': 'Destino obligatorio', 'Informe a cidade de destino para continuar.': 'Indique la ciudad de destino para continuar.', 'Solicitação enviada': 'Solicitud enviada', 'A viagem foi encaminhada ao aprovador da área.': 'El viaje fue enviado al aprobador del área.', 'Ver minhas viagens': 'Ver mis viajes', 'Rascunho salvo': 'Borrador guardado', 'A solicitação ficará disponível para continuar depois.': 'La solicitud estará disponible para continuar después.', 'Preencha os dados essenciais. Você poderá complementar a prestação depois.': 'Complete los datos esenciales. Podrá complementar la rendición después.', 'Comercial': 'Comercial', 'Cooperativa Central': 'Cooperativa Central', 'Relatório restrito': 'Informe restringido', 'Viajante · Prestação de contas': 'Viajero · Rendición de cuentas', 'Reembolso ao viajante': 'Reembolso al viajero', 'Consulte quanto será reembolsado em cada evento, conforme o limite definido para o tipo de gasto e a cidade da viagem.': 'Consulte cuánto se reembolsará en cada evento, según el límite definido para el tipo de gasto y la ciudad del viaje.', 'Filtrar por viagem': 'Filtrar por viaje', 'Gasto informado': 'Gasto informado', 'A reembolsar': 'A reembolsar', 'Excedente': 'Excedente', 'Eventos de gasto': 'Eventos de gasto', 'O reembolso de cada evento corresponde ao gasto informado quando ele está dentro do limite. Quando ultrapassa o teto por cidade e conceito, o reembolso fica limitado ao valor máximo do evento.': 'El reembolso de cada evento corresponde al gasto informado cuando está dentro del límite. Cuando supera el tope por ciudad y concepto, el reembolso queda limitado al valor máximo del evento.', 'Adiantamento já pago': 'Anticipo ya pagado', 'Excedente não reembolsável: ': 'Excedente no reembolsable: ', 'Dentro do limite': 'Dentro del límite', 'Administrativo · Relatório financeiro': 'Administrativo · Informe financiero', 'Detalhamento por viagem e cliente, com comparação entre gasto realizado, limite faturável e valor a faturar.': 'Detalle por viaje y cliente, comparando gasto realizado, límite facturable y valor a facturar.', 'Filtros do relatório': 'Filtros del informe', 'Viagem': 'Viaje', 'Todos': 'Todos', 'Período atual': 'Período actual', 'Mês anterior': 'Mes anterior', 'Total de gastos': 'Total de gastos', 'Limite faturável': 'Límite facturable', 'Total a faturar': 'Total a facturar', 'Detalhamento do período': 'Detalle del período', 'Viagem / Cliente': 'Viaje / Cliente', 'Qtd.': 'Cant.', 'TOTAL DO PERÍODO SELECIONADO': 'TOTAL DEL PERÍODO SELECCIONADO', 'O valor a faturar considera o menor valor entre o gasto realizado e o limite definido para o cliente. Se o gasto exceder o teto, o cliente é faturado somente pelo limite aplicado.': 'El valor a facturar es el menor entre el gasto realizado y el límite definido para el cliente. Si el gasto supera el tope, el cliente se factura solo por el límite aplicado.', 'Este relatório contém valores de faturamento ao cliente e está disponível somente para o perfil Administrativo.': 'Este informe contiene valores de facturación al cliente y está disponible solo para el perfil Administrativo.', 'Exportar': 'Exportar', 'Planilha': 'Hoja de cálculo', 'Período': 'Período', 'Data': 'Fecha', 'Cidade': 'Ciudad', 'Conceito': 'Concepto', 'Quantidade': 'Cantidad', 'Gasto': 'Gasto', 'Limite': 'Límite', 'Diferença': 'Diferencia', 'A faturar': 'A facturar',
 };
 
-const LanguageContext = createContext<LanguageContextValue | null>(null);
 const LANGUAGE_KEY = 'controle-viagens-language';
+type LanguageContextValue = { language: AppLanguage; setLanguage: (language: AppLanguage) => void; t: (text: string) => string };
+const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<AppLanguage>('pt-BR');
-
-  useEffect(() => {
-    AsyncStorage.getItem(LANGUAGE_KEY).then((saved) => {
-      if (saved === 'pt-BR' || saved === 'es-ES') setLanguageState(saved);
-    });
-  }, []);
-
-  const setLanguage = (next: AppLanguage) => {
-    setLanguageState(next);
-    void AsyncStorage.setItem(LANGUAGE_KEY, next);
-  };
-
-  const value = useMemo(() => ({ language, setLanguage }), [language]);
+  useEffect(() => { AsyncStorage.getItem(LANGUAGE_KEY).then((saved) => { if (saved === 'pt-BR' || saved === 'es-ES') setLanguageState(saved); }); }, []);
+  const setLanguage = (next: AppLanguage) => { setLanguageState(next); void AsyncStorage.setItem(LANGUAGE_KEY, next); };
+  const t = (text: string) => language === 'es-ES' ? (translations[text] ?? text) : text;
+  const value = useMemo(() => ({ language, setLanguage, t }), [language]);
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
-
-export function useLanguage() {
-  const context = useContext(LanguageContext);
-  if (!context) throw new Error('useLanguage must be used within LanguageProvider');
-  return context;
-}
+export function useLanguage() { const context = useContext(LanguageContext); if (!context) throw new Error('useLanguage must be used within LanguageProvider'); return context; }

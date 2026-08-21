@@ -218,3 +218,11 @@
 - [x] Criar painel suspenso de Aparência com Sistema, Claro e Escuro
 - [x] Criar indicador circular para a opção ativa e fechar o painel após seleção
 - [x] Remover os controles compactos anteriores e validar desktop, mobile e temas
+
+## Tradução efetiva PT/ES
+
+- [x] Criar catálogo de traduções para Português e Espanhol
+- [x] Fazer o menu e o dashboard reagirem ao idioma selecionado
+- [x] Traduzir Minhas viagens, Nova solicitação, Aprovações, Operação e Perfil
+- [ ] Traduzir Relatórios, Reembolso, Frota, Cadastros e detalhes
+- [x] Validar troca para Español sem recarregar e persistência após navegação

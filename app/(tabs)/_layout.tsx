@@ -27,7 +27,7 @@ export default function TabLayout() {
   const colors = useColors();
   const { role } = useDemoRole();
   const { preference, setPreference } = useThemeContext();
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
@@ -64,27 +64,27 @@ export default function TabLayout() {
           <View style={{ backgroundColor: colors.primary }} className="h-9 w-9 items-center justify-center rounded-xl">
             <IconSymbol name="airplane" size={18} color="white" />
           </View>
-          <Text className="ml-3 text-base font-bold text-foreground">Controle de Viagens</Text>
+          <Text className="ml-3 text-base font-bold text-foreground">{t('Controle de Viagens')}</Text>
         </View>
         <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]} className="mb-6 px-1">
-          <Text className="text-[10px] font-bold uppercase tracking-widest text-muted">Perfil de teste</Text>
-          <Text className="mt-1 text-sm font-bold text-primary">{role}</Text>
-          <Text className="mt-1 text-xs text-muted">Clique para trocar a visão</Text>
+          <Text className="text-[10px] font-bold uppercase tracking-widest text-muted">{t('Perfil de teste')}</Text>
+          <Text className="mt-1 text-sm font-bold text-primary">{t(`Perfil: ${role}`).replace('Perfil: ', '')}</Text>
+          <Text className="mt-1 text-xs text-muted">{t('Clique para trocar a visão')}</Text>
         </Pressable>
-        <Text className="mb-3 px-2 text-[11px] font-bold uppercase tracking-widest text-muted">Workspace</Text>
+        <Text className="mb-3 px-2 text-[11px] font-bold uppercase tracking-widest text-muted">{t('Workspace')}</Text>
         {visibleNavItems.map((item) => {
           const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
           return (
             <Pressable key={item.path} onPress={() => router.push(item.path as never)} onHoverIn={() => setHoveredPath(item.path)} onHoverOut={() => setHoveredPath(null)} style={({ pressed }) => [{ backgroundColor: active ? colors.primary : hoveredPath === item.path ? `${colors.primary}12` : 'transparent', borderRadius: 10, flexDirection: 'row', alignItems: 'center', minHeight: 42, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 4, opacity: pressed ? 0.72 : 1 }]}>
               <IconSymbol name={item.icon} size={19} color={active ? 'white' : hoveredPath === item.path ? colors.primary : colors.muted} />
-              <Text style={{ color: active ? 'white' : hoveredPath === item.path ? colors.primary : colors.foreground, marginLeft: 12, fontSize: 14, fontWeight: '600' }}>{item.label}</Text>
+              <Text style={{ color: active ? 'white' : hoveredPath === item.path ? colors.primary : colors.foreground, marginLeft: 12, fontSize: 14, fontWeight: '600' }}>{t(item.label)}</Text>
               {item.label === 'Aprovações' ? <View style={{ backgroundColor: colors.warning }} className="ml-auto h-5 min-w-5 items-center justify-center rounded-full px-1"><Text className="text-[10px] font-bold text-white">2</Text></View> : null}
             </Pressable>
           );
         })}
         <View className="mt-auto border-t border-border pt-4">
-          <Text className="px-1 text-xs font-semibold text-foreground">{demoRoleLabel(role)}</Text>
-          <Text className="mt-1 px-1 text-xs text-muted">Configurações e preferências</Text>
+          <Text className="px-1 text-xs font-semibold text-foreground">{t(demoRoleLabel(role))}</Text>
+          <Text className="mt-1 px-1 text-xs text-muted">{t('Configurações e preferências')}</Text>
           <PreferenceDropdowns language={language} setLanguage={setLanguage} theme={preference} setTheme={setPreference} />
         </View>
       </View>
