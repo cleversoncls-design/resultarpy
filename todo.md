@@ -82,3 +82,10 @@
 - [x] Adicionar seletor visível de perfil na interface web
 - [x] Permitir alternar entre Viajante, Viajante + Aprovador e Administrativo sem alterar a URL
 - [x] Atualizar navegação e dashboard imediatamente após a troca de perfil
+
+## Responsividade entre dispositivos
+
+- [x] Adaptar sidebar desktop para navegação compacta em larguras menores
+- [x] Reorganizar cartões, métricas, listas e ações para tablet e smartphone
+- [x] Ajustar formulários e telas de detalhe para rolagem e toque em telas estreitas
+- [x] Validar redimensionamento contínuo entre desktop, tablet e smartphone
