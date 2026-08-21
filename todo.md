@@ -211,3 +211,10 @@
 - [x] Aplicar exportação aos relatórios analítico, reembolso e manutenções
 - [x] Preservar filtros, moeda, totais e permissões nos arquivos
 - [x] Validar downloads em desktop e mobile
+
+## Menus suspensos de idioma e tema
+
+- [x] Criar acionador de idioma exibindo bandeira e idioma atual
+- [x] Criar painel suspenso de Aparência com Sistema, Claro e Escuro
+- [x] Criar indicador circular para a opção ativa e fechar o painel após seleção
+- [x] Remover os controles compactos anteriores e validar desktop, mobile e temas
