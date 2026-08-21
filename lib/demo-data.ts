@@ -69,6 +69,8 @@ export const formatCurrency = (value: number) => `R$ ${value.toLocaleString('pt-
 export const parseKm = (value: string) => Number(value.replace(/\D/g, '')) || 0;
 export const maintenanceThreshold = (vehicle: Vehicle) => vehicle.lastMaintenanceKm + vehicle.maintenanceIntervalKm;
 export const maintenancePercent = (vehicle: Vehicle) => Math.round(((vehicle.currentKm - vehicle.lastMaintenanceKm) / vehicle.maintenanceIntervalKm) * 100);
+export const clientBillableAmountFor = (expense: Expense) => Math.min(expense.quantity * expense.unitValue, expense.limit * expense.quantity);
+export const clientBillingDifferenceFor = (expense: Expense) => expense.quantity * expense.unitValue - expense.limit * expense.quantity;
 export const reimbursementLimitFor = (expense: Expense) => reimbursementLimits.find((item) => item.city === expense.city && item.concept === expense.concept)?.limitPerEvent ?? expense.limit;
 export const reimbursementAmountFor = (expense: Expense) => expense.prepaid ? 0 : Math.min(expense.quantity * expense.unitValue, reimbursementLimitFor(expense) * expense.quantity);
 export const reimbursementExcessFor = (expense: Expense) => Math.max(0, expense.quantity * expense.unitValue - reimbursementLimitFor(expense) * expense.quantity);

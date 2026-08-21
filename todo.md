@@ -123,3 +123,9 @@
 - [x] Liberar relatório de reembolso para Viajante e Administrativo
 - [x] Ocultar relatório de faturamento ao cliente do perfil Viajante
 - [x] Validar cálculos e permissões em desktop e smartphone
+
+## Correção do valor faturável por limite do cliente
+
+- [x] Corrigir o valor a faturar para usar o gasto quando for menor ou igual ao limite
+- [x] Corrigir o valor a faturar para usar o limite quando o gasto ultrapassar o teto
+- [x] Corrigir os totais do período e adicionar teste para hospedagem de R$ 86,00 com teto de R$ 80,00
