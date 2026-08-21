@@ -6,8 +6,15 @@ import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
 import { useDemoRole } from '@/lib/demo-role';
+import { useThemeContext, type ThemePreference } from '@/lib/theme-provider';
 
 function demoRoleLabel(role: string) { return role === 'Administrativo' ? 'Perfil Administrativo' : role === 'Aprovador' ? 'Perfil Aprovador' : 'Perfil Viajante'; }
+
+const themeChoices: { key: ThemePreference; icon: 'sun.max.fill' | 'moon.fill' | 'gearshape.fill'; label: string }[] = [
+  { key: 'light', icon: 'sun.max.fill', label: 'Claro' },
+  { key: 'dark', icon: 'moon.fill', label: 'Escuro' },
+  { key: 'system', icon: 'gearshape.fill', label: 'Sistema' },
+];
 
 const navItems = [
   { label: 'Visão geral', path: '/', icon: 'house.fill' as const },
@@ -23,6 +30,7 @@ const navItems = [
 export default function TabLayout() {
   const colors = useColors();
   const { role } = useDemoRole();
+  const { preference, setPreference } = useThemeContext();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
@@ -79,7 +87,17 @@ export default function TabLayout() {
         })}
         <View className="mt-auto border-t border-border pt-4">
           <Text className="px-1 text-xs font-semibold text-foreground">{demoRoleLabel(role)}</Text>
-          <Text className="mt-1 px-1 text-xs text-muted">Configurações, idioma e tema no Perfil</Text>
+          <Text className="mt-1 px-1 text-xs text-muted">Configurações e preferências</Text>
+          <Text className="mb-2 mt-4 px-1 text-[10px] font-bold uppercase tracking-widest text-muted">Tema</Text>
+          <View style={{ flexDirection: 'row', gap: 5 }}>
+            {themeChoices.map((choice) => {
+              const selected = preference === choice.key;
+              return <Pressable key={choice.key} accessibilityLabel={`Tema ${choice.label}`} onPress={() => setPreference(choice.key)} style={({ pressed }) => [{ flex: 1, minHeight: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: selected ? colors.primary : `${colors.primary}0D`, opacity: pressed ? 0.7 : 1 }]}>
+                <IconSymbol name={choice.icon} size={16} color={selected ? 'white' : colors.muted} />
+                <Text style={{ marginTop: 2, color: selected ? 'white' : colors.muted, fontSize: 9, fontWeight: '700' }}>{choice.label}</Text>
+              </Pressable>;
+            })}
+          </View>
         </View>
       </View>
       <View className="flex-1">{tabs}</View>

@@ -182,3 +182,23 @@
 - [x] Alinhar cada ícone diretamente ao lado do texto do menu
 - [x] Criar retângulo arredondado para hover e item ativo
 - [x] Validar menu nos temas claro e escuro e em larguras responsivas
+
+## Idioma direto no menu
+
+- [ ] Adicionar troca de idioma diretamente no menu com bandeiras do Brasil e da Espanha
+- [ ] Remover o seletor de idioma da tela Perfil sem remover a preferência global
+- [ ] Validar persistência, temas, perfis e responsividade após a mudança
+
+## Tema direto no menu
+
+- [x] Adicionar controles compactos de Claro, Escuro e Sistema no menu
+- [x] Remover o seletor de tema da tela Perfil sem remover a preferência global
+- [x] Validar destaque ativo, persistência, idioma e responsividade após a mudança
+
+## Exportação de relatórios
+
+- [ ] Criar exportação de todos os relatórios para planilha
+- [ ] Criar exportação de todos os relatórios para CSV
+- [ ] Criar exportação de todos os relatórios para PDF
+- [ ] Preservar filtros, moeda global, totais e permissões nos arquivos exportados
+- [ ] Validar download e compartilhamento em desktop e mobile
