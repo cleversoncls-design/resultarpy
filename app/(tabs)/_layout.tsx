@@ -12,6 +12,7 @@ const navItems = [
   { label: 'Aprovações', path: '/approvals', icon: 'checkmark.seal.fill' as const },
   { label: 'Operação', path: '/operations', icon: 'briefcase.fill' as const },
   { label: 'Frota', path: '/fleet', icon: 'car.fill' as const },
+  { label: 'Relatório de reembolso', path: '/reimbursements', icon: 'wallet.pass.fill' as const },
   { label: 'Relatórios', path: '/reports', icon: 'chart.bar.fill' as const },
 ];
 
@@ -38,6 +39,7 @@ export default function TabLayout() {
       <Tabs.Screen name="approvals" options={{ title: 'Aprovações', href: canApprove ? undefined : null, tabBarIcon: ({ color }) => <IconSymbol name="checkmark.seal.fill" size={23} color={color} /> }} />
       <Tabs.Screen name="operations" options={{ title: 'Operação', href: canAdmin ? undefined : null, tabBarIcon: ({ color }) => <IconSymbol name="briefcase.fill" size={23} color={color} /> }} />
       <Tabs.Screen name="fleet" options={{ title: 'Frota', href: canAdmin ? undefined : null, tabBarIcon: ({ color }) => <IconSymbol name="car.fill" size={23} color={color} /> }} />
+      <Tabs.Screen name="reimbursements" options={{ title: 'Reembolso', tabBarIcon: ({ color }) => <IconSymbol name="wallet.pass.fill" size={23} color={color} /> }} />
       <Tabs.Screen name="reports" options={{ title: 'Relatórios', href: canAdmin ? undefined : null, tabBarIcon: ({ color }) => <IconSymbol name="chart.bar.fill" size={23} color={color} /> }} />
       <Tabs.Screen name="profile" options={{ title: 'Perfil', tabBarIcon: ({ color }) => <IconSymbol name="person.crop.circle.fill" size={23} color={color} /> }} />
     </Tabs>

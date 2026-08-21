@@ -6,6 +6,7 @@ export type FleetEventType = 'Multa' | 'Avaria' | 'Outro';
 export type Unit = { id: string; name: string; city: string };
 export type Trip = { id: string; destination: string; country: string; client: string; area: string; startDate: string; endDate: string; status: TripStatus; amount: number; hasAdvance: boolean; needsHotel: boolean; transport: string; unitId?: string; requestsFleetVehicle?: boolean };
 export type Expense = { id: string; tripId: string; date: string; city: string; client: string; concept: string; group: string; quantity: number; unitValue: number; prepaid: boolean; billable: boolean; limit: number; reviewNote?: string };
+export type ReimbursementLimit = { id: string; city: string; concept: string; limitPerEvent: number; active: boolean };
 export type Vehicle = { id: string; plate: string; brand: string; model: string; year: number; color: string; unitId: string; currentKm: number; lastMaintenanceKm: number; maintenanceIntervalKm: number; extinguisherDue: string; status: FleetStatus; observations?: string };
 export type FleetReservation = { id: string; tripId: string; vehicleId?: string; driver: string; startDate: string; endDate: string; status: 'Aguardando veículo' | 'Reservada' | 'Em viagem' | 'Finalizada'; departureKm?: number; returnKm?: number };
 export type FleetEvent = { id: string; tripId: string; vehicleId: string; type: FleetEventType; description: string; photos: string[]; createdAt: string };
@@ -22,6 +23,13 @@ export const trips: Trip[] = [
   { id: 'TR-2026-031', destination: 'Ciudad del Este', country: 'Paraguai', client: 'AgroNorte S.A.', area: 'Comercial', startDate: '18 ago', endDate: '21 ago', status: 'Em prestação', amount: 1280, hasAdvance: true, needsHotel: true, transport: 'Veículo da frota', unitId: 'UN-001', requestsFleetVehicle: true },
   { id: 'TR-2026-028', destination: 'Asunción', country: 'Paraguai', client: 'Cooperativa Central', area: 'Serviços', startDate: '02 set', endDate: '05 set', status: 'Aguardando aprovação', amount: 920, hasAdvance: true, needsHotel: true, transport: 'Passagem aérea', unitId: 'UN-001', requestsFleetVehicle: false },
   { id: 'TR-2026-019', destination: 'Foz do Iguaçu', country: 'Brasil', client: 'Sem cliente', area: 'Administrativo', startDate: '10 jul', endDate: '12 jul', status: 'Finalizada', amount: 640, hasAdvance: false, needsHotel: false, transport: 'Veículo próprio', unitId: 'UN-002', requestsFleetVehicle: false },
+];
+export const reimbursementLimits: ReimbursementLimit[] = [
+  { id: 'LIM-001', city: 'Ciudad del Este', concept: 'Alimentação', limitPerEvent: 40, active: true },
+  { id: 'LIM-002', city: 'Ciudad del Este', concept: 'Combustível', limitPerEvent: 45, active: true },
+  { id: 'LIM-003', city: 'Ciudad del Este', concept: 'Hospedagem', limitPerEvent: 80, active: true },
+  { id: 'LIM-004', city: 'Asunción', concept: 'Alimentação', limitPerEvent: 45, active: true },
+  { id: 'LIM-005', city: 'Asunción', concept: 'Hospedagem', limitPerEvent: 95, active: true },
 ];
 export const expenses: Expense[] = [
   { id: 'EX-001', tripId: 'TR-2026-031', date: '18 ago', city: 'Ciudad del Este', client: 'AgroNorte S.A.', concept: 'Alimentação', group: 'Viáticos', quantity: 2, unitValue: 18, prepaid: true, billable: true, limit: 40 },
@@ -61,5 +69,8 @@ export const formatCurrency = (value: number) => `R$ ${value.toLocaleString('pt-
 export const parseKm = (value: string) => Number(value.replace(/\D/g, '')) || 0;
 export const maintenanceThreshold = (vehicle: Vehicle) => vehicle.lastMaintenanceKm + vehicle.maintenanceIntervalKm;
 export const maintenancePercent = (vehicle: Vehicle) => Math.round(((vehicle.currentKm - vehicle.lastMaintenanceKm) / vehicle.maintenanceIntervalKm) * 100);
+export const reimbursementLimitFor = (expense: Expense) => reimbursementLimits.find((item) => item.city === expense.city && item.concept === expense.concept)?.limitPerEvent ?? expense.limit;
+export const reimbursementAmountFor = (expense: Expense) => expense.prepaid ? 0 : Math.min(expense.quantity * expense.unitValue, reimbursementLimitFor(expense) * expense.quantity);
+export const reimbursementExcessFor = (expense: Expense) => Math.max(0, expense.quantity * expense.unitValue - reimbursementLimitFor(expense) * expense.quantity);
 export const isMaintenanceAlert = (vehicle: Vehicle) => { const target = maintenanceThreshold(vehicle); const tolerance = vehicle.maintenanceIntervalKm * 0.03; return vehicle.currentKm >= target - tolerance && vehicle.currentKm <= target + tolerance; };
 export const isExtinguisherNearDue = (dateText: string) => { const match = dateText.match(/(\d{1,2})\s+([A-Za-zç]+)\s+(\d{4})/i); if (!match) return false; const months: Record<string, number> = { jan: 0, fev: 1, mar: 2, abr: 3, mai: 4, jun: 5, jul: 6, ago: 7, set: 8, out: 9, nov: 10, dez: 11 }; const month = Object.entries(months).find(([key]) => match[2].toLowerCase().startsWith(key))?.[1]; if (month === undefined) return false; const due = new Date(Number(match[3]), month, Number(match[1])); const days = Math.ceil((due.getTime() - Date.now()) / 86400000); return days >= 0 && days <= 30; };

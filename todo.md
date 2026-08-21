@@ -113,3 +113,13 @@
 - [x] Calcular valor total faturável por gasto e total do período selecionado
 - [x] Adicionar filtros por período, viagem e cliente
 - [x] Adaptar o relatório para desktop e smartphone
+
+## Reembolso ao viajante e separação de relatórios
+
+- [x] Corrigir valor faturável para usar o teto quando o gasto ultrapassar o limite faturável
+- [x] Criar limites de reembolso por tipo de gasto e cidade
+- [x] Criar relatório de reembolso por viagem, data, cidade, conceito, quantidade e valor
+- [x] Calcular valor reembolsável e excedente não reembolsável por evento
+- [x] Liberar relatório de reembolso para Viajante e Administrativo
+- [x] Ocultar relatório de faturamento ao cliente do perfil Viajante
+- [x] Validar cálculos e permissões em desktop e smartphone
