@@ -162,3 +162,10 @@
 - [x] Reorganizar dashboard em métricas e cartões de ação no estilo das referências
 - [x] Reestruturar telas administrativas em seções e tabelas mais próximas dos exemplos
 - [x] Validar responsividade, perfis, moeda global e fluxos existentes após a mudança visual
+
+## Revisão visual por diferença insuficiente
+
+- [x] Reestruturar o dashboard com composição claramente diferente da versão anterior e mais próxima das referências
+- [x] Reposicionar a navegação e o bloco de perfil para reproduzir a hierarquia visual dos exemplos
+- [x] Aplicar cartões de acesso rápido com dimensões, espaçamento e agrupamento visivelmente distintos
+- [x] Validar a nova versão lado a lado em desktop e mobile antes de criar novo checkpoint
