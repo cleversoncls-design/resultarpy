@@ -185,9 +185,9 @@
 
 ## Idioma direto no menu
 
-- [ ] Adicionar troca de idioma diretamente no menu com bandeiras do Brasil e da Espanha
-- [ ] Remover o seletor de idioma da tela Perfil sem remover a preferência global
-- [ ] Validar persistência, temas, perfis e responsividade após a mudança
+- [x] Adicionar troca de idioma diretamente no menu com bandeiras do Brasil e da Espanha
+- [x] Remover o seletor de idioma da tela Perfil sem remover a preferência global
+- [x] Validar persistência, temas, perfis e responsividade após a mudança
 
 ## Tema direto no menu
 
@@ -197,8 +197,17 @@
 
 ## Exportação de relatórios
 
-- [ ] Criar exportação de todos os relatórios para planilha
-- [ ] Criar exportação de todos os relatórios para CSV
-- [ ] Criar exportação de todos os relatórios para PDF
-- [ ] Preservar filtros, moeda global, totais e permissões nos arquivos exportados
-- [ ] Validar download e compartilhamento em desktop e mobile
+- [x] Criar exportação de todos os relatórios para planilha
+- [x] Criar exportação de todos os relatórios para CSV
+- [x] Criar exportação de todos os relatórios para PDF
+- [x] Preservar filtros, moeda global, totais e permissões nos arquivos exportados
+- [x] Validar download e compartilhamento em desktop e mobile
+
+## Execução dos itens pendentes: idioma e exportações
+
+- [x] Mover o seletor de idioma para o menu com bandeiras do Brasil e da Espanha
+- [x] Remover o seletor duplicado de idioma do Perfil
+- [x] Criar exportação dos relatórios em planilha, CSV e PDF
+- [x] Aplicar exportação aos relatórios analítico, reembolso e manutenções
+- [x] Preservar filtros, moeda, totais e permissões nos arquivos
+- [x] Validar downloads em desktop e mobile

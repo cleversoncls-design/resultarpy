@@ -7,6 +7,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
 import { useDemoRole } from '@/lib/demo-role';
 import { useThemeContext, type ThemePreference } from '@/lib/theme-provider';
+import { useLanguage, languageOptions, type AppLanguage } from '@/lib/language-provider';
 
 function demoRoleLabel(role: string) { return role === 'Administrativo' ? 'Perfil Administrativo' : role === 'Aprovador' ? 'Perfil Aprovador' : 'Perfil Viajante'; }
 
@@ -31,6 +32,7 @@ export default function TabLayout() {
   const colors = useColors();
   const { role } = useDemoRole();
   const { preference, setPreference } = useThemeContext();
+  const { language, setLanguage } = useLanguage();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
@@ -88,6 +90,16 @@ export default function TabLayout() {
         <View className="mt-auto border-t border-border pt-4">
           <Text className="px-1 text-xs font-semibold text-foreground">{demoRoleLabel(role)}</Text>
           <Text className="mt-1 px-1 text-xs text-muted">Configurações e preferências</Text>
+          <Text className="mb-2 mt-4 px-1 text-[10px] font-bold uppercase tracking-widest text-muted">Idioma</Text>
+          <View style={{ flexDirection: 'row', gap: 5 }}>
+            {languageOptions.map((option) => {
+              const selected = language === option.key;
+              return <Pressable key={option.key} accessibilityLabel={`Idioma ${option.label}`} onPress={() => setLanguage(option.key as AppLanguage)} style={({ pressed }) => [{ flex: 1, minHeight: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: selected ? colors.primary : `${colors.primary}0D`, opacity: pressed ? 0.7 : 1 }]}>
+                <Text style={{ fontSize: 15 }}>{option.flag}</Text>
+                <Text style={{ marginTop: 2, color: selected ? 'white' : colors.muted, fontSize: 9, fontWeight: '700' }}>{option.label}</Text>
+              </Pressable>;
+            })}
+          </View>
           <Text className="mb-2 mt-4 px-1 text-[10px] font-bold uppercase tracking-widest text-muted">Tema</Text>
           <View style={{ flexDirection: 'row', gap: 5 }}>
             {themeChoices.map((choice) => {

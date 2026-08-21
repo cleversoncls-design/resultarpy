@@ -10,6 +10,7 @@ import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { DemoRoleProvider } from "@/lib/demo-role";
 import { CurrencyProvider } from "@/lib/currency-provider";
+import { LanguageProvider } from "@/lib/language-provider";
 import { DesktopRouteShell } from "@/components/desktop-route-shell";
 import {
   SafeAreaFrameContext,
@@ -89,12 +90,14 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <DemoRoleProvider>
         <CurrencyProvider>
-          <TrpcProvider client={trpcClient} queryClient={queryClient}>
+          <LanguageProvider>
+            <TrpcProvider client={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>
               {useStandaloneShell ? <DesktopRouteShell><Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack></DesktopRouteShell> : <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack>}
               <StatusBar style="auto" />
             </QueryClientProvider>
-          </TrpcProvider>
+            </TrpcProvider>
+          </LanguageProvider>
         </CurrencyProvider>
       </DemoRoleProvider>
     </GestureHandlerRootView>
