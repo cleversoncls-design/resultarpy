@@ -5,6 +5,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
 import { useDemoRole } from '@/lib/demo-role';
 import { useThemeContext, type ThemePreference } from '@/lib/theme-provider';
+import { useCurrency } from '@/lib/currency-provider';
 
 const themeOptions: { key: ThemePreference; label: string; description: string }[] = [
   { key: 'system', label: 'Sistema', description: 'Segue a aparência do dispositivo' },
@@ -16,6 +17,7 @@ export default function ProfileScreen() {
   const colors = useColors();
   const { role, setRole } = useDemoRole();
   const { preference, setPreference } = useThemeContext();
+  const { currency, setCurrency, options: currencyOptions } = useCurrency();
   const switchRole = (nextRole: Role) => { setRole(nextRole); Alert.alert('Perfil atualizado', `A interface agora está configurada para ${nextRole}.`); };
   return (
     <ScreenContainer className="px-5 pt-4">
@@ -33,6 +35,12 @@ export default function ProfileScreen() {
           <SettingChoice icon="globe" label="Português (Brasil)" description="Idioma atual da interface" selected={true} onPress={() => Alert.alert('Idioma', 'Português (Brasil) está selecionado.')} />
           <SettingChoice icon="globe" label="Español" description="Preparado para a versão em espanhol" selected={false} onPress={() => Alert.alert('Idioma', 'A tradução para Espanhol será aplicada quando o pacote de idioma estiver conectado.')} />
         </View>
+        {role === 'Administrativo' ? <>
+          <Text className="mb-2 text-xs font-bold uppercase tracking-widest text-muted">Moeda global</Text>
+          <View className="mb-5 rounded-2xl border border-border bg-surface p-2">
+            {currencyOptions.map((option) => <SettingChoice key={option.key} icon="gearshape.fill" label={option.label} description="Aplicada a todos os usuários e relatórios" selected={currency === option.key} onPress={() => setCurrency(option.key)} />)}
+          </View>
+        </> : null}
         <Text className="mb-2 text-xs font-bold uppercase tracking-widest text-muted">Aparência</Text>
         <View className="rounded-2xl border border-border bg-surface p-2">
           {themeOptions.map((option) => <SettingChoice key={option.key} icon={option.key === 'dark' ? 'moon.fill' : option.key === 'light' ? 'sun.max.fill' : 'gearshape.fill'} label={option.label} description={option.description} selected={preference === option.key} onPress={() => setPreference(option.key)} />)}

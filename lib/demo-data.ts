@@ -1,3 +1,6 @@
+import { formatCurrency } from './currency';
+export { formatCurrency } from './currency';
+
 export type Role = 'Viajante' | 'Aprovador' | 'Administrativo';
 export type TripStatus = 'Aguardando aprovação' | 'Aprovada' | 'Liberada para viagem' | 'Em prestação' | 'Finalizada' | 'Devolvida';
 export type FleetStatus = 'Disponível' | 'Reservado' | 'Em viagem' | 'Realizar manutenção' | 'Em manutenção' | 'Extintor próximo do vencimento' | 'Avaria registrada';
@@ -65,7 +68,6 @@ export const adminQueue = [
   { id: 'TR-2026-024', traveler: 'Carlos Duarte', destination: 'Pedro Juan Caballero', status: 'Adiantamento pendente', hotel: true, vehicle: false },
   { id: 'TR-2026-022', traveler: 'Ana Souza', destination: 'Asunción', status: 'Reservar hotel', hotel: true, vehicle: true },
 ];
-export const formatCurrency = (value: number) => `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 export const parseKm = (value: string) => Number(value.replace(/\D/g, '')) || 0;
 export const maintenanceThreshold = (vehicle: Vehicle) => vehicle.lastMaintenanceKm + vehicle.maintenanceIntervalKm;
 export const maintenancePercent = (vehicle: Vehicle) => Math.round(((vehicle.currentKm - vehicle.lastMaintenanceKm) / vehicle.maintenanceIntervalKm) * 100);

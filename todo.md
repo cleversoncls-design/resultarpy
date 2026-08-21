@@ -141,3 +141,10 @@
 - [x] Ajustar o valor reembolsável para ser o menor entre gasto informado e limite por evento
 - [x] Garantir que o excedente seja calculado apenas quando o gasto ultrapassar o limite
 - [x] Validar o relatório com eventos abaixo, iguais e acima do limite
+
+## Moeda global configurável
+
+- [x] Criar configuração administrativa de moeda com R$, US$ e G$
+- [x] Aplicar a moeda selecionada na formatação monetária de todo o sistema
+- [x] Persistir a configuração global e refletir a alteração para todos os perfis
+- [x] Validar relatórios, despesas, adiantamentos e dashboards nas três moedas
