@@ -89,3 +89,19 @@
 - [x] Reorganizar cartões, métricas, listas e ações para tablet e smartphone
 - [x] Ajustar formulários e telas de detalhe para rolagem e toque em telas estreitas
 - [x] Validar redimensionamento contínuo entre desktop, tablet e smartphone
+
+## Configurações de idioma e tema
+
+- [x] Exibir seletor de idioma com Português e Espanhol no Perfil
+- [x] Exibir seletor de tema com Claro, Escuro e Sistema no Perfil
+- [x] Persistir as preferências e aplicar o tema imediatamente em todas as telas
+- [x] Validar os controles em desktop, tablet e smartphone
+
+## Manutenção corretiva e análise de gastos
+
+- [x] Criar cadastro de tipos ou motivos de manutenção
+- [x] Vincular tipo ou motivo às Ordens de Serviço
+- [x] Permitir Ordem de Serviço Corretiva avulsa, sem manutenção prevista
+- [x] Diferenciar manutenção preventiva e corretiva no histórico
+- [x] Criar relatório de manutenções por veículo e período
+- [x] Exibir custos, quantidade de O.S. e totais filtrados
