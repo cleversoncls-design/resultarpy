@@ -105,3 +105,11 @@
 - [x] Diferenciar manutenção preventiva e corretiva no histórico
 - [x] Criar relatório de manutenções por veículo e período
 - [x] Exibir custos, quantidade de O.S. e totais filtrados
+
+## Relatório analítico de gastos e faturamento
+
+- [x] Detalhar viagem, cliente, data, conceito, quantidade e valor do gasto
+- [x] Exibir limite de valor faturável por cliente e diferença para o gasto realizado
+- [x] Calcular valor total faturável por gasto e total do período selecionado
+- [x] Adicionar filtros por período, viagem e cliente
+- [x] Adaptar o relatório para desktop e smartphone
