@@ -254,3 +254,10 @@
 - [x] Persistir o último módulo expandido
 - [x] Adicionar animação curta na abertura e fechamento dos submenus
 - [x] Validar permissões, rotas, temas e responsividade
+
+## Aprimoramentos de Frota e manutenção
+
+- [x] Criar tela independente de Cadastros de Frota
+- [x] Adicionar filtros avançados ao Histórico de manutenção
+- [x] Animar o fechamento dos submenus
+- [x] Validar permissões, rotas, filtros e responsividade

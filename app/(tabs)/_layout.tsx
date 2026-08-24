@@ -25,7 +25,7 @@ const moduleGroups = [
   ] },
   { key: 'fleet', label: 'Frota', icon: 'car.fill' as const, items: [
     { label: 'Painel da frota', path: '/fleet', icon: 'car.fill' as const },
-    { label: 'Cadastro de veículos', path: '/new-vehicle', icon: 'plus' as const },
+    { label: 'Cadastros de Frota', path: '/fleet-cadastros', icon: 'building.2.fill' as const },
     { label: 'Ordens de Serviço', path: '/new-work-order', icon: 'wrench.and.screwdriver.fill' as const },
     { label: 'Histórico de manutenção', path: '/maintenance-report', icon: 'chart.bar.fill' as const },
   ] },
@@ -40,6 +40,7 @@ export default function TabLayout() {
   const { width } = useWindowDimensions();
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [expandedModule, setExpandedModule] = useState('travel');
+  const [renderedModules, setRenderedModules] = useState<Record<string, boolean>>({ travel: true, fleet: false });
   const moduleAnimations = useRef<Record<string, Animated.Value>>({ travel: new Animated.Value(1), fleet: new Animated.Value(0) }).current;
   const isCompactWeb = Platform.OS === 'web' && width < 900;
   const canApprove = role === 'Aprovador' || role === 'Administrativo';
@@ -52,8 +53,8 @@ export default function TabLayout() {
   }) })).filter((module) => module.items.length > 0);
   const pathname = usePathname();
   const bottomPadding = Platform.OS === 'web' ? 12 : Math.max(insets.bottom, 8);
-  useEffect(() => { AsyncStorage.getItem('controle-viagens-expanded-module').then((saved) => { if (saved && visibleModules.some((module) => module.key === saved)) { setExpandedModule(saved); moduleAnimations[saved]?.setValue(1); } }); }, []);
-  const toggleModule = (key: string) => { const next = expandedModule === key ? '' : key; setExpandedModule(next); if (next) { moduleAnimations[next]?.setValue(0); Animated.timing(moduleAnimations[next], { toValue: 1, duration: 180, useNativeDriver: true }).start(); AsyncStorage.setItem('controle-viagens-expanded-module', next); } else { AsyncStorage.removeItem('controle-viagens-expanded-module'); } };
+  useEffect(() => { AsyncStorage.getItem('controle-viagens-expanded-module').then((saved) => { if (saved && visibleModules.some((module) => module.key === saved)) { setExpandedModule(saved); setRenderedModules((current) => ({ ...current, [saved]: true })); moduleAnimations[saved]?.setValue(1); } }); }, []);
+  const toggleModule = (key: string) => { const closing = expandedModule === key; if (closing) { Animated.timing(moduleAnimations[key], { toValue: 0, duration: 180, useNativeDriver: true }).start(() => { setExpandedModule(''); setRenderedModules((current) => ({ ...current, [key]: false })); }); AsyncStorage.removeItem('controle-viagens-expanded-module'); return; } const next = key; setRenderedModules((current) => ({ ...current, [next]: true })); setExpandedModule(next); moduleAnimations[next]?.setValue(0); Animated.timing(moduleAnimations[next], { toValue: 1, duration: 180, useNativeDriver: true }).start(); AsyncStorage.setItem('controle-viagens-expanded-module', next); };
 
   const tabs = (
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted, tabBarButton: HapticTab, tabBarStyle: { display: isCompactWeb ? 'flex' : Platform.OS === 'web' ? 'none' : 'flex', paddingTop: 8, paddingBottom: bottomPadding, height: 56 + bottomPadding, backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 0.5 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
@@ -94,7 +95,7 @@ export default function TabLayout() {
               <Text style={{ color: moduleActive || hoveredPath === `module-${module.key}` ? colors.primary : colors.foreground, marginLeft: 12, fontSize: 14, fontWeight: '700', flex: 1 }}>{t(module.label)}</Text>
               <Text style={{ color: colors.muted, fontSize: 14 }}>{open ? '⌃' : '⌄'}</Text>
             </Pressable>
-            {open ? <Animated.View style={{ opacity: moduleAnimations[module.key], transform: [{ scaleY: moduleAnimations[module.key] }] }} className="ml-3 border-l border-border pl-2">{module.items.map((item) => {
+            {renderedModules[module.key] ? <Animated.View style={{ opacity: moduleAnimations[module.key], transform: [{ scaleY: moduleAnimations[module.key] }] }} className="ml-3 border-l border-border pl-2">{module.items.map((item) => {
               const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
               return <Pressable key={item.path} onPress={() => router.push(item.path as never)} onHoverIn={() => setHoveredPath(item.path)} onHoverOut={() => setHoveredPath(null)} style={({ pressed }) => [{ backgroundColor: active ? colors.primary : hoveredPath === item.path ? `${colors.primary}12` : 'transparent', borderRadius: 9, flexDirection: 'row', alignItems: 'center', minHeight: 38, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 3, opacity: pressed ? 0.72 : 1 }]}>
                 <IconSymbol name={item.icon} size={16} color={active ? 'white' : hoveredPath === item.path ? colors.primary : colors.muted} />
