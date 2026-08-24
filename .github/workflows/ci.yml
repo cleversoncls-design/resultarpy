@@ -89,8 +89,14 @@ jobs:
 
       - name: Compose logs on failure
         if: failure()
+        env:
+          JWT_SECRET: ci-only-ephemeral-secret-change-per-run
+          FRONTEND_PORT: 8080
         run: docker compose -f compose.yaml logs --no-color
 
       - name: Tear down Compose
         if: always()
+        env:
+          JWT_SECRET: ci-only-ephemeral-secret-change-per-run
+          FRONTEND_PORT: 8080
         run: docker compose -f compose.yaml down -v
