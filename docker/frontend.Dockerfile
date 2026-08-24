@@ -10,6 +10,7 @@ ENV EXPO_PUBLIC_API_BASE_URL=${EXPO_PUBLIC_API_BASE_URL}
 RUN EXPO_NO_METRO_WORKSPACE_ROOT=1 pnpm exec expo export --platform web
 
 FROM nginx:1.29-alpine3.22 AS runtime
+RUN apk upgrade --no-cache
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
