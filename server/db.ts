@@ -1,21 +1,48 @@
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { users, type InsertUser } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
+let _pool: Pool | null = null;
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+function isPostgresUrl(value: string) {
+  return value.startsWith("postgres://") || value.startsWith("postgresql://");
+}
+
+/**
+ * Lazily creates the PostgreSQL connection so local tooling can run without a DB.
+ * A non-PostgreSQL URL is ignored during the transition instead of being parsed by pg.
+ */
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  const connectionString = process.env.DATABASE_URL;
+  if (!_db && connectionString && isPostgresUrl(connectionString)) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _pool = new Pool({
+        connectionString,
+        max: Number(process.env.DATABASE_POOL_MAX ?? 10),
+        ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+      });
+      _pool.on("error", (error) => {
+        console.error("[Database] Unexpected PostgreSQL pool error:", error);
+      });
+      _db = drizzle(_pool);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.warn("[Database] Failed to connect to PostgreSQL:", error);
+      _pool = null;
       _db = null;
     }
   }
   return _db;
+}
+
+export async function closeDb() {
+  if (_pool) {
+    await _pool.end();
+    _pool = null;
+    _db = null;
+  }
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {
@@ -25,7 +52,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
+    console.warn("[Database] Cannot upsert user: PostgreSQL database is not available");
     return;
   }
 
@@ -33,7 +60,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     const values: InsertUser = {
       openId: user.openId,
     };
-    const updateSet: Record<string, unknown> = {};
+    const updateSet: Partial<InsertUser> = {};
 
     const textFields = ["name", "email", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
@@ -68,7 +95,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -80,7 +108,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
+    console.warn("[Database] Cannot get user: PostgreSQL database is not available");
     return undefined;
   }
 
@@ -88,5 +116,3 @@ export async function getUserByOpenId(openId: string) {
 
   return result.length > 0 ? result[0] : undefined;
 }
-
-// TODO: add feature queries here as your schema grows.

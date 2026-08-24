@@ -6,9 +6,9 @@ if (!connectionString) {
 }
 
 export default defineConfig({
-  schema: "./drizzle/schema.ts",
-  out: "./drizzle-pg",
-  dialect: "postgresql",
+  schema: "./drizzle/schema.mysql-rollback.ts",
+  out: "./drizzle-mysql-rollback",
+  dialect: "mysql",
   dbCredentials: {
     url: connectionString,
   },

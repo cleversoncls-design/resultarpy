@@ -81,3 +81,15 @@ Dockerfile.frontend              # se o projeto preferir arquivos na raiz
 A especificação foi incorporada ao backlog como uma etapa posterior à simulação. Permanecem pendentes a conversão oficial do Drizzle, a persistência tRPC dos quatro cadastros, a integração inicial do frontend, os containers de API e Nginx, o Compose completo, os scripts operacionais de backup/restore e a bateria de testes de integração.
 
 Portanto, o resultado atual deve ser interpretado como **prova técnica de que o PostgreSQL 16, o schema de domínio e o seed podem ser executados em Docker**, e não como conclusão da migração total. Essa distinção evita declarar como concluídos os critérios que dependem de API e frontend conectados ao banco real.
+
+## Execução da etapa seguinte
+
+A primeira fatia funcional da migração foi concluída. O schema principal e o Drizzle Kit agora usam `drizzle-orm/node-postgres`, `pg` e dialeto PostgreSQL; a configuração MySQL anterior permanece em `drizzle/schema.mysql-rollback.ts` e `drizzle.config.mysql-rollback.ts` para rollback explícito. A migration oficial em `drizzle-pg/0000_postgres_domain_initial.sql` foi aplicada ao banco isolado.
+
+Foram criados `server/catalog-repository.ts` e `server/catalog-router.ts`, com listagem paginada, pesquisa, ordenação, criação, atualização, arquivamento lógico, validação Zod, tratamento de conflitos e proteção por `adminProcedure` para Unidades, Clientes, Viajantes e Tipos de gasto. A tela `app/general-cadastros.tsx` agora oferece CRUD quando existe sessão autenticada e perfil Administrativo; sessões demonstrativas não autenticadas continuam identificadas como modo local para preservar a avaliação atual.
+
+O seed oficial `scripts/seed-postgres.ts` é idempotente e foi executado duas vezes, mantendo 3 usuários, 2 unidades, 2 clientes, 3 tipos de gasto, 2 viajantes e 3 motivos de manutenção. Os testes de repositories e autorização tRPC passaram contra o banco PostgreSQL isolado.
+
+Também foram preparados `compose.yaml`, Dockerfiles multi-stage, proxy Nginx, scripts de saúde, subida, encerramento, logs, backup e restore, além de `docker/ENVIRONMENT.md`. As imagens da API e do frontend foram construídas com sucesso. O frontend retornou HTTP 200 para `/general-cadastros`, a API respondeu `/api/health` e o proxy Nginx encaminhou `/api/health` corretamente. No sandbox, o Compose completo com rede bridge não pode ser iniciado por uma limitação do kernel/iptables; a configuração de produção mantém rede interna bridge e foi validada sintaticamente.
+
+Permanecem fora desta etapa a migração dos demais domínios — viagens, despesas, frota, manutenção e relatórios — e a configuração dos valores reais de OAuth/JWT em cada ambiente. O Compose exige `JWT_SECRET` antes de iniciar a API, e nenhum secret real é incluído nas imagens ou no bundle.

@@ -1,0 +1,12 @@
+node_modules
+.expo
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+dist
+coverage
+backups
+*.log
+.DS_Store

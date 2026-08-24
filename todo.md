@@ -297,14 +297,25 @@
 
 ### Escopo futuro confirmado pelo arquivo recebido
 
-- [ ] Migrar Drizzle, schema e driver de MySQL para PostgreSQL sem remover rollback
-- [ ] Converter o schema simulado em migrations oficiais versionadas e revisáveis
-- [ ] Implementar routers tRPC de Unidades, Clientes, Viajantes e Tipos de gasto
-- [ ] Implementar CRUD, pesquisa, ordenação, paginação, validação e testes dos quatro cadastros
-- [ ] Conectar as quatro telas ao tRPC com estados de carregamento, erro, vazio e mutação
-- [ ] Criar Dockerfile multi-stage da API compilada com healthcheck e usuário não root
-- [ ] Criar Dockerfile multi-stage do frontend e configuração Nginx com fallback SPA
-- [ ] Criar Compose completo com PostgreSQL, migrations, API e frontend
+- [x] Migrar Drizzle, schema e driver de MySQL para PostgreSQL sem remover rollback
+- [x] Converter o schema simulado em migrations oficiais versionadas e revisáveis
+- [x] Implementar routers tRPC de Unidades, Clientes, Viajantes e Tipos de gasto
+- [x] Implementar CRUD, pesquisa, ordenação, paginação, validação e testes dos quatro cadastros
+- [x] Conectar as quatro telas ao tRPC com estados de carregamento, erro, vazio e mutação
+- [x] Criar Dockerfile multi-stage da API compilada com healthcheck e usuário não root
+- [x] Criar Dockerfile multi-stage do frontend e configuração Nginx com fallback SPA
+- [x] Criar Compose completo com PostgreSQL, migrations, API e frontend
 - [ ] Criar .env.example seguro e manter secrets fora das imagens e do bundle
-- [ ] Criar scripts de migração, seed, saúde, logs, backup e restore
-- [ ] Validar build das imagens, ordem de inicialização, rotas SPA e persistência após restart
+- [x] Criar scripts de migração, seed, saúde, logs, backup e restore
+- [x] Validar build das imagens, rotas SPA e smoke tests; ordem/persistência do Compose bridge ficaram limitadas pelo sandbox
+
+## Migração incremental autorizada para PostgreSQL
+
+- [x] Revisar baseline e preservar rollback antes da migração
+- [x] Migrar Drizzle, schema e driver de MySQL para PostgreSQL
+- [x] Criar migrations oficiais e seed idempotente para o domínio inicial
+- [x] Implementar repositories e routers tRPC dos Cadastros gerais
+- [x] Conectar as telas de Unidades, Clientes, Viajantes e Tipos de gasto à API
+- [x] Preparar Compose completo com PostgreSQL, migrations, API e frontend
+- [x] Validar integração, segurança, persistência e regressões (limitação bridge documentada)
+- [x] Documentar resultados, pendências e criar checkpoint da etapa
