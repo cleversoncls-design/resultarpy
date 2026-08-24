@@ -394,3 +394,11 @@
 - [x] Adicionar exportação CSV, XLSX e PDF do histórico filtrado
 - [x] Validar autorização, filtros, paginação, exports e CI local
 - [x] Documentar resultados e salvar checkpoint atualizado
+
+## Publicação GitHub e execução remota do CI
+
+- [x] Confirmar acesso ao repositório privado `cleversoncls-design/resultarpy`
+- [x] Publicar o projeto atual na branch `main`
+- [x] Corrigir a falha do CI causada pelo teardown do Compose sem `JWT_SECRET`
+- [x] Executar o workflow remoto com TypeScript, lint, Vitest, PostgreSQL 16, Compose bridge e Playwright
+- [x] Confirmar workflow CI remoto concluído com sucesso no run 32774527939
