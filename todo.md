@@ -402,3 +402,11 @@
 - [x] Corrigir a falha do CI causada pelo teardown do Compose sem `JWT_SECRET`
 - [x] Executar o workflow remoto com TypeScript, lint, Vitest, PostgreSQL 16, Compose bridge e Playwright
 - [x] Confirmar workflow CI remoto concluído com sucesso no run 32774527939
+
+## Proteção da branch, publicação Docker e hooks
+
+- [ ] Corrigir os dois avisos de dependências em useEffect
+- [ ] Adicionar publicação automática das imagens API e frontend no GitHub Container Registry
+- [ ] Configurar proteção da branch main exigindo o check CI/validate
+- [ ] Validar localmente, publicar alterações e executar CI remoto
+- [ ] Documentar resultados e salvar checkpoint atualizado

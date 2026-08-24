@@ -1,6 +1,6 @@
 import { Tabs, router, usePathname } from 'expo-router';
 import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -46,15 +46,15 @@ export default function TabLayout() {
   const isCompactWeb = Platform.OS === 'web' && width < 900;
   const canApprove = role === 'Aprovador' || role === 'Administrativo';
   const canAdmin = role === 'Administrativo';
-  const visibleModules = moduleGroups.map((module) => ({ ...module, items: module.items.filter((item) => {
+  const visibleModules = useMemo(() => moduleGroups.map((module) => ({ ...module, items: module.items.filter((item) => {
     if (module.key === 'fleet' && !canAdmin) return false;
     if (item.path === '/approvals') return canApprove;
     if (['/operations', '/reports', '/general-cadastros'].includes(item.path)) return canAdmin;
     return true;
-  }) })).filter((module) => module.items.length > 0);
+  }) })).filter((module) => module.items.length > 0), [canAdmin, canApprove]);
   const pathname = usePathname();
   const bottomPadding = Platform.OS === 'web' ? 12 : Math.max(insets.bottom, 8);
-  useEffect(() => { AsyncStorage.getItem('controle-viagens-expanded-module').then((saved) => { if (saved && visibleModules.some((module) => module.key === saved)) { setExpandedModule(saved); setRenderedModules((current) => ({ ...current, [saved]: true })); moduleAnimations[saved]?.setValue(1); } }); }, []);
+  useEffect(() => { AsyncStorage.getItem('controle-viagens-expanded-module').then((saved) => { if (saved && visibleModules.some((module) => module.key === saved)) { setExpandedModule(saved); setRenderedModules((current) => ({ ...current, [saved]: true })); moduleAnimations[saved]?.setValue(1); } }); }, [moduleAnimations, visibleModules]);
   const toggleModule = (key: string) => { const closing = expandedModule === key; if (closing) { Animated.timing(moduleAnimations[key], { toValue: 0, duration: 180, useNativeDriver: true }).start(() => { setExpandedModule(''); setRenderedModules((current) => ({ ...current, [key]: false })); }); AsyncStorage.removeItem('controle-viagens-expanded-module'); return; } const next = key; setRenderedModules((current) => ({ ...current, [next]: true })); setExpandedModule(next); moduleAnimations[next]?.setValue(0); Animated.timing(moduleAnimations[next], { toValue: 1, duration: 180, useNativeDriver: true }).start(); AsyncStorage.setItem('controle-viagens-expanded-module', next); };
 
   const tabs = (

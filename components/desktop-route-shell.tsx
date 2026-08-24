@@ -1,5 +1,5 @@
 import { Animated, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, usePathname } from 'expo-router';
 import { useColors } from '@/hooks/use-colors';
@@ -42,13 +42,13 @@ export function DesktopRouteShell({ children }: { children: React.ReactNode }) {
   const isDesktop = width >= 900;
   const canApprove = role === 'Aprovador' || role === 'Administrativo';
   const canAdmin = role === 'Administrativo';
-  const visibleModules = moduleGroups.map((module) => ({ ...module, items: module.items.filter((item) => {
+  const visibleModules = useMemo(() => moduleGroups.map((module) => ({ ...module, items: module.items.filter((item) => {
     if (module.key === 'fleet' && !canAdmin) return false;
     if (item.path === '/approvals') return canApprove;
     if (['/operations', '/reports', '/general-cadastros'].includes(item.path)) return canAdmin;
     return true;
-  }) })).filter((module) => module.items.length > 0);
-  useEffect(() => { AsyncStorage.getItem('controle-viagens-expanded-module').then((saved) => { if (saved && visibleModules.some((module) => module.key === saved)) { setExpandedModule(saved); setRenderedModules((current) => ({ ...current, [saved]: true })); moduleAnimations[saved]?.setValue(1); } }); }, []);
+  }) })).filter((module) => module.items.length > 0), [canAdmin, canApprove]);
+  useEffect(() => { AsyncStorage.getItem('controle-viagens-expanded-module').then((saved) => { if (saved && visibleModules.some((module) => module.key === saved)) { setExpandedModule(saved); setRenderedModules((current) => ({ ...current, [saved]: true })); moduleAnimations[saved]?.setValue(1); } }); }, [moduleAnimations, visibleModules]);
   if (!isDesktop) return <>{children}</>;
   const toggleModule = (key: string) => { const closing = expandedModule === key; if (closing) { Animated.timing(moduleAnimations[key], { toValue: 0, duration: 180, useNativeDriver: true }).start(() => { setExpandedModule(''); setRenderedModules((current) => ({ ...current, [key]: false })); }); AsyncStorage.removeItem('controle-viagens-expanded-module'); return; } const next = key; setRenderedModules((current) => ({ ...current, [next]: true })); setExpandedModule(next); moduleAnimations[next]?.setValue(0); Animated.timing(moduleAnimations[next], { toValue: 1, duration: 180, useNativeDriver: true }).start(); AsyncStorage.setItem('controle-viagens-expanded-module', next); };
   return <View style={{ backgroundColor: colors.background }} className="flex-1 flex-row">
