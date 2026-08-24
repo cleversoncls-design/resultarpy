@@ -26,7 +26,9 @@ ENV NODE_ENV=production
 
 WORKDIR /app
 
-RUN groupadd --system --gid 1001 appgroup \
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+
+  && groupadd --system --gid 1001 appgroup \
 
   && useradd --system --uid 1001 --gid appgroup appuser
 
