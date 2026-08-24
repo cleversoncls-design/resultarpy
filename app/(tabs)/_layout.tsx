@@ -1,6 +1,6 @@
 import { Tabs, router, usePathname } from 'expo-router';
-import { Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { useState } from 'react';
+import { Animated, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -9,6 +9,7 @@ import { useDemoRole } from '@/lib/demo-role';
 import { useThemeContext } from '@/lib/theme-provider';
 import { useLanguage } from '@/lib/language-provider';
 import { PreferenceDropdowns } from '@/components/preference-dropdown';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 function demoRoleLabel(role: string) { return role === 'Administrativo' ? 'Perfil Administrativo' : role === 'Aprovador' ? 'Perfil Aprovador' : 'Perfil Viajante'; }
 
@@ -24,6 +25,9 @@ const moduleGroups = [
   ] },
   { key: 'fleet', label: 'Frota', icon: 'car.fill' as const, items: [
     { label: 'Painel da frota', path: '/fleet', icon: 'car.fill' as const },
+    { label: 'Cadastro de veículos', path: '/new-vehicle', icon: 'plus' as const },
+    { label: 'Ordens de Serviço', path: '/new-work-order', icon: 'wrench.and.screwdriver.fill' as const },
+    { label: 'Histórico de manutenção', path: '/maintenance-report', icon: 'chart.bar.fill' as const },
   ] },
 ];
 
@@ -36,6 +40,7 @@ export default function TabLayout() {
   const { width } = useWindowDimensions();
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [expandedModule, setExpandedModule] = useState('travel');
+  const moduleAnimations = useRef<Record<string, Animated.Value>>({ travel: new Animated.Value(1), fleet: new Animated.Value(0) }).current;
   const isCompactWeb = Platform.OS === 'web' && width < 900;
   const canApprove = role === 'Aprovador' || role === 'Administrativo';
   const canAdmin = role === 'Administrativo';
@@ -47,6 +52,8 @@ export default function TabLayout() {
   }) })).filter((module) => module.items.length > 0);
   const pathname = usePathname();
   const bottomPadding = Platform.OS === 'web' ? 12 : Math.max(insets.bottom, 8);
+  useEffect(() => { AsyncStorage.getItem('controle-viagens-expanded-module').then((saved) => { if (saved && visibleModules.some((module) => module.key === saved)) { setExpandedModule(saved); moduleAnimations[saved]?.setValue(1); } }); }, []);
+  const toggleModule = (key: string) => { const next = expandedModule === key ? '' : key; setExpandedModule(next); if (next) { moduleAnimations[next]?.setValue(0); Animated.timing(moduleAnimations[next], { toValue: 1, duration: 180, useNativeDriver: true }).start(); AsyncStorage.setItem('controle-viagens-expanded-module', next); } else { AsyncStorage.removeItem('controle-viagens-expanded-module'); } };
 
   const tabs = (
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted, tabBarButton: HapticTab, tabBarStyle: { display: isCompactWeb ? 'flex' : Platform.OS === 'web' ? 'none' : 'flex', paddingTop: 8, paddingBottom: bottomPadding, height: 56 + bottomPadding, backgroundColor: colors.surface, borderTopColor: colors.border, borderTopWidth: 0.5 }, tabBarLabelStyle: { fontSize: 11, fontWeight: '600' } }}>
@@ -82,19 +89,19 @@ export default function TabLayout() {
           const moduleActive = module.items.some((item) => item.path === '/' ? pathname === '/' : pathname.startsWith(item.path));
           const open = expandedModule === module.key;
           return <View key={module.key} className="mb-2">
-            <Pressable onPress={() => setExpandedModule(open ? '' : module.key)} onHoverIn={() => setHoveredPath(`module-${module.key}`)} onHoverOut={() => setHoveredPath(null)} style={({ pressed }) => [{ backgroundColor: moduleActive && !open ? `${colors.primary}12` : hoveredPath === `module-${module.key}` ? `${colors.primary}12` : 'transparent', borderRadius: 10, flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, opacity: pressed ? 0.72 : 1 }]}>
+            <Pressable onPress={() => toggleModule(module.key)} onHoverIn={() => setHoveredPath(`module-${module.key}`)} onHoverOut={() => setHoveredPath(null)} style={({ pressed }) => [{ backgroundColor: moduleActive && !open ? `${colors.primary}12` : hoveredPath === `module-${module.key}` ? `${colors.primary}12` : 'transparent', borderRadius: 10, flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, opacity: pressed ? 0.72 : 1 }]}>
               <IconSymbol name={module.icon} size={19} color={moduleActive || hoveredPath === `module-${module.key}` ? colors.primary : colors.muted} />
               <Text style={{ color: moduleActive || hoveredPath === `module-${module.key}` ? colors.primary : colors.foreground, marginLeft: 12, fontSize: 14, fontWeight: '700', flex: 1 }}>{t(module.label)}</Text>
               <Text style={{ color: colors.muted, fontSize: 14 }}>{open ? '⌃' : '⌄'}</Text>
             </Pressable>
-            {open ? <View className="ml-3 border-l border-border pl-2">{module.items.map((item) => {
+            {open ? <Animated.View style={{ opacity: moduleAnimations[module.key], transform: [{ scaleY: moduleAnimations[module.key] }] }} className="ml-3 border-l border-border pl-2">{module.items.map((item) => {
               const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
               return <Pressable key={item.path} onPress={() => router.push(item.path as never)} onHoverIn={() => setHoveredPath(item.path)} onHoverOut={() => setHoveredPath(null)} style={({ pressed }) => [{ backgroundColor: active ? colors.primary : hoveredPath === item.path ? `${colors.primary}12` : 'transparent', borderRadius: 9, flexDirection: 'row', alignItems: 'center', minHeight: 38, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 3, opacity: pressed ? 0.72 : 1 }]}>
                 <IconSymbol name={item.icon} size={16} color={active ? 'white' : hoveredPath === item.path ? colors.primary : colors.muted} />
                 <Text style={{ color: active ? 'white' : hoveredPath === item.path ? colors.primary : colors.foreground, marginLeft: 10, fontSize: 13, fontWeight: '600', flex: 1 }}>{t(item.label)}</Text>
                 {item.label === 'Aprovações' ? <View style={{ backgroundColor: colors.warning }} className="h-5 min-w-5 items-center justify-center rounded-full px-1"><Text className="text-[10px] font-bold text-white">2</Text></View> : null}
               </Pressable>;
-            })}</View> : null}
+            })}</Animated.View> : null}
           </View>;
         })}
         <View className="mt-auto border-t border-border pt-4">

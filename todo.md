@@ -246,3 +246,11 @@
 - [x] Implementar submenus de Viagens com funcionalidades permitidas por perfil
 - [x] Implementar submenus de Frota com funcionalidades administrativas
 - [x] Preservar idioma, tema, moeda, rotas e responsividade
+
+## Aprimoramentos da navegação modular
+
+- [x] Criar submenu específico para Cadastros de Frota
+- [x] Criar submenu específico para Ordens de Serviço
+- [x] Persistir o último módulo expandido
+- [x] Adicionar animação curta na abertura e fechamento dos submenus
+- [x] Validar permissões, rotas, temas e responsividade
