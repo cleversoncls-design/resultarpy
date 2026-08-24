@@ -34,7 +34,12 @@ export const operationsRouter = router({
   }),
   approvals: router({
     list: protectedProcedure.input(pageInput).query(({ ctx, input }) => operations.listTripApprovals({ ...input, userId: ctx.user.id, admin: ctx.user.role === 'admin' })),
-    decide: protectedProcedure.input(z.object({ tripId: idInput.shape.id, decision: z.enum(['Aprovada', 'Rejeitada', 'Devolvida']), comment: z.string().max(2000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+    history: protectedProcedure.input(idInput).query(async ({ ctx, input }) => {
+      const history = await operations.listTripApprovalHistory(input.id, scopeFor(ctx.user));
+      if (!history) throw notFound();
+      return history;
+    }),
+    decide: protectedProcedure.input(z.object({ tripId: idInput.shape.id, decision: z.enum(['Aprovada', 'Rejeitada', 'Devolvida']), comment: z.string().trim().min(3, 'Comentário obrigatório').max(2000) })).mutation(async ({ ctx, input }) => {
       const result = await operations.decideTripApproval({ ...input, approverId: ctx.user.id }, ctx.user.role === 'admin');
       if (!result) throw forbidden();
       return result;

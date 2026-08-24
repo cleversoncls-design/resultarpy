@@ -361,3 +361,13 @@
 - [x] Cobrir interface de viagem, aprovação, despesa e manutenção com testes E2E
 - [x] Validar regressões, autorização, persistência e build
 - [x] Documentar resultado e salvar checkpoint atualizado
+
+## Comentários, histórico, CI e bridge externo
+
+- [x] Detectar VM Docker externa; nenhum context remoto ou VM anexada foi disponibilizado
+- [x] Tentar o Compose bridge; bloqueado no sandbox por ausência de iptables/raw
+- [x] Exigir comentário nas decisões de aprovação e rejeição
+- [x] Consultar e exibir histórico visual de decisões por viagem
+- [x] Configurar CI para TypeScript, lint, Vitest, Playwright e Compose
+- [x] Executar validações locais finais e revisar segurança
+- [x] Documentar resultados e salvar checkpoint atualizado

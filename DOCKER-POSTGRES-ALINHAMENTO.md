@@ -129,3 +129,21 @@ A tela `app/(tabs)/approvals.tsx` consulta a fila persistente quando existe sess
 Foi adicionado um ambiente E2E separado do preview Metro: `playwright.config.ts` usa o Chromium do sistema e aponta por padrão para `http://127.0.0.1:3101`, o Nginx do `compose.sandbox.yaml`. O comando `pnpm test:e2e` executa `tests/e2e/web-flows.spec.ts`, cobrindo entrada do Viajante, abertura do formulário de nova viagem, nova despesa, edição de viagem e fila do Aprovador. O script `pnpm test` exclui esses specs para manter Vitest e Playwright independentes.
 
 A validação final passou com TypeScript, 19 testes Vitest contra o PostgreSQL host, 4 testes Playwright e build da composição host. O lint não apresentou erros, mantendo apenas dois avisos preexistentes de dependências em `useEffect` nos shells de navegação. A tentativa do bridge continua condicionada a uma VM ou Docker Engine com iptables/raw habilitado.
+
+## Comentários obrigatórios, histórico visual e CI
+
+A decisão de aprovação agora exige comentário com no mínimo três caracteres no contrato tRPC, além da validação inline no modal da interface. O servidor rejeita chamadas sem comentário, impedindo que a regra seja contornada pelo cliente. O histórico é consultável por viagem e respeita o escopo: Administrador, aprovador atribuído e viajante relacionado podem visualizar as decisões; cada registro apresenta decisão, data, responsável e comentário.
+
+A fila e o histórico foram conectados à tela `app/(tabs)/approvals.tsx`. Em sessão autenticada, Aprovar e Rejeitar gravam a decisão no PostgreSQL; no modo demonstrativo, a interface mantém o comportamento local para permitir avaliação sem login. O fluxo E2E também verifica a abertura do histórico e a mensagem de comentário obrigatório.
+
+Foi criado `.github/workflows/ci.yml`. Em `ubuntu-latest`, o workflow instala Node 22 e pnpm 9.12, executa TypeScript, lint, migrations e seed contra PostgreSQL 16, roda Vitest, instala Chromium para Playwright, sobe `compose.yaml` com rede bridge, aguarda o healthcheck do frontend e executa `pnpm test:e2e`. Logs do Compose são coletados em caso de falha e os volumes são removidos no encerramento do job.
+
+A VM Docker externa foi procurada novamente, mas a sessão continua sem context remoto: só existe `default`, e o acesso ao daemon local sem privilégios é negado. A tentativa privilegiada do bridge continua falhando porque o kernel do sandbox não possui a tabela `iptables/raw`. A composição host foi reconstruída e validada com sucesso.
+
+## Etapa final: comentários, histórico e integração contínua
+
+A aprovação persistente passou a exigir comentário no servidor, com mínimo de três caracteres e limite de 2.000 caracteres. A interface também apresenta validação inline no modal antes de enviar a decisão. O histórico de cada viagem pode ser aberto visualmente e exibe decisão, data, aprovador e comentário; o acesso é limitado ao Administrador, ao aprovador atribuído ou ao viajante relacionado.
+
+Foi criado o workflow `.github/workflows/ci.yml`, que executa TypeScript, lint, migrations, seed, Vitest contra PostgreSQL 16, instalação do Chromium, build e subida do `compose.yaml` com rede bridge, healthcheck do frontend e Playwright. O job coleta logs do Compose em caso de falha e remove seus volumes ao finalizar.
+
+A sessão atual não possui VM ou Docker context externo: apenas `default` está disponível. A tentativa local do bridge continua bloqueada pela tabela `iptables/raw` ausente no kernel do sandbox. O Compose host foi reconstruído e validado. A checagem final confirmou TypeScript sem erros, 19 testes Vitest aprovados, 5 testes Playwright aprovados, lint sem erros (dois avisos preexistentes nos shells), workflow e Compose formatados, `git diff --check` limpo e segredo JWT fornecido somente por interpolação de ambiente.

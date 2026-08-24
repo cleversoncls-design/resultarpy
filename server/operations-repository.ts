@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, gte, ilike, lte, or } from 'drizzle-orm';
 import { getDb } from './db';
-import { fleetEvents, fleetReservations, fleetWorkOrders, travelers, tripApprovals, tripExpenses, trips, vehicles } from '../drizzle/schema';
+import { fleetEvents, fleetReservations, fleetWorkOrders, travelers, tripApprovals, tripExpenses, trips, users, vehicles } from '../drizzle/schema';
 
 export type PageInput = { page: number; pageSize: number; search?: string; direction?: 'asc' | 'desc' };
 type Scope = { userId?: number; admin?: boolean };
@@ -75,6 +75,14 @@ export async function listTripApprovals(input: PageInput & { userId?: number; ad
   const rows = await db.select({ trip: trips }).from(trips).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(trips.createdAt) : asc(trips.createdAt)).limit(paging.limit).offset(paging.offset);
   const [{ total }] = await db.select({ total: count() }).from(trips).where(filters.length ? and(...filters) : undefined);
   return { items: rows.map(({ trip }) => trip), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+}
+
+export async function listTripApprovalHistory(tripId: number, scope: Scope = {}) {
+  const db = await requireDb();
+  const [tripAccess] = await db.select({ tripId: trips.id, approverId: trips.approverId, travelerUserId: travelers.userId }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(eq(trips.id, tripId)).limit(1);
+  if (!tripAccess || (!scope.admin && scope.userId !== tripAccess.approverId && scope.userId !== tripAccess.travelerUserId)) return undefined;
+  const rows = await db.select({ approval: tripApprovals, approverName: users.name, approverEmail: users.email }).from(tripApprovals).leftJoin(users, eq(tripApprovals.approverId, users.id)).where(eq(tripApprovals.tripId, tripId)).orderBy(desc(tripApprovals.decidedAt));
+  return rows.map(({ approval, approverName, approverEmail }) => ({ ...approval, approverName: approverName ?? approverEmail ?? 'Usuário' }));
 }
 
 export async function decideTripApproval(input: { tripId: number; approverId: number; decision: typeof tripApprovals.decision.enumValues[number]; comment?: string | null }, admin = false) {
