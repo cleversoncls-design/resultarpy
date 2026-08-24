@@ -261,3 +261,9 @@
 - [x] Adicionar filtros avançados ao Histórico de manutenção
 - [x] Animar o fechamento dos submenus
 - [x] Validar permissões, rotas, filtros e responsividade
+
+## Relatório de Faturamento restrito
+
+- [x] Renomear o item Relatórios para Relatório de Faturamento
+- [x] Exibir o item somente no perfil Administrativo
+- [x] Validar menus, rota e tradução PT/ES nos três perfis

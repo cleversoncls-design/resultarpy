@@ -17,7 +17,7 @@ const moduleGroups = [
     { label: 'Aprovações', path: '/approvals', icon: 'checkmark.seal.fill' as const },
     { label: 'Preparação', path: '/operations', icon: 'briefcase.fill' as const },
     { label: 'Relatório de reembolso', path: '/reimbursements', icon: 'wallet.pass.fill' as const },
-    { label: 'Relatórios', path: '/reports', icon: 'chart.bar.fill' as const },
+    { label: 'Relatório de Faturamento', path: '/reports', icon: 'chart.bar.fill' as const },
   ] },
   { key: 'fleet', label: 'Frota', icon: 'car.fill' as const, items: [
     { label: 'Painel da frota', path: '/fleet', icon: 'car.fill' as const },
