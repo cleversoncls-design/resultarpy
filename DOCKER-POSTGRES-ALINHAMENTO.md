@@ -111,3 +111,11 @@ Os routers de operações agora oferecem `list`, `get`, `create`, `update` e `de
 Foi criado `tests/operations-router.test.ts`. Contra o PostgreSQL host do Compose, o teste autenticado executou CRUD de viagem, despesa e Ordem de Serviço e confirmou que um usuário autenticado não administrador recebe `FORBIDDEN` ao consultar veículos administrativos. O seed foi ampliado com um veículo idempotente para tornar esse teste reproduzível.
 
 A tentativa do `compose.yaml` bridge foi executada com privilégios do daemon e construiu as imagens da API e do frontend, mas o kernel do sandbox rejeitou a criação do endpoint por ausência da tabela `iptables/raw`. A verificação de contexts confirmou que só existe o context `default`; não há VM ou Docker context externo anexado nesta sessão. O `compose.sandbox.yaml` host continua sendo a simulação integrada executável e saudável.
+
+## Execução solicitada: bridge, edição e fluxo ponta a ponta
+
+Foi verificado o ambiente atual com privilégios do daemon. O único Docker context disponível é `default`, sem VM externa anexada. O Compose bridge construiu API, frontend e migrator, mas a inicialização do PostgreSQL foi bloqueada pelo kernel do sandbox: a tabela `iptables/raw` não existe, impedindo a regra de filtragem direta da rede bridge. Portanto, a validação final do bridge deve ser repetida em uma VM ou Docker Engine real com iptables habilitado.
+
+Os formulários visuais agora suportam criação e edição persistentes. A lista de viagens abre `new-trip` com `tripId`; despesas abrem o próprio formulário com `expenseId`; e o painel de Frota apresenta Editar nas Ordens de Serviço persistentes, usando `workOrderId`. Cada tela hidrata o registro via `get`, valida os campos e escolhe `create` ou `update` conforme o modo.
+
+O arquivo `tests/operations-flow.e2e.test.ts` cobre o fluxo API-to-database: criação da viagem, aprovação por transição de status, lançamento e alteração de despesa, reserva, início, finalização com KM, criação e conclusão da Ordem de Serviço e limpeza dos registros temporários. Com `TEST_DATABASE_URL` apontando para o PostgreSQL 16 host, esse teste e o CRUD autenticado existente passaram. A suíte padrão também passou; os testes que dependem de PostgreSQL permanecem condicionados à variável de ambiente.

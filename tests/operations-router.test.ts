@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { appRouter } from '../server/routers';
 import { closeDb, getDb, getUserByOpenId } from '../server/db';
 import type { TrpcContext } from '../server/_core/context';
-import { clients, expenseTypes, fleetWorkOrders, travelers, units, vehicles } from '../drizzle/schema';
+import { clients, expenseTypes, travelers, units, vehicles } from '../drizzle/schema';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (testDatabaseUrl) process.env.DATABASE_URL = testDatabaseUrl;
@@ -27,8 +27,8 @@ describePostgres('Operações persistentes autenticadas no PostgreSQL', () => {
     const [unit] = await db.select().from(units).limit(1);
     const [client] = await db.select().from(clients).limit(1);
     const [expenseType] = await db.select().from(expenseTypes).limit(1);
-    const [vehicle] = await db.select().from(vehicles).limit(1);
-    expect(traveler && unit && client && expenseType && vehicle).toBeTruthy();
+    expect(traveler && unit && client && expenseType).toBeTruthy();
+    const vehicle = await caller.operations.fleet.vehicles.create({ plate: `IT${Date.now()}`.slice(0, 10), brand: 'Toyota', model: 'Integration Test', modelYear: 2024, color: 'Prata', unitId: unit!.id, currentKm: 10000, lastMaintenanceKm: 9000, maintenanceIntervalKm: 10000, fireExtinguisherExpiresOn: null, notes: 'Registro temporário do teste' });
 
     const tripCode = `IT-${Date.now()}`;
     const trip = await caller.operations.trips.create({ tripCode, travelerId: traveler!.id, clientId: client!.id, unitId: unit!.id, origin: 'São Paulo', destination: 'Asunción', country: 'Paraguai', area: 'Comercial', transport: 'Passagem aérea', startsOn: '2026-09-02', endsOn: '2026-09-05', status: 'Rascunho', requiresFleetVehicle: false, hasAdvance: true, needsHotel: true, advanceAmount: '920.00' });
@@ -49,8 +49,7 @@ describePostgres('Operações persistentes autenticadas no PostgreSQL', () => {
     await caller.operations.fleet.workOrders.delete({ id: workOrder!.id });
     await caller.operations.expenses.delete({ id: expense!.id });
     await caller.operations.trips.delete({ id: trip.id });
-    await db.delete(vehicles).where(eq(vehicles.id, vehicle!.id)).catch(() => undefined);
-    await db.delete(fleetWorkOrders).where(eq(fleetWorkOrders.id, workOrder!.id)).catch(() => undefined);
+    await db.delete(vehicles).where(eq(vehicles.id, vehicle.id)).catch(() => undefined);
   });
 
   it('bloqueia operações administrativas para usuário autenticado não administrador', async () => {

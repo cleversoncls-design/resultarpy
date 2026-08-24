@@ -341,3 +341,12 @@
 - [x] Tentar executar o Compose bridge; sandbox sem iptables/raw e sem VM/Docker context externo disponível
 - [x] Validar regressões, persistência após restart, segurança e backups no Compose host; bridge bloqueado no sandbox
 - [x] Documentar resultado e criar checkpoint atualizado
+
+## Próximos passos solicitados: bridge, edição e fluxos automatizados
+
+- [x] Verificar VM/Docker context externo; somente o context default do sandbox está disponível
+- [x] Tentar validar o Compose bridge; bloqueado no sandbox por ausência da tabela iptables/raw
+- [x] Adicionar edição aos formulários visuais de viagens, despesas e Ordens de Serviço
+- [x] Criar teste automatizado do fluxo persistente de viagem, aprovação por status, despesa, reserva e manutenção
+- [x] Validar regressões, segurança e persistência; TypeScript, lint e testes passaram
+- [x] Documentar o resultado e salvar checkpoint atualizado
