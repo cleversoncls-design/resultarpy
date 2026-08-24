@@ -286,3 +286,25 @@
 - [x] Executar smoke tests da aplicação e do banco em ambiente isolado
 - [x] Documentar limitações, riscos de migração e instruções de execução
 - [x] Salvar checkpoint da simulação após validação
+
+## Análise do arquivo recebido e alinhamento Docker/PostgreSQL
+
+- [x] Ler e classificar o conteúdo de pasted_content_2.txt
+- [x] Comparar o conteúdo com o diagnóstico Docker/PostgreSQL existente
+- [x] Incorporar requisitos e decisões compatíveis ao projeto e à documentação
+- [x] Registrar conflitos, lacunas e decisões de migração
+- [x] Validar as alterações e salvar checkpoint atualizado
+
+### Escopo futuro confirmado pelo arquivo recebido
+
+- [ ] Migrar Drizzle, schema e driver de MySQL para PostgreSQL sem remover rollback
+- [ ] Converter o schema simulado em migrations oficiais versionadas e revisáveis
+- [ ] Implementar routers tRPC de Unidades, Clientes, Viajantes e Tipos de gasto
+- [ ] Implementar CRUD, pesquisa, ordenação, paginação, validação e testes dos quatro cadastros
+- [ ] Conectar as quatro telas ao tRPC com estados de carregamento, erro, vazio e mutação
+- [ ] Criar Dockerfile multi-stage da API compilada com healthcheck e usuário não root
+- [ ] Criar Dockerfile multi-stage do frontend e configuração Nginx com fallback SPA
+- [ ] Criar Compose completo com PostgreSQL, migrations, API e frontend
+- [ ] Criar .env.example seguro e manter secrets fora das imagens e do bundle
+- [ ] Criar scripts de migração, seed, saúde, logs, backup e restore
+- [ ] Validar build das imagens, ordem de inicialização, rotas SPA e persistência após restart
