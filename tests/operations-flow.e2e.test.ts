@@ -38,9 +38,13 @@ describePostgres('Fluxo persistente ponta a ponta', () => {
     const approvedTrip = await approverCaller.operations.approvals.decide({ tripId: trip.id, decision: 'Aprovada', comment: 'Aprovado no fluxo E2E' });
     expect(approvedTrip.trip.status).toBe('Aprovada');
     const approvedHistory = await approverCaller.operations.approvals.history({ id: trip.id, decision: 'Aprovada', from: '2020-01-01', to: '2099-12-31' });
-    expect(approvedHistory).toHaveLength(1);
-    expect(approvedHistory[0]?.comment).toBe('Aprovado no fluxo E2E');
-    expect(await approverCaller.operations.approvals.history({ id: trip.id, decision: 'Rejeitada', from: '2020-01-01', to: '2099-12-31' })).toHaveLength(0);
+    expect(approvedHistory.items).toHaveLength(1);
+    expect(approvedHistory.page).toBe(1);
+    expect(approvedHistory.total).toBe(1);
+    expect(approvedHistory.items[0]?.comment).toBe('Aprovado no fluxo E2E');
+    expect((await approverCaller.operations.approvals.history({ id: trip.id, decision: 'Rejeitada', from: '2020-01-01', to: '2099-12-31' })).items).toHaveLength(0);
+    const exportedHistory = await approverCaller.operations.approvals.historyExport({ id: trip.id, decision: 'Aprovada', from: '2020-01-01', to: '2099-12-31' });
+    expect(exportedHistory).toHaveLength(1);
 
     const expense = await caller.operations.expenses.create({ tripId: trip.id, expenseTypeId: expenseType!.id, occurredOn: '2026-09-11', city: 'Asunción', quantity: '2', unitValue: '80.00', expenseGroup: 'Hospedagem', prepaid: false, billable: true, notes: 'Fluxo E2E' });
     expect(expense.amount).toBe('160.00');

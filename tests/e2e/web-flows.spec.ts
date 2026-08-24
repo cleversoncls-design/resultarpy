@@ -34,6 +34,9 @@ test.describe('fluxos web do Controle de Viagens', () => {
 
   test('exibe o histórico e exige comentário antes da decisão', async ({ page }) => {
     await page.goto('/approvals?perfil=Aprovador');
+    await expect(page.getByText('Filtros do histórico', { exact: true })).toBeVisible();
+    await expect(page.getByText('Aprovada', { exact: true })).toBeVisible();
+    await page.getByText('Aprovada', { exact: true }).click();
     await page.getByText('Histórico', { exact: true }).first().click();
     await expect(page.getByText('Histórico de decisões', { exact: true })).toBeVisible();
     await page.getByText('Aprovar').first().click();

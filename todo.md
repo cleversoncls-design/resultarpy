@@ -383,3 +383,14 @@
 - [x] Conectar filtros à interface e preservar autorização por perfil
 - [x] Validar regressões, CI local e documentar resultados
 - [x] Salvar checkpoint atualizado
+
+## CI remoto, bridge e histórico exportável
+
+- [x] Verificar exportação segura; GitHub existe desativado e aguarda vinculação da conta pelo usuário
+- [x] Preparar o workflow para execução remota; disparo aguarda repositório GitHub conectado
+- [x] Verificar VM Docker externa; nenhum context remoto ou VM anexada está disponível
+- [x] Tentar o Compose bridge local; bloqueado no sandbox por ausência de iptables/raw
+- [x] Adicionar paginação ao histórico de aprovações filtrado
+- [x] Adicionar exportação CSV, XLSX e PDF do histórico filtrado
+- [x] Validar autorização, filtros, paginação, exports e CI local
+- [x] Documentar resultados e salvar checkpoint atualizado

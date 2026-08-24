@@ -155,3 +155,9 @@ O histórico de aprovações agora aceita filtro por decisão (`Aprovada`, `Reje
 A sessão foi verificada para execução remota. O repositório `origin` atual é um repositório interno do projeto, sem remoto GitHub/GitLab, e a autenticação GitHub não está habilitada; por isso o workflow não pôde ser disparado remotamente nesta sessão. O workflow permanece pronto em `.github/workflows/ci.yml` para ser executado após exportação pelo Management UI para um repositório GitHub.
 
 Também não há VM Docker anexada nem Docker context remoto. O Compose bridge foi tentado novamente no daemon local com o segredo fornecido por ambiente, mas o sandbox continua sem a tabela `iptables/raw`. A validação equivalente no Compose host passou: TypeScript sem erros, 19 testes Vitest, 5 testes Playwright, build do frontend/API e configuração do Compose válidos.
+
+## Histórico paginado e exportável
+
+O histórico de aprovações passou a retornar metadados de paginação (`page`, `pageSize`, `total` e `totalPages`) e a interface apresenta navegação anterior/próxima. A consulta `historyExport` reutiliza os filtros de decisão e período, busca todos os registros filtrados com autorização no servidor e alimenta a camada existente de exportação em CSV, XLSX e PDF.
+
+A validação local foi repetida após a alteração: Compose host reconstruído e saudável, TypeScript sem erros, lint sem erros com dois avisos preexistentes de `useEffect`, 19 testes Vitest passando e 5 testes Playwright passando. A exportação para GitHub e o disparo remoto do workflow continuam aguardando a vinculação da conta pelo usuário; o origin atual é interno do projeto. Não há VM Docker externa nem context remoto disponível, e o bridge continua limitado pela ausência de `iptables/raw` no sandbox.

@@ -12,7 +12,9 @@ const pageInput = z.object({
 const idInput = z.object({ id: z.number().int().positive() });
 const tripStatus = z.enum(['Rascunho', 'Aguardando aprovação', 'Aprovada', 'Em preparação', 'Liberada para viagem', 'Em prestação', 'Finalizada', 'Rejeitada', 'Devolvida']);
 const approvalDecision = z.enum(['Aprovada', 'Rejeitada', 'Devolvida']);
-const approvalHistoryInput = idInput.extend({ decision: approvalDecision.optional(), from: z.string().date().optional(), to: z.string().date().optional() }).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
+const approvalHistoryFields = { decision: approvalDecision.optional(), from: z.string().date().optional(), to: z.string().date().optional() };
+const approvalHistoryInput = idInput.extend({ ...approvalHistoryFields, page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(10) }).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
+const approvalHistoryExportInput = idInput.extend(approvalHistoryFields).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
 const reservationStatus = z.enum(['Aguardando veículo', 'Reservado', 'Reservada', 'Em viagem', 'Finalizada', 'Cancelada']);
 const maintenanceType = z.enum(['Preventiva', 'Corretiva']);
 const vehicleStatus = z.enum(['Disponível', 'Reservado', 'Em viagem', 'Realizar Manutenção', 'Em manutenção', 'Extintor próximo do vencimento', 'Avaria registrada']);
@@ -41,6 +43,12 @@ export const operationsRouter = router({
       const history = await operations.listTripApprovalHistory(id, scopeFor(ctx.user), filters);
       if (!history) throw notFound();
       return history;
+    }),
+    historyExport: protectedProcedure.input(approvalHistoryExportInput).query(async ({ ctx, input }) => {
+      const { id, ...filters } = input;
+      const history = await operations.listTripApprovalHistory(id, scopeFor(ctx.user), { ...filters, exportAll: true });
+      if (!history) throw notFound();
+      return history.items;
     }),
     decide: protectedProcedure.input(z.object({ tripId: idInput.shape.id, decision: approvalDecision, comment: z.string().trim().min(3, 'Comentário obrigatório').max(2000) })).mutation(async ({ ctx, input }) => {
       const result = await operations.decideTripApproval({ ...input, approverId: ctx.user.id }, ctx.user.role === 'admin');

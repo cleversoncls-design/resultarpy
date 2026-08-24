@@ -81,6 +81,9 @@ export type ApprovalHistoryFilters = {
   decision?: typeof tripApprovals.decision.enumValues[number];
   from?: string;
   to?: string;
+  page?: number;
+  pageSize?: number;
+  exportAll?: boolean;
 };
 
 export async function listTripApprovalHistory(tripId: number, scope: Scope = {}, filters: ApprovalHistoryFilters = {}) {
@@ -93,8 +96,14 @@ export async function listTripApprovalHistory(tripId: number, scope: Scope = {},
     filters.from ? gte(tripApprovals.decidedAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
     filters.to ? lte(tripApprovals.decidedAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
   ].filter(Boolean);
-  const rows = await db.select({ approval: tripApprovals, approverName: users.name, approverEmail: users.email }).from(tripApprovals).leftJoin(users, eq(tripApprovals.approverId, users.id)).where(and(...historyFilters)).orderBy(desc(tripApprovals.decidedAt));
-  return rows.map(({ approval, approverName, approverEmail }) => ({ ...approval, approverName: approverName ?? approverEmail ?? 'Usuário' }));
+  const currentPage = Math.max(filters.page ?? 1, 1);
+  const pageSize = filters.exportAll ? 1000 : Math.min(Math.max(filters.pageSize ?? 10, 1), 100);
+  const offset = filters.exportAll ? 0 : (currentPage - 1) * pageSize;
+  const where = and(...historyFilters);
+  const rows = await db.select({ approval: tripApprovals, approverName: users.name, approverEmail: users.email }).from(tripApprovals).leftJoin(users, eq(tripApprovals.approverId, users.id)).where(where).orderBy(desc(tripApprovals.decidedAt)).limit(pageSize).offset(offset);
+  const [{ total }] = await db.select({ total: count() }).from(tripApprovals).where(where);
+  const items = rows.map(({ approval, approverName, approverEmail }) => ({ ...approval, approverName: approverName ?? approverEmail ?? 'Usuário' }));
+  return { items, page: currentPage, pageSize, total: Number(total), totalPages: filters.exportAll ? 1 : Math.max(Math.ceil(Number(total) / pageSize), 1) };
 }
 
 export async function decideTripApproval(input: { tripId: number; approverId: number; decision: typeof tripApprovals.decision.enumValues[number]; comment?: string | null }, admin = false) {

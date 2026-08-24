@@ -8,11 +8,13 @@ import { useColors } from '@/hooks/use-colors';
 import { useLanguage } from '@/lib/language-provider';
 import { useAuth } from '@/hooks/use-auth';
 import { trpc } from '@/lib/trpc';
+import { ReportExportActions } from '@/components/report-export-actions';
 
 type DecisionAction = 'Aprovar' | 'Rejeitar';
 type HistoryDecision = 'Todas' | 'Aprovada' | 'Rejeitada' | 'Devolvida';
 
 const decisionOptions: HistoryDecision[] = ['Todas', 'Aprovada', 'Rejeitada', 'Devolvida'];
+const historyPageSize = 5;
 const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
 export default function ApprovalsScreen() {
@@ -27,6 +29,7 @@ export default function ApprovalsScreen() {
   const [historyDecision, setHistoryDecision] = useState<HistoryDecision>('Todas');
   const [historyFrom, setHistoryFrom] = useState('');
   const [historyTo, setHistoryTo] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
   const query = trpc.operations.approvals.list.useQuery({ page: 1, pageSize: 50, direction: 'asc' }, { enabled: isAuthenticated });
   const decideMutation = trpc.operations.approvals.decide.useMutation();
   const historyNumericId = historyTripId && /^\d+$/.test(historyTripId) ? Number(historyTripId) : null;
@@ -34,6 +37,10 @@ export default function ApprovalsScreen() {
   const toFilter = isIsoDate(historyTo) ? historyTo : undefined;
   const historyRangeValid = (!historyFrom || Boolean(fromFilter)) && (!historyTo || Boolean(toFilter)) && (!fromFilter || !toFilter || fromFilter <= toFilter);
   const historyQuery = trpc.operations.approvals.history.useQuery(
+    { id: historyNumericId ?? 0, decision: historyDecision === 'Todas' ? undefined : historyDecision, from: fromFilter, to: toFilter, page: historyPage, pageSize: historyPageSize },
+    { enabled: isAuthenticated && historyNumericId !== null && historyRangeValid },
+  );
+  const historyExportQuery = trpc.operations.approvals.historyExport.useQuery(
     { id: historyNumericId ?? 0, decision: historyDecision === 'Todas' ? undefined : historyDecision, from: fromFilter, to: toFilter },
     { enabled: isAuthenticated && historyNumericId !== null && historyRangeValid },
   );
@@ -95,7 +102,7 @@ export default function ApprovalsScreen() {
             {decisionOptions.map((option) => (
               <Pressable
                 key={option}
-                onPress={() => setHistoryDecision(option)}
+                onPress={() => { setHistoryDecision(option); setHistoryPage(1); }}
                 style={({ pressed }) => [{ backgroundColor: historyDecision === option ? colors.primary : colors.background, borderColor: historyDecision === option ? colors.primary : colors.border, opacity: pressed ? 0.7 : 1 }]}
                 className="rounded-xl border px-3 py-2"
               >
@@ -106,11 +113,11 @@ export default function ApprovalsScreen() {
           <View className="mt-3 flex-row gap-3">
             <View className="flex-1">
               <Text className="mb-1 text-xs font-bold text-muted">{t('De')}</Text>
-              <TextInput value={historyFrom} onChangeText={setHistoryFrom} placeholder="AAAA-MM-DD" placeholderTextColor={colors.muted} maxLength={10} className="rounded-xl border border-border bg-background px-3 py-2 text-foreground" />
+              <TextInput value={historyFrom} onChangeText={(value) => { setHistoryFrom(value); setHistoryPage(1); }} placeholder="AAAA-MM-DD" placeholderTextColor={colors.muted} maxLength={10} className="rounded-xl border border-border bg-background px-3 py-2 text-foreground" />
             </View>
             <View className="flex-1">
               <Text className="mb-1 text-xs font-bold text-muted">{t('Até')}</Text>
-              <TextInput value={historyTo} onChangeText={setHistoryTo} placeholder="AAAA-MM-DD" placeholderTextColor={colors.muted} maxLength={10} className="rounded-xl border border-border bg-background px-3 py-2 text-foreground" />
+              <TextInput value={historyTo} onChangeText={(value) => { setHistoryTo(value); setHistoryPage(1); }} placeholder="AAAA-MM-DD" placeholderTextColor={colors.muted} maxLength={10} className="rounded-xl border border-border bg-background px-3 py-2 text-foreground" />
             </View>
           </View>
           {!historyRangeValid ? <Text className="mt-2 text-sm font-medium text-error">{t('Informe datas válidas e um período final igual ou posterior ao inicial.')}</Text> : null}
@@ -137,7 +144,7 @@ export default function ApprovalsScreen() {
                 <Text className="ml-auto font-bold text-foreground">{formatCurrency(item.amount)}</Text>
               </View>
               <View className="mt-5 flex-row flex-wrap gap-3">
-                <Pressable onPress={() => setHistoryTripId(historyTripId === item.id ? null : item.id)} style={({ pressed }) => [{ borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]} className="rounded-xl border px-3 py-3">
+                <Pressable onPress={() => { setHistoryTripId(historyTripId === item.id ? null : item.id); setHistoryPage(1); }} style={({ pressed }) => [{ borderColor: colors.border, opacity: pressed ? 0.7 : 1 }]} className="rounded-xl border px-3 py-3">
                   <Text className="font-bold text-foreground">{t('Histórico')}</Text>
                 </Pressable>
                 <Pressable onPress={() => openDecision(item.id, 'Rejeitar')} style={({ pressed }) => [{ borderColor: colors.error, opacity: pressed ? 0.7 : 1 }]} className="flex-1 items-center rounded-xl border px-3 py-3">
@@ -152,7 +159,7 @@ export default function ApprovalsScreen() {
                   <Text className="text-sm font-bold text-foreground">{t('Histórico de decisões')}</Text>
                   {historyQuery.isLoading ? <Text className="mt-2 text-sm text-muted">{t('Carregando histórico...')}</Text> : null}
                   {historyQuery.isError ? <Text className="mt-2 text-sm text-error">{t('Não foi possível carregar o histórico.')}</Text> : null}
-                  {!historyQuery.isLoading && !historyQuery.isError && historyQuery.data?.length ? historyQuery.data.map((entry) => (
+                  {!historyQuery.isLoading && !historyQuery.isError && historyQuery.data?.items.length ? historyQuery.data.items.map((entry) => (
                     <View key={entry.id} className="mt-3 border-t border-border pt-3">
                       <View className="flex-row items-center justify-between">
                         <Text className="font-bold text-foreground">{t(entry.decision)}</Text>
@@ -162,7 +169,19 @@ export default function ApprovalsScreen() {
                       <Text className="mt-1 text-sm text-muted">{entry.comment ?? t('Sem comentário')}</Text>
                     </View>
                   )) : null}
-                  {!historyQuery.isLoading && !historyQuery.isError && !historyQuery.data?.length ? <Text className="mt-2 text-sm text-muted">{t('Sem histórico de decisões para esta viagem.')}</Text> : null}
+                  {!historyQuery.isLoading && !historyQuery.isError && !historyQuery.data?.items.length ? <Text className="mt-2 text-sm text-muted">{t('Sem histórico de decisões para esta viagem.')}</Text> : null}
+                  {historyQuery.data && historyQuery.data.total > 0 ? (
+                    <>
+                      <View className="mt-4 flex-row items-center justify-between">
+                        <Text className="text-xs text-muted">{t('Página')} {historyQuery.data.page} {t('de')} {historyQuery.data.totalPages} · {historyQuery.data.total} {t('registros')}</Text>
+                        <View className="flex-row gap-2">
+                          <Pressable disabled={historyPage <= 1} onPress={() => setHistoryPage((page) => Math.max(page - 1, 1))} style={({ pressed }) => [{ borderColor: colors.border, opacity: pressed || historyPage <= 1 ? 0.45 : 1 }]} className="rounded-xl border px-3 py-2"><Text className="font-bold text-foreground">‹ {t('Anterior')}</Text></Pressable>
+                          <Pressable disabled={historyPage >= historyQuery.data.totalPages} onPress={() => setHistoryPage((page) => Math.min(page + 1, historyQuery.data.totalPages))} style={({ pressed }) => [{ borderColor: colors.border, opacity: pressed || historyPage >= historyQuery.data.totalPages ? 0.45 : 1 }]} className="rounded-xl border px-3 py-2"><Text className="font-bold text-foreground">{t('Próxima')} ›</Text></Pressable>
+                        </View>
+                      </View>
+                      {historyExportQuery.data?.length ? <ReportExportActions title={`${t('Histórico de decisões')} · ${item.id}`} filename={`historico-aprovacoes-${item.id}`} columns={[{ key: 'decision', label: 'Decisão' }, { key: 'approver', label: 'Aprovador' }, { key: 'date', label: 'Data' }, { key: 'comment', label: 'Comentário' }]} rows={historyExportQuery.data.map((entry) => ({ decision: t(entry.decision), approver: entry.approverName, date: new Date(entry.decidedAt).toLocaleString(), comment: entry.comment ?? t('Sem comentário') }))} /> : null}
+                    </>
+                  ) : null}
                 </View>
               ) : null}
             </View>
