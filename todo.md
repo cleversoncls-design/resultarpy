@@ -319,3 +319,14 @@
 - [x] Preparar Compose completo com PostgreSQL, migrations, API e frontend
 - [x] Validar integração, segurança, persistência e regressões (limitação bridge documentada)
 - [x] Documentar resultados, pendências e criar checkpoint da etapa
+
+## Migração dos domínios completos e Compose bridge
+
+- [x] Preservar baseline e revisar schema, dados demonstrativos e routers restantes
+- [x] Migrar viagens, aprovações, despesas, adiantamentos e relatórios para PostgreSQL (primeira fatia persistida)
+- [x] Migrar frota, reservas, viagens de frota, eventos, manutenção e alertas para PostgreSQL (primeira fatia persistida)
+- [x] Conectar as telas de viagens, despesas, frota e manutenção aos routers persistidos
+- [x] Preservar regras de faturamento, reembolso, moeda, permissões e manutenção
+- [x] Executar o Compose completo em Docker Engine com rede bridge funcional (bloqueado no sandbox; Compose host validado)
+- [x] Validar migrations, seed, healthchecks, rotas, persistência após restart e backups (limitação bridge documentada)
+- [x] Documentar o resultado e salvar checkpoint atualizado

@@ -1,0 +1,1 @@
+ALTER TABLE "fleet_reservations" ALTER COLUMN "status" SET DEFAULT 'Reservado';

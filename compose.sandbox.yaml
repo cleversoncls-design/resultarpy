@@ -1,0 +1,83 @@
+name: controle-viagens-sandbox
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    command: ["postgres", "-p", "5433"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-controle_viagens_host}
+      POSTGRES_USER: ${POSTGRES_USER:-controle}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-controle_dev_only}
+    network_mode: host
+    volumes:
+      - postgres_host_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5433 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+      target: build
+      network: host
+    network_mode: host
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-controle}:${POSTGRES_PASSWORD:-controle_dev_only}@127.0.0.1:5433/${POSTGRES_DB:-controle_viagens_host}
+    command: ["sh", "-c", "pnpm db:migrate && pnpm db:seed"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+      target: runtime
+      network: host
+    network_mode: host
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-controle}:${POSTGRES_PASSWORD:-controle_dev_only}@127.0.0.1:5433/${POSTGRES_DB:-controle_viagens_host}
+      DATABASE_SSL: "false"
+      VITE_APP_ID: ${VITE_APP_ID:-controle-viagens-local}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set before starting the API}
+      OAUTH_SERVER_URL: ${OAUTH_SERVER_URL:-}
+      OWNER_OPEN_ID: ${OWNER_OPEN_ID:-}
+      BUILT_IN_FORGE_API_URL: ${BUILT_IN_FORGE_API_URL:-}
+      BUILT_IN_FORGE_API_KEY: ${BUILT_IN_FORGE_API_KEY:-}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      network: host
+    network_mode: host
+    volumes:
+      - ./docker/nginx/host-compose.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3101/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  postgres_host_data:
+    name: controle-viagens_host_postgres_data

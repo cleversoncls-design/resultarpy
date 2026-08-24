@@ -20,10 +20,13 @@ export const tripStatusEnum = pgEnum("trip_status", [
   "Aguardando aprovação",
   "Aprovada",
   "Em preparação",
+  "Liberada para viagem",
   "Em prestação",
   "Finalizada",
   "Rejeitada",
+  "Devolvida",
 ]);
+export const approvalDecisionEnum = pgEnum("approval_decision", ["Aprovada", "Rejeitada", "Devolvida"]);
 export const maintenanceCategoryEnum = pgEnum("maintenance_category", ["Preventiva", "Corretiva"]);
 export const vehicleStatusEnum = pgEnum("vehicle_status", [
   "Disponível",
@@ -35,11 +38,14 @@ export const vehicleStatusEnum = pgEnum("vehicle_status", [
   "Avaria registrada",
 ]);
 export const reservationStatusEnum = pgEnum("reservation_status", [
+  "Aguardando veículo",
   "Reservado",
+  "Reservada",
   "Em viagem",
   "Finalizada",
   "Cancelada",
 ]);
+export const fleetWorkOrderStatusEnum = pgEnum("fleet_work_order_status", ["Em andamento", "Concluída", "Cancelada"]);
 export const fleetEventTypeEnum = pgEnum("fleet_event_type", ["Multa", "Avaria", "Outro"]);
 
 export const users = pgTable(
@@ -159,12 +165,18 @@ export const trips = pgTable(
     travelerId: bigint("traveler_id", { mode: "number" }).notNull().references(() => travelers.id),
     approverId: bigint("approver_id", { mode: "number" }).references(() => users.id),
     clientId: bigint("client_id", { mode: "number" }).references(() => clients.id),
+    unitId: bigint("unit_id", { mode: "number" }).references(() => units.id),
     origin: varchar("origin", { length: 120 }).notNull(),
     destination: varchar("destination", { length: 120 }).notNull(),
+    country: varchar("country", { length: 80 }),
+    area: varchar("area", { length: 120 }),
+    transport: varchar("transport", { length: 120 }),
     startsOn: date("starts_on").notNull(),
     endsOn: date("ends_on").notNull(),
     status: tripStatusEnum("status").notNull(),
     requiresFleetVehicle: boolean("requires_fleet_vehicle").default(false).notNull(),
+    hasAdvance: boolean("has_advance").default(false).notNull(),
+    needsHotel: boolean("needs_hotel").default(false).notNull(),
     advanceAmount: numeric("advance_amount", { precision: 14, scale: 2 }).default("0").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -183,9 +195,14 @@ export const tripExpenses = pgTable(
     occurredOn: date("occurred_on").notNull(),
     city: varchar("city", { length: 120 }).notNull(),
     quantity: numeric("quantity", { precision: 12, scale: 2 }).default("1").notNull(),
+    unitValue: numeric("unit_value", { precision: 14, scale: 2 }).notNull(),
     amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+    expenseGroup: varchar("expense_group", { length: 120 }),
+    prepaid: boolean("prepaid").default(false).notNull(),
+    billable: boolean("billable").default(true).notNull(),
     receiptUri: text("receipt_uri"),
     notes: text("notes"),
+    reviewNote: text("review_note"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
@@ -193,11 +210,25 @@ export const tripExpenses = pgTable(
   }),
 );
 
+export const tripApprovals = pgTable(
+  "trip_approvals",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    tripId: bigint("trip_id", { mode: "number" }).notNull().references(() => trips.id, { onDelete: "cascade" }),
+    approverId: bigint("approver_id", { mode: "number" }).notNull().references(() => users.id),
+    decision: approvalDecisionEnum("decision").notNull(),
+    comment: text("comment"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ tripApproverUnique: uniqueIndex("trip_approvals_trip_approver_unique").on(table.tripId, table.approverId) }),
+);
+
 export const maintenanceReasons = pgTable(
   "maintenance_reasons",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     name: varchar("name", { length: 160 }).notNull(),
+    description: text("description"),
     category: maintenanceCategoryEnum("category").notNull(),
     active: boolean("active").default(true).notNull(),
   },
@@ -233,9 +264,11 @@ export const fleetReservations = pgTable(
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     tripId: bigint("trip_id", { mode: "number" }).notNull().references(() => trips.id, { onDelete: "cascade" }),
-    vehicleId: bigint("vehicle_id", { mode: "number" }).notNull().references(() => vehicles.id),
+    vehicleId: bigint("vehicle_id", { mode: "number" }).references(() => vehicles.id),
     driverId: bigint("driver_id", { mode: "number" }).notNull().references(() => travelers.id),
     status: reservationStatusEnum("status").default("Reservado").notNull(),
+    plannedStartOn: date("planned_start_on").notNull(),
+    plannedEndOn: date("planned_end_on").notNull(),
     departureAt: timestamp("departure_at", { withTimezone: true }),
     departureKm: integer("departure_km"),
     returnAt: timestamp("return_at", { withTimezone: true }),
@@ -256,6 +289,16 @@ export const fleetEvents = pgTable(
   },
 );
 
+export const fleetEventPhotos = pgTable(
+  "fleet_event_photos",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    eventId: bigint("event_id", { mode: "number" }).notNull().references(() => fleetEvents.id, { onDelete: "cascade" }),
+    photoUri: text("photo_uri").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+);
+
 export const fleetWorkOrders = pgTable(
   "fleet_work_orders",
   {
@@ -267,6 +310,7 @@ export const fleetWorkOrders = pgTable(
     vehicleKm: integer("vehicle_km").notNull(),
     observation: text("observation"),
     costAmount: numeric("cost_amount", { precision: 14, scale: 2 }).default("0").notNull(),
+    status: fleetWorkOrderStatusEnum("status").default("Concluída").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
