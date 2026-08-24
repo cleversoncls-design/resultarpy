@@ -77,11 +77,23 @@ export async function listTripApprovals(input: PageInput & { userId?: number; ad
   return { items: rows.map(({ trip }) => trip), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
 
-export async function listTripApprovalHistory(tripId: number, scope: Scope = {}) {
+export type ApprovalHistoryFilters = {
+  decision?: typeof tripApprovals.decision.enumValues[number];
+  from?: string;
+  to?: string;
+};
+
+export async function listTripApprovalHistory(tripId: number, scope: Scope = {}, filters: ApprovalHistoryFilters = {}) {
   const db = await requireDb();
   const [tripAccess] = await db.select({ tripId: trips.id, approverId: trips.approverId, travelerUserId: travelers.userId }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(eq(trips.id, tripId)).limit(1);
   if (!tripAccess || (!scope.admin && scope.userId !== tripAccess.approverId && scope.userId !== tripAccess.travelerUserId)) return undefined;
-  const rows = await db.select({ approval: tripApprovals, approverName: users.name, approverEmail: users.email }).from(tripApprovals).leftJoin(users, eq(tripApprovals.approverId, users.id)).where(eq(tripApprovals.tripId, tripId)).orderBy(desc(tripApprovals.decidedAt));
+  const historyFilters = [
+    eq(tripApprovals.tripId, tripId),
+    filters.decision ? eq(tripApprovals.decision, filters.decision) : undefined,
+    filters.from ? gte(tripApprovals.decidedAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
+    filters.to ? lte(tripApprovals.decidedAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
+  ].filter(Boolean);
+  const rows = await db.select({ approval: tripApprovals, approverName: users.name, approverEmail: users.email }).from(tripApprovals).leftJoin(users, eq(tripApprovals.approverId, users.id)).where(and(...historyFilters)).orderBy(desc(tripApprovals.decidedAt));
   return rows.map(({ approval, approverName, approverEmail }) => ({ ...approval, approverName: approverName ?? approverEmail ?? 'Usuário' }));
 }
 

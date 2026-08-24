@@ -147,3 +147,11 @@ A aprovação persistente passou a exigir comentário no servidor, com mínimo d
 Foi criado o workflow `.github/workflows/ci.yml`, que executa TypeScript, lint, migrations, seed, Vitest contra PostgreSQL 16, instalação do Chromium, build e subida do `compose.yaml` com rede bridge, healthcheck do frontend e Playwright. O job coleta logs do Compose em caso de falha e remove seus volumes ao finalizar.
 
 A sessão atual não possui VM ou Docker context externo: apenas `default` está disponível. A tentativa local do bridge continua bloqueada pela tabela `iptables/raw` ausente no kernel do sandbox. O Compose host foi reconstruído e validado. A checagem final confirmou TypeScript sem erros, 19 testes Vitest aprovados, 5 testes Playwright aprovados, lint sem erros (dois avisos preexistentes nos shells), workflow e Compose formatados, `git diff --check` limpo e segredo JWT fornecido somente por interpolação de ambiente.
+
+## Filtros de histórico e execução remota
+
+O histórico de aprovações agora aceita filtro por decisão (`Aprovada`, `Rejeitada` ou `Devolvida`) e por período inclusivo, com datas no formato `AAAA-MM-DD`. O backend valida o intervalo, a consulta usa `gte`/`lte` sobre `decidedAt` e a interface aplica os filtros somente quando as datas estão completas e coerentes. A autorização por Administrador, aprovador atribuído e viajante relacionado foi preservada.
+
+A sessão foi verificada para execução remota. O repositório `origin` atual é um repositório interno do projeto, sem remoto GitHub/GitLab, e a autenticação GitHub não está habilitada; por isso o workflow não pôde ser disparado remotamente nesta sessão. O workflow permanece pronto em `.github/workflows/ci.yml` para ser executado após exportação pelo Management UI para um repositório GitHub.
+
+Também não há VM Docker anexada nem Docker context remoto. O Compose bridge foi tentado novamente no daemon local com o segredo fornecido por ambiente, mas o sandbox continua sem a tabela `iptables/raw`. A validação equivalente no Compose host passou: TypeScript sem erros, 19 testes Vitest, 5 testes Playwright, build do frontend/API e configuração do Compose válidos.

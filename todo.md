@@ -371,3 +371,15 @@
 - [x] Configurar CI para TypeScript, lint, Vitest, Playwright e Compose
 - [x] Executar validações locais finais e revisar segurança
 - [x] Documentar resultados e salvar checkpoint atualizado
+
+## Execução remota e filtros do histórico de aprovações
+
+- [x] Verificar repositório remoto; origin é interno e GitHub não está habilitado nesta sessão
+- [x] Preparar o workflow para execução remota; disparo bloqueado sem repositório GitHub conectado
+- [x] Verificar VM Docker externa; nenhum context remoto ou VM anexada está disponível
+- [x] Tentar o Compose bridge local; bloqueado no sandbox por ausência de iptables/raw
+- [x] Adicionar filtro por decisão ao histórico de aprovações
+- [x] Adicionar filtros de período ao histórico de aprovações
+- [x] Conectar filtros à interface e preservar autorização por perfil
+- [x] Validar regressões, CI local e documentar resultados
+- [x] Salvar checkpoint atualizado
