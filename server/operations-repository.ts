@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, gte, ilike, lte, or } from 'drizzle-orm';
 import { getDb } from './db';
-import { fleetEvents, fleetReservations, fleetWorkOrders, travelers, tripExpenses, trips, vehicles } from '../drizzle/schema';
+import { fleetEvents, fleetReservations, fleetWorkOrders, travelers, tripApprovals, tripExpenses, trips, vehicles } from '../drizzle/schema';
 
 export type PageInput = { page: number; pageSize: number; search?: string; direction?: 'asc' | 'desc' };
 type Scope = { userId?: number; admin?: boolean };
@@ -62,6 +62,31 @@ export async function deleteTrip(id: number, scope: Scope = {}) {
   if (!(await getTrip(id, scope))) return undefined;
   const [deleted] = await db.delete(trips).where(eq(trips.id, id)).returning({ id: trips.id });
   return deleted;
+}
+
+export async function listTripApprovals(input: PageInput & { userId?: number; admin?: boolean }) {
+  const db = await requireDb();
+  const filters = [
+    eq(trips.status, 'Aguardando aprovação'),
+    input.admin ? undefined : input.userId ? eq(trips.approverId, input.userId) : undefined,
+    input.search ? or(ilike(trips.tripCode, `%${input.search}%`), ilike(trips.destination, `%${input.search}%`)) : undefined,
+  ].filter(Boolean);
+  const paging = page(input);
+  const rows = await db.select({ trip: trips }).from(trips).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(trips.createdAt) : asc(trips.createdAt)).limit(paging.limit).offset(paging.offset);
+  const [{ total }] = await db.select({ total: count() }).from(trips).where(filters.length ? and(...filters) : undefined);
+  return { items: rows.map(({ trip }) => trip), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+}
+
+export async function decideTripApproval(input: { tripId: number; approverId: number; decision: typeof tripApprovals.decision.enumValues[number]; comment?: string | null }, admin = false) {
+  const db = await requireDb();
+  const [trip] = await db.select().from(trips).where(eq(trips.id, input.tripId)).limit(1);
+  if (!trip || (!admin && trip.approverId !== input.approverId)) return undefined;
+  if (trip.status !== 'Aguardando aprovação') return undefined;
+  return db.transaction(async (tx) => {
+    const [approval] = await tx.insert(tripApprovals).values({ tripId: input.tripId, approverId: input.approverId, decision: input.decision, comment: input.comment ?? null }).onConflictDoUpdate({ target: [tripApprovals.tripId, tripApprovals.approverId], set: { decision: input.decision, comment: input.comment ?? null, decidedAt: new Date() } }).returning();
+    const [updatedTrip] = await tx.update(trips).set({ status: input.decision === 'Aprovada' ? 'Aprovada' : input.decision === 'Rejeitada' ? 'Rejeitada' : 'Devolvida' }).where(eq(trips.id, input.tripId)).returning();
+    return { approval, trip: updatedTrip };
+  });
 }
 
 export async function listTripExpenses(tripId: number | undefined, input: PageInput & { userId?: number }) {

@@ -119,3 +119,13 @@ Foi verificado o ambiente atual com privilégios do daemon. O único Docker cont
 Os formulários visuais agora suportam criação e edição persistentes. A lista de viagens abre `new-trip` com `tripId`; despesas abrem o próprio formulário com `expenseId`; e o painel de Frota apresenta Editar nas Ordens de Serviço persistentes, usando `workOrderId`. Cada tela hidrata o registro via `get`, valida os campos e escolhe `create` ou `update` conforme o modo.
 
 O arquivo `tests/operations-flow.e2e.test.ts` cobre o fluxo API-to-database: criação da viagem, aprovação por transição de status, lançamento e alteração de despesa, reserva, início, finalização com KM, criação e conclusão da Ordem de Serviço e limpeza dos registros temporários. Com `TEST_DATABASE_URL` apontando para o PostgreSQL 16 host, esse teste e o CRUD autenticado existente passaram. A suíte padrão também passou; os testes que dependem de PostgreSQL permanecem condicionados à variável de ambiente.
+
+## Aprovação persistente e E2E web independente
+
+A tabela `trip_approvals`, já prevista no schema PostgreSQL, passou a ser usada pelo repositório de operações. A fila retorna somente viagens com status `Aguardando aprovação`; usuários não administradores recebem apenas viagens cujo `approverId` corresponde ao próprio usuário. A decisão grava ou atualiza o histórico de aprovação em uma transação e altera o status da viagem para `Aprovada`, `Rejeitada` ou `Devolvida`. O Administrador pode decidir qualquer item pendente, enquanto um Aprovador só pode decidir itens atribuídos a ele.
+
+A tela `app/(tabs)/approvals.tsx` consulta a fila persistente quando existe sessão e mantém o fallback demonstrativo somente no modo não autenticado. Os botões Aprovar e Rejeitar agora executam a mutation de decisão e atualizam a fila; a autorização definitiva permanece no servidor.
+
+Foi adicionado um ambiente E2E separado do preview Metro: `playwright.config.ts` usa o Chromium do sistema e aponta por padrão para `http://127.0.0.1:3101`, o Nginx do `compose.sandbox.yaml`. O comando `pnpm test:e2e` executa `tests/e2e/web-flows.spec.ts`, cobrindo entrada do Viajante, abertura do formulário de nova viagem, nova despesa, edição de viagem e fila do Aprovador. O script `pnpm test` exclui esses specs para manter Vitest e Playwright independentes.
+
+A validação final passou com TypeScript, 19 testes Vitest contra o PostgreSQL host, 4 testes Playwright e build da composição host. O lint não apresentou erros, mantendo apenas dois avisos preexistentes de dependências em `useEffect` nos shells de navegação. A tentativa do bridge continua condicionada a uma VM ou Docker Engine com iptables/raw habilitado.

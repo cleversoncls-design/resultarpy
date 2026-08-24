@@ -32,6 +32,14 @@ export const operationsRouter = router({
     update: protectedProcedure.input(tripFields.partial().extend({ id: idInput.shape.id })).mutation(async ({ ctx, input }) => { const { id, ...changes } = input; const trip = await operations.updateTrip(id, changes, scopeFor(ctx.user)); if (!trip) throw notFound(); return trip; }),
     delete: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => { const deleted = await operations.deleteTrip(input.id, scopeFor(ctx.user)); if (!deleted) throw notFound(); return deleted; }),
   }),
+  approvals: router({
+    list: protectedProcedure.input(pageInput).query(({ ctx, input }) => operations.listTripApprovals({ ...input, userId: ctx.user.id, admin: ctx.user.role === 'admin' })),
+    decide: protectedProcedure.input(z.object({ tripId: idInput.shape.id, decision: z.enum(['Aprovada', 'Rejeitada', 'Devolvida']), comment: z.string().max(2000).nullable().optional() })).mutation(async ({ ctx, input }) => {
+      const result = await operations.decideTripApproval({ ...input, approverId: ctx.user.id }, ctx.user.role === 'admin');
+      if (!result) throw forbidden();
+      return result;
+    }),
+  }),
   expenses: router({
     list: protectedProcedure.input(pageInput.extend({ tripId: z.number().int().positive().optional() })).query(({ ctx, input }) => operations.listTripExpenses(input.tripId, { ...input, userId: ctx.user.role === 'admin' ? undefined : ctx.user.id })),
     get: protectedProcedure.input(idInput).query(async ({ ctx, input }) => { const expense = await operations.getTripExpense(input.id, scopeFor(ctx.user)); if (!expense) throw notFound(); return expense; }),

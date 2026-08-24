@@ -350,3 +350,14 @@
 - [x] Criar teste automatizado do fluxo persistente de viagem, aprovação por status, despesa, reserva e manutenção
 - [x] Validar regressões, segurança e persistência; TypeScript, lint e testes passaram
 - [x] Documentar o resultado e salvar checkpoint atualizado
+
+## Aprovação persistente e testes E2E web
+
+- [x] Detectar VM ou Docker context externo; somente o context default do sandbox está disponível
+- [x] Tentar executar e validar o Compose bridge; bloqueado no sandbox por ausência de iptables/raw
+- [x] Criar procedimento persistente de aprovação e rejeição para Aprovador
+- [x] Conectar a tela de Aprovações às consultas e mutations persistentes
+- [x] Configurar ambiente web E2E separado do preview Expo com Nginx e Playwright
+- [x] Cobrir interface de viagem, aprovação, despesa e manutenção com testes E2E
+- [x] Validar regressões, autorização, persistência e build
+- [x] Documentar resultado e salvar checkpoint atualizado
