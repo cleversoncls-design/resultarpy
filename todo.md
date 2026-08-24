@@ -277,3 +277,12 @@
 - [x] Traduzir e validar a nova navegação em PT/ES, desktop e smartphone
 - [x] Validar que Viajante e Aprovador não recebam acesso administrativo aos cadastros gerais
 - [x] Testar rotas, permissões e responsividade após a alteração
+
+## Diagnóstico e simulação Docker com PostgreSQL
+
+- [x] Inventariar a arquitetura atual, o banco configurado e os dados demonstrativos
+- [x] Definir a arquitetura Docker para web, API e PostgreSQL
+- [x] Preparar arquivos de simulação com schema, migrações e seed inicial
+- [x] Executar smoke tests da aplicação e do banco em ambiente isolado
+- [x] Documentar limitações, riscos de migração e instruções de execução
+- [x] Salvar checkpoint da simulação após validação
