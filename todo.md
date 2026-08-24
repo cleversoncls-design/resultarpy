@@ -232,3 +232,9 @@
 - [x] Verificar o estado do servidor e do endereço atual
 - [x] Recuperar ou gerar um novo link de preview funcional
 - [x] Validar o acesso ao novo link em desktop
+
+## Novo link de visualização
+
+- [x] Verificar e ativar o servidor de desenvolvimento
+- [x] Validar o preview web após a compilação
+- [x] Entregar um link de acesso funcional
