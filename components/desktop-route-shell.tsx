@@ -14,6 +14,7 @@ const moduleGroups = [
     { label: 'Painel', path: '/', icon: 'house.fill' as const },
     { label: 'Minhas viagens', path: '/trips', icon: 'airplane' as const },
     { label: 'Nova solicitação', path: '/new-trip', icon: 'plus' as const },
+    { label: 'Cadastros gerais', path: '/general-cadastros', icon: 'building.2.fill' as const },
     { label: 'Aprovações', path: '/approvals', icon: 'checkmark.seal.fill' as const },
     { label: 'Preparação', path: '/operations', icon: 'briefcase.fill' as const },
     { label: 'Relatório de reembolso', path: '/reimbursements', icon: 'wallet.pass.fill' as const },
@@ -44,7 +45,7 @@ export function DesktopRouteShell({ children }: { children: React.ReactNode }) {
   const visibleModules = moduleGroups.map((module) => ({ ...module, items: module.items.filter((item) => {
     if (module.key === 'fleet' && !canAdmin) return false;
     if (item.path === '/approvals') return canApprove;
-    if (['/operations', '/reports'].includes(item.path)) return canAdmin;
+    if (['/operations', '/reports', '/general-cadastros'].includes(item.path)) return canAdmin;
     return true;
   }) })).filter((module) => module.items.length > 0);
   useEffect(() => { AsyncStorage.getItem('controle-viagens-expanded-module').then((saved) => { if (saved && visibleModules.some((module) => module.key === saved)) { setExpandedModule(saved); setRenderedModules((current) => ({ ...current, [saved]: true })); moduleAnimations[saved]?.setValue(1); } }); }, []);

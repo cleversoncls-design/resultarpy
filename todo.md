@@ -267,3 +267,13 @@
 - [x] Renomear o item Relatórios para Relatório de Faturamento
 - [x] Exibir o item somente no perfil Administrativo
 - [x] Validar menus, rota e tradução PT/ES nos três perfis
+
+
+## Cadastros gerais compartilhados
+
+- [x] Criar entrada explícita de Cadastros gerais para o perfil Administrativo
+- [x] Organizar Unidade, Viajantes, Clientes e Tipos de gasto como cadastros compartilhados entre Viagens e Frota
+- [x] Integrar a entrada de Cadastros gerais à navegação modular e ao shell de rotas externas
+- [x] Traduzir e validar a nova navegação em PT/ES, desktop e smartphone
+- [x] Validar que Viajante e Aprovador não recebam acesso administrativo aos cadastros gerais
+- [x] Testar rotas, permissões e responsividade após a alteração
