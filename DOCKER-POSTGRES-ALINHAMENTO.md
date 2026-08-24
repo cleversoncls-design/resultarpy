@@ -103,3 +103,11 @@ Foram implementados `server/operations-repository.ts` e `server/operations-route
 O banco gerenciado foi preservado: ele continua sendo TiDB/MySQL e não recebeu SQL PostgreSQL. O arquivo `server/db.ts` agora possui adaptador dual, usando PostgreSQL para o ambiente Docker e MySQL/TiDB para a autenticação do preview gerenciado.
 
 As imagens da API e do frontend foram reconstruídas com sucesso. A tentativa do Compose de produção com rede bridge confirmou a limitação do kernel do sandbox (`iptables` sem a tabela `raw`). Em seguida, o Compose standalone `compose.sandbox.yaml`, com rede host e volume separado, subiu com sucesso: PostgreSQL ficou saudável, migrations e seed concluíram, a API respondeu `/api/health`, o frontend Nginx respondeu `/healthz` e 16 tabelas foram confirmadas. Esse override é apenas para teste local; produção deve usar o `compose.yaml` bridge em um Docker Engine com suporte normal a iptables.
+
+## CRUD completo e teste autenticado
+
+Os routers de operações agora oferecem `list`, `get`, `create`, `update` e `delete` para viagens e despesas, com escopo por usuário para perfis não administrativos. Ordens de Serviço também possuem `get`, `create`, `update` e `delete`; ao criar ou concluir uma O.S., o KM e a última manutenção do veículo são atualizados. O dashboard de frota, a lista de viagens e a tela de despesas consultam a persistência quando a sessão autenticada está disponível, mantendo o modo demonstrativo local separado.
+
+Foi criado `tests/operations-router.test.ts`. Contra o PostgreSQL host do Compose, o teste autenticado executou CRUD de viagem, despesa e Ordem de Serviço e confirmou que um usuário autenticado não administrador recebe `FORBIDDEN` ao consultar veículos administrativos. O seed foi ampliado com um veículo idempotente para tornar esse teste reproduzível.
+
+A tentativa do `compose.yaml` bridge foi executada com privilégios do daemon e construiu as imagens da API e do frontend, mas o kernel do sandbox rejeitou a criação do endpoint por ausência da tabela `iptables/raw`. A verificação de contexts confirmou que só existe o context `default`; não há VM ou Docker context externo anexado nesta sessão. O `compose.sandbox.yaml` host continua sendo a simulação integrada executável e saudável.

@@ -1,14 +1,14 @@
 import { and, asc, count, desc, eq, gte, ilike, lte, or } from 'drizzle-orm';
 import { getDb } from './db';
-import { fleetEvents, fleetReservations, fleetWorkOrders, tripExpenses, trips, vehicles } from '../drizzle/schema';
+import { fleetEvents, fleetReservations, fleetWorkOrders, travelers, tripExpenses, trips, vehicles } from '../drizzle/schema';
 
 export type PageInput = { page: number; pageSize: number; search?: string; direction?: 'asc' | 'desc' };
+type Scope = { userId?: number; admin?: boolean };
 
-function requireDb() {
-  return getDb().then((db) => {
-    if (!db) throw new Error('PostgreSQL database is not available for this operation');
-    return db;
-  });
+async function requireDb() {
+  const db = await getDb();
+  if (!db) throw new Error('PostgreSQL database is not available for this operation');
+  return db;
 }
 
 function page(input: PageInput) {
@@ -16,13 +16,32 @@ function page(input: PageInput) {
   return { limit: pageSize, offset: Math.max(input.page - 1, 0) * pageSize };
 }
 
-export async function listTrips(input: PageInput & { status?: string; travelerId?: number }) {
+export async function findTravelerIdByUserId(userId: number) {
   const db = await requireDb();
-  const filters = [input.search ? or(ilike(trips.tripCode, `%${input.search}%`), ilike(trips.destination, `%${input.search}%`)) : undefined, input.status ? eq(trips.status, input.status as typeof trips.status.enumValues[number]) : undefined, input.travelerId ? eq(trips.travelerId, input.travelerId) : undefined].filter(Boolean);
+  const [traveler] = await db.select({ id: travelers.id }).from(travelers).where(eq(travelers.userId, userId)).limit(1);
+  return traveler?.id;
+}
+
+export async function listTrips(input: PageInput & { status?: string; travelerId?: number; userId?: number }) {
+  const db = await requireDb();
+  const filters = [
+    input.search ? or(ilike(trips.tripCode, `%${input.search}%`), ilike(trips.destination, `%${input.search}%`)) : undefined,
+    input.status ? eq(trips.status, input.status as typeof trips.status.enumValues[number]) : undefined,
+    input.travelerId ? eq(trips.travelerId, input.travelerId) : undefined,
+    input.userId ? eq(travelers.userId, input.userId) : undefined,
+  ].filter(Boolean);
   const paging = page(input);
-  const items = await db.select().from(trips).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(trips.startsOn) : asc(trips.startsOn)).limit(paging.limit).offset(paging.offset);
-  const [{ total }] = await db.select({ total: count() }).from(trips).where(filters.length ? and(...filters) : undefined);
-  return { items, page: input.page, pageSize: paging.limit, total };
+  const query = db.select({ trip: trips }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id));
+  const rows = await query.where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(trips.startsOn) : asc(trips.startsOn)).limit(paging.limit).offset(paging.offset);
+  const [{ total }] = await db.select({ total: count() }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(filters.length ? and(...filters) : undefined);
+  return { items: rows.map(({ trip }) => trip), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+}
+
+export async function getTrip(id: number, scope: Scope = {}) {
+  const db = await requireDb();
+  const filters = [eq(trips.id, id), scope.admin ? undefined : scope.userId ? eq(travelers.userId, scope.userId) : undefined].filter(Boolean);
+  const [row] = await db.select({ trip: trips }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(and(...filters)).limit(1);
+  return row?.trip;
 }
 
 export async function createTrip(input: typeof trips.$inferInsert) {
@@ -31,19 +50,59 @@ export async function createTrip(input: typeof trips.$inferInsert) {
   return created;
 }
 
-export async function listTripExpenses(tripId: number | undefined, input: PageInput) {
+export async function updateTrip(id: number, input: Partial<typeof trips.$inferInsert>, scope: Scope = {}) {
   const db = await requireDb();
-  const filters = [tripId ? eq(tripExpenses.tripId, tripId) : undefined, input.search ? or(ilike(tripExpenses.city, `%${input.search}%`), ilike(tripExpenses.notes, `%${input.search}%`)) : undefined].filter(Boolean);
-  const paging = page(input);
-  const items = await db.select().from(tripExpenses).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(tripExpenses.occurredOn) : asc(tripExpenses.occurredOn)).limit(paging.limit).offset(paging.offset);
-  const [{ total }] = await db.select({ total: count() }).from(tripExpenses).where(filters.length ? and(...filters) : undefined);
-  return { items, page: input.page, pageSize: paging.limit, total };
+  if (!(await getTrip(id, scope))) return undefined;
+  const [updated] = await db.update(trips).set(input).where(eq(trips.id, id)).returning();
+  return updated;
 }
 
-export async function createTripExpense(input: typeof tripExpenses.$inferInsert) {
+export async function deleteTrip(id: number, scope: Scope = {}) {
   const db = await requireDb();
+  if (!(await getTrip(id, scope))) return undefined;
+  const [deleted] = await db.delete(trips).where(eq(trips.id, id)).returning({ id: trips.id });
+  return deleted;
+}
+
+export async function listTripExpenses(tripId: number | undefined, input: PageInput & { userId?: number }) {
+  const db = await requireDb();
+  const filters = [
+    tripId ? eq(tripExpenses.tripId, tripId) : undefined,
+    input.search ? or(ilike(tripExpenses.city, `%${input.search}%`), ilike(tripExpenses.notes, `%${input.search}%`)) : undefined,
+    input.userId ? eq(travelers.userId, input.userId) : undefined,
+  ].filter(Boolean);
+  const paging = page(input);
+  const rows = await db.select({ expense: tripExpenses }).from(tripExpenses).innerJoin(trips, eq(tripExpenses.tripId, trips.id)).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(tripExpenses.occurredOn) : asc(tripExpenses.occurredOn)).limit(paging.limit).offset(paging.offset);
+  const [{ total }] = await db.select({ total: count() }).from(tripExpenses).innerJoin(trips, eq(tripExpenses.tripId, trips.id)).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(filters.length ? and(...filters) : undefined);
+  return { items: rows.map(({ expense }) => expense), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+}
+
+export async function getTripExpense(id: number, scope: Scope = {}) {
+  const db = await requireDb();
+  const filters = [eq(tripExpenses.id, id), scope.admin ? undefined : scope.userId ? eq(travelers.userId, scope.userId) : undefined].filter(Boolean);
+  const [row] = await db.select({ expense: tripExpenses }).from(tripExpenses).innerJoin(trips, eq(tripExpenses.tripId, trips.id)).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(and(...filters)).limit(1);
+  return row?.expense;
+}
+
+export async function createTripExpense(input: typeof tripExpenses.$inferInsert, scope: Scope = {}) {
+  const db = await requireDb();
+  if (!(await getTrip(input.tripId, scope))) return undefined;
   const [created] = await db.insert(tripExpenses).values(input).returning();
   return created;
+}
+
+export async function updateTripExpense(id: number, input: Partial<typeof tripExpenses.$inferInsert>, scope: Scope = {}) {
+  const db = await requireDb();
+  if (!(await getTripExpense(id, scope))) return undefined;
+  const [updated] = await db.update(tripExpenses).set(input).where(eq(tripExpenses.id, id)).returning();
+  return updated;
+}
+
+export async function deleteTripExpense(id: number, scope: Scope = {}) {
+  const db = await requireDb();
+  if (!(await getTripExpense(id, scope))) return undefined;
+  const [deleted] = await db.delete(tripExpenses).where(eq(tripExpenses.id, id)).returning({ id: tripExpenses.id });
+  return deleted;
 }
 
 export async function listVehicles(input: PageInput & { status?: string }) {
@@ -52,7 +111,7 @@ export async function listVehicles(input: PageInput & { status?: string }) {
   const paging = page(input);
   const items = await db.select().from(vehicles).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(vehicles.createdAt) : asc(vehicles.createdAt)).limit(paging.limit).offset(paging.offset);
   const [{ total }] = await db.select({ total: count() }).from(vehicles).where(filters.length ? and(...filters) : undefined);
-  return { items, page: input.page, pageSize: paging.limit, total };
+  return { items, page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
 
 export async function createVehicle(input: typeof vehicles.$inferInsert) {
@@ -73,7 +132,7 @@ export async function listFleetReservations(input: PageInput & { status?: string
   const paging = page(input);
   const items = await db.select().from(fleetReservations).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(fleetReservations.plannedStartOn) : asc(fleetReservations.plannedStartOn)).limit(paging.limit).offset(paging.offset);
   const [{ total }] = await db.select({ total: count() }).from(fleetReservations).where(filters.length ? and(...filters) : undefined);
-  return { items, page: input.page, pageSize: paging.limit, total };
+  return { items, page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
 
 export async function createFleetReservation(input: typeof fleetReservations.$inferInsert) {
@@ -94,7 +153,7 @@ export async function listFleetEvents(reservationId: number | undefined, input: 
   const paging = page(input);
   const items = await db.select().from(fleetEvents).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(fleetEvents.createdAt) : asc(fleetEvents.createdAt)).limit(paging.limit).offset(paging.offset);
   const [{ total }] = await db.select({ total: count() }).from(fleetEvents).where(filters.length ? and(...filters) : undefined);
-  return { items, page: input.page, pageSize: paging.limit, total };
+  return { items, page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
 
 export async function createFleetEvent(input: typeof fleetEvents.$inferInsert) {
@@ -109,7 +168,13 @@ export async function listWorkOrders(input: PageInput & { vehicleId?: number; ma
   const paging = page(input);
   const items = await db.select().from(fleetWorkOrders).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(fleetWorkOrders.maintenanceDate) : asc(fleetWorkOrders.maintenanceDate)).limit(paging.limit).offset(paging.offset);
   const [{ total }] = await db.select({ total: count() }).from(fleetWorkOrders).where(filters.length ? and(...filters) : undefined);
-  return { items, page: input.page, pageSize: paging.limit, total };
+  return { items, page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+}
+
+export async function getWorkOrder(id: number) {
+  const db = await requireDb();
+  const [order] = await db.select().from(fleetWorkOrders).where(eq(fleetWorkOrders.id, id)).limit(1);
+  return order;
 }
 
 export async function createWorkOrder(input: typeof fleetWorkOrders.$inferInsert) {
@@ -117,4 +182,17 @@ export async function createWorkOrder(input: typeof fleetWorkOrders.$inferInsert
   const [created] = await db.insert(fleetWorkOrders).values(input).returning();
   if (created) await updateVehicle(created.vehicleId, { currentKm: created.vehicleKm, lastMaintenanceKm: created.vehicleKm, status: 'Disponível' });
   return created;
+}
+
+export async function updateWorkOrder(id: number, input: Partial<typeof fleetWorkOrders.$inferInsert>) {
+  const db = await requireDb();
+  const [updated] = await db.update(fleetWorkOrders).set(input).where(eq(fleetWorkOrders.id, id)).returning();
+  if (updated && (input.vehicleKm !== undefined || input.status === 'Concluída')) await updateVehicle(updated.vehicleId, { currentKm: updated.vehicleKm, lastMaintenanceKm: updated.vehicleKm, status: 'Disponível' });
+  return updated;
+}
+
+export async function deleteWorkOrder(id: number) {
+  const db = await requireDb();
+  const [deleted] = await db.delete(fleetWorkOrders).where(eq(fleetWorkOrders.id, id)).returning({ id: fleetWorkOrders.id });
+  return deleted;
 }

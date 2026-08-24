@@ -58,6 +58,17 @@ async function seed() {
     `);
 
     await client.query(`
+      INSERT INTO vehicles (plate, brand, model, model_year, color, unit_id, current_km, last_maintenance_km, maintenance_interval_km, fire_extinguisher_expires_on, status, notes)
+      SELECT 'ABC1D23', 'Toyota', 'Corolla', 2024, 'Prata', un.id, 74101, 65000, 10000, '2026-12-31', 'Disponível', 'Veículo inicial do ambiente local'
+      FROM units un WHERE un.code = 'SP-CAP'
+      ON CONFLICT (plate) DO UPDATE SET
+        brand = EXCLUDED.brand,
+        model = EXCLUDED.model,
+        unit_id = EXCLUDED.unit_id,
+        status = 'Disponível'
+    `);
+
+    await client.query(`
       INSERT INTO maintenance_reasons (name, category)
       VALUES
         ('Revisão periódica', 'Preventiva'),

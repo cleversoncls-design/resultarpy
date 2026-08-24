@@ -330,3 +330,14 @@
 - [x] Executar o Compose completo em Docker Engine com rede bridge funcional (bloqueado no sandbox; Compose host validado)
 - [x] Validar migrations, seed, healthchecks, rotas, persistência após restart e backups (limitação bridge documentada)
 - [x] Documentar o resultado e salvar checkpoint atualizado
+
+## CRUDs persistentes e validação Docker bridge
+
+- [x] Preservar baseline e revisar contratos atuais de viagens, despesas e Ordens de Serviço
+- [x] Implementar CRUD persistente de viagens com filtros, paginação e autorização
+- [x] Implementar CRUD persistente de despesas com cálculo e validação monetária
+- [x] Implementar CRUD persistente de Ordens de Serviço com atualização de veículo
+- [x] Criar teste de integração autenticado contra PostgreSQL
+- [x] Tentar executar o Compose bridge; sandbox sem iptables/raw e sem VM/Docker context externo disponível
+- [x] Validar regressões, persistência após restart, segurança e backups no Compose host; bridge bloqueado no sandbox
+- [x] Documentar resultado e criar checkpoint atualizado
