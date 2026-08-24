@@ -238,3 +238,11 @@
 - [x] Verificar e ativar o servidor de desenvolvimento
 - [x] Validar o preview web após a compilação
 - [x] Entregar um link de acesso funcional
+
+## Navegação por módulos
+
+- [x] Criar entrada inicial para o módulo Viagens
+- [x] Criar entrada inicial para o módulo Frota
+- [x] Implementar submenus de Viagens com funcionalidades permitidas por perfil
+- [x] Implementar submenus de Frota com funcionalidades administrativas
+- [x] Preservar idioma, tema, moeda, rotas e responsividade
