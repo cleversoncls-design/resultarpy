@@ -107,7 +107,7 @@ export default function TripDetailScreen() {
       arrivalAirport?: string;
     } | null;
   };
-  const clientLabel = tripRecord.clientName ?? ('client' in trip ? trip.client : '—');
+  const clientLabel = tripRecord.clientName ?? tripRecord.travelerName ?? "—";
   const advanceValue = tripRecord.advanceAmount ?? ('amount' in trip ? String(trip.amount) : '0');
   const flightDetails = tripRecord.flightDetails ?? undefined;
 
