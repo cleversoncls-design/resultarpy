@@ -35,9 +35,13 @@ export default function TripDetailScreen() {
 
   // Todos os hooks abaixo são sempre chamados, em toda renderização,
   // independentemente de a viagem já ter chegado ou não (regra do React).
-  const reservation = fleetReservations.find((item) => item.tripId === trip?.id);
+  const reservation = fleetReservations.find(
+    (item) => item.tripId === String(trip?.id),
+  );
   const vehicle = vehicles.find((item) => item.id === reservation?.vehicleId);
-  const tripExpenses = expenses.filter((expense) => expense.tripId === trip?.id);
+  const tripExpenses = expenses.filter(
+    (expense) => expense.tripId === String(trip?.id),
+  );
   const spent = tripExpenses.reduce(
     (sum, expense) => sum + expense.quantity * expense.unitValue,
     0,
@@ -88,7 +92,21 @@ export default function TripDetailScreen() {
   }
 
   // A partir daqui, `trip` está garantidamente preenchido.
-  const tripRecord = trip as typeof trip & { clientName?: string | null; travelerName?: string | null; advanceAmount?: string; flightDetails?: { passengerName?: string; passengerDocument?: string; passengerBirthDate?: string; airline?: string; flightNumber?: string; departureAirport?: string; arrivalAirport?: string } | null };
+  const tripRecord = trip as typeof trip & {
+    clientName?: string | null;
+    travelerName?: string | null;
+    advanceAmount?: string;
+    notes?: string | null;
+    flightDetails?: {
+      passengerName?: string;
+      passengerDocument?: string;
+      passengerBirthDate?: string;
+      airline?: string;
+      flightNumber?: string;
+      departureAirport?: string;
+      arrivalAirport?: string;
+    } | null;
+  };
   const clientLabel = tripRecord.clientName ?? ('client' in trip ? trip.client : '—');
   const advanceValue = tripRecord.advanceAmount ?? ('amount' in trip ? String(trip.amount) : '0');
   const flightDetails = tripRecord.flightDetails ?? undefined;
@@ -149,7 +167,7 @@ export default function TripDetailScreen() {
                 {trip.destination}
               </Text>
               <Text className="mt-1 text-sm text-muted">
-                {'startsOn' in trip ? trip.startsOn : trip.startDate} — {'endsOn' in trip ? trip.endsOn : trip.endDate} · {clientLabel}
+                  {trip.startsOn} — {trip.endsOn} · {clientLabel}
               </Text>
             </View>
             <StatusPill
@@ -158,10 +176,10 @@ export default function TripDetailScreen() {
               }
             />
           </View>
-          {'notes' in trip && trip.notes ? (
+          {tripRecord.notes ? (
             <View className="mt-5 rounded-2xl border border-border bg-surface p-5">
               <Text className="text-lg font-bold text-foreground">{t('Observações')}</Text>
-              <Text className="mt-3 text-sm leading-6 text-foreground">{trip.notes}</Text>
+              <Text className="mt-3 text-sm leading-6 text-foreground">{tripRecord.notes}</Text>
             </View>
           ) : null}
           {flightDetails ? (
