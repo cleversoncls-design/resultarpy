@@ -6,7 +6,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { PrimaryButton, SectionHeader, StatusPill } from "@/components/app-ui";
@@ -15,18 +15,33 @@ import {
   fleetReservations,
   formatCurrency,
   parseKm,
-  trips,
   vehicles,
 } from "@/lib/demo-data";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useLanguage } from "@/lib/language-provider";
+import { useAuth } from "@/hooks/use-auth";
+import { trpc } from "@/lib/trpc";
+import { ReportExportActions } from "@/components/report-export-actions";
 
 export default function TripDetailScreen() {
   const colors = useColors();
-  const trip = trips[0];
-  const reservation = fleetReservations.find((item) => item.tripId === trip.id);
+  const { t } = useLanguage();
+  const { isAuthenticated } = useAuth();
+  const params = useLocalSearchParams<{ tripId?: string }>();
+  const tripId = typeof params.tripId === "string" && /^\d+$/.test(params.tripId) ? Number(params.tripId) : undefined;
+  const tripQuery = trpc.operations.trips.get.useQuery({ id: tripId as number }, { enabled: isAuthenticated && tripId !== undefined });
+  const trip = tripQuery.data;
+
+  // Todos os hooks abaixo são sempre chamados, em toda renderização,
+  // independentemente de a viagem já ter chegado ou não (regra do React).
+  const reservation = fleetReservations.find(
+    (item) => item.tripId === String(trip?.id),
+  );
   const vehicle = vehicles.find((item) => item.id === reservation?.vehicleId);
-  const tripExpenses = expenses.filter((expense) => expense.tripId === trip.id);
+  const tripExpenses = expenses.filter(
+    (expense) => expense.tripId === String(trip?.id),
+  );
   const spent = tripExpenses.reduce(
     (sum, expense) => sum + expense.quantity * expense.unitValue,
     0,
@@ -39,6 +54,62 @@ export default function TripDetailScreen() {
   const [returnKm, setReturnKm] = useState("");
   const [hasEvent, setHasEvent] = useState(false);
   const [eventNote, setEventNote] = useState("");
+
+  // Só a partir daqui decidimos o que renderizar.
+  if (!tripId) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
+        <Pressable onPress={() => router.back()} className="mb-5">
+          <Text className="font-semibold text-primary">‹ Voltar</Text>
+        </Pressable>
+        <Text className="text-foreground">Nenhuma viagem informada para exibir.</Text>
+      </ScreenContainer>
+    );
+  }
+
+  if (tripQuery.isLoading) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
+        <Text className="text-foreground">Carregando viagem...</Text>
+      </ScreenContainer>
+    );
+  }
+
+  if (tripQuery.isError || !trip) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
+        <Pressable onPress={() => router.back()} className="mb-5">
+          <Text className="font-semibold text-primary">‹ Voltar</Text>
+        </Pressable>
+        <Text className="text-foreground">
+          Não foi possível carregar os detalhes desta viagem.
+        </Text>
+        {tripQuery.error ? (
+          <Text className="mt-2 text-sm text-muted">{tripQuery.error.message}</Text>
+        ) : null}
+      </ScreenContainer>
+    );
+  }
+
+  // A partir daqui, `trip` está garantidamente preenchido.
+  const tripRecord = trip as typeof trip & {
+    clientName?: string | null;
+    travelerName?: string | null;
+    advanceAmount?: string;
+    notes?: string | null;
+    flightDetails?: {
+      passengerName?: string;
+      passengerDocument?: string;
+      passengerBirthDate?: string;
+      airline?: string;
+      flightNumber?: string;
+      departureAirport?: string;
+      arrivalAirport?: string;
+    } | null;
+  };
+  const clientLabel = tripRecord.clientName ?? tripRecord.travelerName ?? "—";
+  const advanceValue = tripRecord.advanceAmount ?? ('amount' in trip ? String(trip.amount) : '0');
+  const flightDetails = tripRecord.flightDetails ?? undefined;
 
   const startTrip = () => {
     const km = parseKm(departureKm);
@@ -96,7 +167,7 @@ export default function TripDetailScreen() {
                 {trip.destination}
               </Text>
               <Text className="mt-1 text-sm text-muted">
-                {trip.startDate} — {trip.endDate} · {trip.client}
+                  {trip.startsOn} — {trip.endsOn} · {clientLabel}
               </Text>
             </View>
             <StatusPill
@@ -105,11 +176,42 @@ export default function TripDetailScreen() {
               }
             />
           </View>
+          {tripRecord.notes ? (
+            <View className="mt-5 rounded-2xl border border-border bg-surface p-5">
+              <Text className="text-lg font-bold text-foreground">{t('Observações')}</Text>
+              <Text className="mt-3 text-sm leading-6 text-foreground">{tripRecord.notes}</Text>
+            </View>
+          ) : null}
+          {flightDetails ? (
+            <View className="mt-5 rounded-2xl border border-border bg-surface p-5">
+              <Text className="text-lg font-bold text-foreground">{t('Dados do voo')}</Text>
+              <View className="mt-3 gap-2">
+                <Text className="text-sm text-muted">{t('Passageiro')}: <Text className="font-semibold text-foreground">{flightDetails.passengerName || t('Não informado')}</Text></Text>
+                <Text className="text-sm text-muted">{t('Documento / Passaporte')}: <Text className="font-semibold text-foreground">{flightDetails.passengerDocument || t('Não informado')}</Text></Text>
+                <Text className="text-sm text-muted">{t('Companhia aérea')}: <Text className="font-semibold text-foreground">{flightDetails.airline || t('Não informado')}</Text></Text>
+                <Text className="text-sm text-muted">{t('Voo')}: <Text className="font-semibold text-foreground">{flightDetails.flightNumber || t('Não informado')}</Text></Text>
+                <Text className="text-sm text-muted">{t('Trecho')}: <Text className="font-semibold text-foreground">{flightDetails.departureAirport || '—'} → {flightDetails.arrivalAirport || '—'}</Text></Text>
+              </View>
+              <ReportExportActions
+                title={t('Dados do voo')}
+                filename={`viagem-${trip.id}-voo`}
+                columns={[{ key: 'campo', label: t('Campo') }, { key: 'valor', label: t('Valor') }]}
+                rows={[
+                  { campo: t('Passageiro'), valor: flightDetails.passengerName || t('Não informado') },
+                  { campo: t('Documento / Passaporte'), valor: flightDetails.passengerDocument || t('Não informado') },
+                  { campo: t('Data de nascimento'), valor: flightDetails.passengerBirthDate || t('Não informado') },
+                  { campo: t('Companhia aérea'), valor: flightDetails.airline || t('Não informado') },
+                  { campo: t('Voo'), valor: flightDetails.flightNumber || t('Não informado') },
+                  { campo: t('Trecho'), valor: `${flightDetails.departureAirport || '—'} → ${flightDetails.arrivalAirport || '—'}` },
+                ]}
+              />
+            </View>
+          ) : null}
           <View className="mt-6 flex-row gap-3">
             <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
               <Text className="text-xs text-muted">Adiantamento</Text>
               <Text className="mt-2 text-lg font-bold text-foreground">
-                {formatCurrency(trip.amount)}
+                {formatCurrency(Number(advanceValue))}
               </Text>
             </View>
             <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
