@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { SESSION_TOKEN_KEY, USER_INFO_KEY } from "@/constants/oauth";
+import { SESSION_TOKEN_KEY, USER_INFO_KEY } from "../../constants/oauth";
 
 export type User = {
   id: number;
@@ -9,6 +9,10 @@ export type User = {
   email: string | null;
   loginMethod: string | null;
   lastSignedIn: Date;
+  role: "user" | "admin";
+  profile?: "traveler" | "traveler_approver" | "approver" | "admin";
+  birthDate?: string | null;
+  active?: boolean;
 };
 
 export async function getSessionToken(): Promise<string | null> {

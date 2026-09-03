@@ -17,6 +17,9 @@ type MysqlUserRow = RowDataPacket & {
   email: string | null;
   loginMethod: string | null;
   role: 'user' | 'admin' | string;
+  profile?: string;
+  birthDate?: string | null;
+  active?: number | boolean;
   createdAt: Date;
   updatedAt: Date;
   lastSignedIn: Date;
@@ -38,6 +41,9 @@ function normalizeMysqlUser(row: MysqlUserRow): User {
     email: row.email,
     loginMethod: row.loginMethod,
     role: row.role === 'admin' ? 'admin' : 'user',
+    profile: row.profile ?? (row.role === 'admin' ? 'admin' : 'traveler_approver'),
+    birthDate: row.birthDate ?? null,
+    active: row.active === undefined ? true : Boolean(row.active),
     createdAt: new Date(row.createdAt),
     updatedAt: new Date(row.updatedAt),
     lastSignedIn: new Date(row.lastSignedIn),

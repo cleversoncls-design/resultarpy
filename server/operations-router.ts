@@ -10,6 +10,21 @@ const pageInput = z.object({
   direction: z.enum(['asc', 'desc']).default('asc'),
 });
 const idInput = z.object({ id: z.number().int().positive() });
+const currencyCode = z.enum(['BRL', 'USD', 'PYG']);
+
+function normalizeBirthDate(value: unknown) {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== 'string') return value;
+  const raw = value.trim();
+  if (!raw) return undefined;
+  const brazilian = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brazilian) return `${brazilian[3]}-${brazilian[2]}-${brazilian[1]}`;
+  const isoPrefix = raw.match(/^(\d{4}-\d{2}-\d{2})(?:$|[T\s])/);
+  if (isoPrefix) return isoPrefix[1];
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  return value;
+}
 const tripStatus = z.enum(['Rascunho', 'Aguardando aprovação', 'Aprovada', 'Em preparação', 'Liberada para viagem', 'Em prestação', 'Finalizada', 'Rejeitada', 'Devolvida']);
 const approvalDecision = z.enum(['Aprovada', 'Rejeitada', 'Devolvida']);
 const approvalHistoryFields = { decision: approvalDecision.optional(), from: z.string().date().optional(), to: z.string().date().optional() };
@@ -24,20 +39,29 @@ const notFound = () => new TRPCError({ code: 'NOT_FOUND', message: 'Registro nã
 const scopeFor = (user: { id: number; role: string }) => ({ userId: user.role === 'admin' ? undefined : user.id, admin: user.role === 'admin' });
 
 const tripFields = z.object({
-  tripCode: z.string().min(3).max(40), travelerId: z.number().int().positive(), approverId: z.number().int().positive().nullable().optional(), clientId: z.number().int().positive().nullable().optional(), unitId: z.number().int().positive().nullable().optional(), origin: z.string().min(1).max(120), destination: z.string().min(1).max(120), country: z.string().max(80).nullable().optional(), area: z.string().max(120).nullable().optional(), transport: z.string().max(120).nullable().optional(), startsOn: z.string().date(), endsOn: z.string().date(), status: tripStatus.default('Aguardando aprovação'), requiresFleetVehicle: z.boolean().default(false), hasAdvance: z.boolean().default(false), needsHotel: z.boolean().default(false), advanceAmount: z.string().default('0'),
-});
-const expenseFields = z.object({ tripId: z.number().int().positive(), expenseTypeId: z.number().int().positive(), occurredOn: z.string().date(), city: z.string().min(1).max(120), quantity: z.string().default('1'), unitValue: z.string(), expenseGroup: z.string().max(120).nullable().optional(), prepaid: z.boolean().default(false), billable: z.boolean().default(true), receiptUri: z.string().url().nullable().optional(), notes: z.string().max(2000).nullable().optional(), reviewNote: z.string().max(2000).nullable().optional() });
+  tripCode: z.string().min(3).max(40), travelerId: z.number().int().positive().optional(), approverId: z.number().int().positive().nullable().optional(), clientId: z.number().int().positive().nullable().optional(), unitId: z.number().int().positive().nullable().optional(), origin: z.string().max(120).default(''), destination: z.string().min(1).max(120), country: z.string().max(80).nullable().optional(), area: z.string().max(120).nullable().optional(), transport: z.string().max(120).nullable().optional(), startsOn: z.string().date(), endsOn: z.string().date(), notes: z.string().max(4000).nullable().optional(), status: tripStatus.default('Aguardando aprovação'), requiresFleetVehicle: z.boolean().default(false), hasAdvance: z.boolean().default(false), needsHotel: z.boolean().default(false), advanceAmount: z.string().default('0'), flightDetails: z.object({ passengerName: z.string().max(180).optional(), passengerDocument: z.string().max(80).optional(), passengerBirthDate: z.preprocess(normalizeBirthDate, z.string().date().optional()), airline: z.string().max(120).optional(), flightNumber: z.string().max(40).optional(), departureAirport: z.string().max(12).optional(), arrivalAirport: z.string().max(12).optional() }).nullable().optional(),
+  }).superRefine((input, ctx) => {
+    if (input.transport !== 'Passagem aérea') return;
+    const flight = input.flightDetails;
+    if (!flight?.passengerName?.trim() || !flight.passengerDocument?.trim() || !flight.passengerBirthDate) {
+      ctx.addIssue({ code: 'custom', path: ['flightDetails'], message: 'Dados do passageiro são obrigatórios para passagem aérea.' });
+    }
+  });
+const expenseFields = z.object({ tripId: z.number().int().positive(), expenseTypeId: z.number().int().positive(), occurredOn: z.string().date(), city: z.string().min(1).max(120), quantity: z.string().default('1'), unitValue: z.string(), currency: currencyCode.default('BRL'), expenseGroup: z.string().max(120).nullable().optional(), prepaid: z.boolean().default(false), billable: z.boolean().default(true), receiptUri: z.string().url().nullable().optional(), notes: z.string().max(2000).nullable().optional(), reviewNote: z.string().max(2000).nullable().optional() });
+const reportPeriod = { tripId: z.number().int().positive().optional(), clientId: z.number().int().positive().optional(), from: z.string().date().optional(), to: z.string().date().optional() };
+const reimbursementReportInput = pageInput.extend(reportPeriod).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
+const billingReportInput = pageInput.extend(reportPeriod).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
 
 export const operationsRouter = router({
   trips: router({
     list: protectedProcedure.input(pageInput.extend({ status: tripStatus.optional(), travelerId: z.number().int().positive().optional() })).query(({ ctx, input }) => operations.listTrips({ ...input, travelerId: ctx.user.role === 'admin' ? input.travelerId : undefined, userId: ctx.user.role === 'admin' ? undefined : ctx.user.id })),
     get: protectedProcedure.input(idInput).query(async ({ ctx, input }) => { const trip = await operations.getTrip(input.id, scopeFor(ctx.user)); if (!trip) throw notFound(); return trip; }),
-    create: protectedProcedure.input(tripFields).mutation(async ({ ctx, input }) => { if (ctx.user.role !== 'admin') { const travelerId = await operations.findTravelerIdByUserId(ctx.user.id); if (travelerId !== input.travelerId) throw forbidden(); } return operations.createTrip(input); }),
+    create: protectedProcedure.input(tripFields).mutation(async ({ ctx, input }) => { const isAdmin = ctx.user.role === 'admin' || ctx.user.profile === 'admin'; const travelerId = isAdmin ? input.travelerId : await operations.ensureTravelerIdByUserId(ctx.user.id); if (!travelerId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Não foi possível identificar o viajante da sessão.' }); return operations.createTrip({ ...input, travelerId }); }),
     update: protectedProcedure.input(tripFields.partial().extend({ id: idInput.shape.id })).mutation(async ({ ctx, input }) => { const { id, ...changes } = input; const trip = await operations.updateTrip(id, changes, scopeFor(ctx.user)); if (!trip) throw notFound(); return trip; }),
     delete: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => { const deleted = await operations.deleteTrip(input.id, scopeFor(ctx.user)); if (!deleted) throw notFound(); return deleted; }),
   }),
   approvals: router({
-    list: protectedProcedure.input(pageInput).query(({ ctx, input }) => operations.listTripApprovals({ ...input, userId: ctx.user.id, admin: ctx.user.role === 'admin' })),
+    list: protectedProcedure.input(pageInput.extend({ status: z.enum(['Pendiente', 'Aprovada', 'Rejeitada']).default('Pendiente') })).query(({ ctx, input }) => operations.listTripApprovals({ ...input, userId: ctx.user.id, admin: ctx.user.role === 'admin' || ctx.user.profile === 'admin', approver: ctx.user.profile === 'approver' || ctx.user.profile === 'traveler_approver' })),
     history: protectedProcedure.input(approvalHistoryInput).query(async ({ ctx, input }) => {
       const { id, ...filters } = input;
       const history = await operations.listTripApprovalHistory(id, scopeFor(ctx.user), filters);
@@ -51,7 +75,7 @@ export const operationsRouter = router({
       return history.items;
     }),
     decide: protectedProcedure.input(z.object({ tripId: idInput.shape.id, decision: approvalDecision, comment: z.string().trim().min(3, 'Comentário obrigatório').max(2000) })).mutation(async ({ ctx, input }) => {
-      const result = await operations.decideTripApproval({ ...input, approverId: ctx.user.id }, ctx.user.role === 'admin');
+      const result = await operations.decideTripApproval({ ...input, approverId: ctx.user.id }, ctx.user.role === 'admin' || ctx.user.profile === 'admin', ctx.user.profile === 'approver' || ctx.user.profile === 'traveler_approver');
       if (!result) throw forbidden();
       return result;
     }),
@@ -62,6 +86,10 @@ export const operationsRouter = router({
     create: protectedProcedure.input(expenseFields).mutation(async ({ ctx, input }) => { const amount = (Number(input.quantity) * Number(input.unitValue)).toFixed(2); const created = await operations.createTripExpense({ ...input, amount }, scopeFor(ctx.user)); if (!created) throw forbidden(); return created; }),
     update: protectedProcedure.input(expenseFields.partial().extend({ id: idInput.shape.id })).mutation(async ({ ctx, input }) => { const { id, quantity, unitValue, ...changes } = input; const amount = quantity !== undefined || unitValue !== undefined ? (Number(quantity ?? 1) * Number(unitValue ?? 0)).toFixed(2) : undefined; const updated = await operations.updateTripExpense(id, { ...changes, ...(amount !== undefined ? { amount } : {}) }, scopeFor(ctx.user)); if (!updated) throw notFound(); return updated; }),
     delete: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => { const deleted = await operations.deleteTripExpense(input.id, scopeFor(ctx.user)); if (!deleted) throw notFound(); return deleted; }),
+  }),
+  reports: router({
+    reimbursement: protectedProcedure.input(reimbursementReportInput).query(({ ctx, input }) => operations.listReimbursementReport({ ...input, userId: ctx.user.role === 'admin' ? undefined : ctx.user.id, admin: ctx.user.role === 'admin' })),
+    billing: adminProcedure.input(billingReportInput).query(({ input }) => operations.listBillingReport(input)),
   }),
   fleet: router({
     vehicles: router({

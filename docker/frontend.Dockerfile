@@ -6,10 +6,21 @@ RUN pnpm config set node-linker hoisted && pnpm install --frozen-lockfile
 COPY . .
 RUN mkdir -p node_modules/react-native-css-interop/.cache && touch node_modules/react-native-css-interop/.cache/web.css
 ARG EXPO_PUBLIC_API_BASE_URL=
+ARG EXPO_PUBLIC_OAUTH_PORTAL_URL=
+ARG EXPO_PUBLIC_OAUTH_SERVER_URL=
+ARG EXPO_PUBLIC_APP_ID=
+ARG EXPO_PUBLIC_OWNER_OPEN_ID=
+ARG EXPO_PUBLIC_DEMO_MODE=false
 ENV EXPO_PUBLIC_API_BASE_URL=${EXPO_PUBLIC_API_BASE_URL}
+ENV EXPO_PUBLIC_OAUTH_PORTAL_URL=${EXPO_PUBLIC_OAUTH_PORTAL_URL}
+ENV EXPO_PUBLIC_OAUTH_SERVER_URL=${EXPO_PUBLIC_OAUTH_SERVER_URL}
+ENV EXPO_PUBLIC_APP_ID=${EXPO_PUBLIC_APP_ID}
+ENV EXPO_PUBLIC_OWNER_OPEN_ID=${EXPO_PUBLIC_OWNER_OPEN_ID}
+ENV EXPO_PUBLIC_DEMO_MODE=${EXPO_PUBLIC_DEMO_MODE}
 RUN EXPO_NO_METRO_WORKSPACE_ROOT=1 pnpm exec expo export --platform web
 
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.29-alpine3.22 AS runtime
+RUN apk upgrade --no-cache
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80

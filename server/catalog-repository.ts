@@ -1,9 +1,19 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import {
   clients,
+  clientBillingLimits,
+  clientBillingProfiles,
+  clientBillingProfileItems,
   expenseTypes,
+  maintenanceReasons,
+  reimbursementLimits,
+  reimbursementLimitProfiles,
+  reimbursementLimitProfileItems,
+  currencyRates,
   travelers,
+  users,
   units,
+  translationEntries,
   type InsertClient,
   type InsertExpenseType,
   type InsertTraveler,
@@ -56,6 +66,25 @@ function result<T>(items: T[], input: CatalogListInput, total: number): CatalogL
     total,
     totalPages: totalPages(total, input.pageSize),
   };
+}
+
+export async function listTranslationEntries(input: { search?: string }) {
+  const db = await requireDb();
+  const search = normalizedSearch(input.search);
+  const where = search ? or(ilike(translationEntries.translationKey, search), ilike(translationEntries.spanish, search)) : undefined;
+  return db.select().from(translationEntries).where(where).orderBy(asc(translationEntries.translationKey));
+}
+
+export async function upsertTranslationEntries(items: Array<{ key: string; spanish: string }>, updatedBy: number) {
+  const db = await requireDb();
+  return db.transaction(async (tx) => {
+    const rows = [];
+    for (const item of items) {
+      const [row] = await tx.insert(translationEntries).values({ translationKey: item.key, spanish: item.spanish, updatedBy }).onConflictDoUpdate({ target: translationEntries.translationKey, set: { spanish: item.spanish, updatedBy, updatedAt: new Date() } }).returning();
+      if (row) rows.push(row);
+    }
+    return rows;
+  });
 }
 
 export async function listUnits(input: CatalogListInput) {
@@ -140,10 +169,11 @@ export async function listTravelers(input: CatalogListInput) {
   if (search) filters.push(or(ilike(travelers.name, search), ilike(travelers.documentNumber, search)));
   const where = filters.length ? and(...filters) : undefined;
   const order = input.direction === "desc" ? desc(travelers.name) : asc(travelers.name);
-  const [items, countRows] = await Promise.all([
-    db.select().from(travelers).where(where).orderBy(order).limit(input.pageSize).offset(pageOffset(input)),
+  const [rows, countRows] = await Promise.all([
+    db.select({ traveler: travelers, birthDate: users.birthDate }).from(travelers).leftJoin(users, eq(travelers.userId, users.id)).where(where).orderBy(order).limit(input.pageSize).offset(pageOffset(input)),
     db.select({ count: sql<number>`count(*)` }).from(travelers).where(where),
   ]);
+  const items = rows.map(({ traveler, birthDate }) => ({ ...traveler, birthDate: birthDate ?? null }));
   return result(items, input, Number(countRows[0]?.count ?? 0));
 }
 
@@ -212,4 +242,237 @@ export async function updateExpenseType(
 
 export async function archiveExpenseType(id: number) {
   return updateExpenseType(id, { active: false });
+}
+
+export type ReimbursementProfileItemInput = { expenseTypeId: number; limitAmount: string };
+export type ReimbursementProfileInput = { city: string; currency: string; items: ReimbursementProfileItemInput[] };
+
+export async function listReimbursementLimitProfiles(input: CatalogListInput) {
+  const db = await requireDb();
+  const search = normalizedSearch(input.search);
+  const rows = await db
+    .select({
+      profileId: reimbursementLimitProfiles.id,
+      city: reimbursementLimitProfiles.city,
+      currency: reimbursementLimitProfiles.currency,
+      itemId: reimbursementLimitProfileItems.id,
+      expenseTypeId: reimbursementLimitProfileItems.expenseTypeId,
+      expenseTypeName: expenseTypes.name,
+      limitAmount: reimbursementLimitProfileItems.limitAmount,
+    })
+    .from(reimbursementLimitProfiles)
+    .leftJoin(reimbursementLimitProfileItems, eq(reimbursementLimitProfileItems.profileId, reimbursementLimitProfiles.id))
+    .leftJoin(expenseTypes, eq(reimbursementLimitProfileItems.expenseTypeId, expenseTypes.id))
+    .orderBy(input.direction === 'desc' ? desc(reimbursementLimitProfiles.city) : asc(reimbursementLimitProfiles.city));
+
+  const grouped = new Map<number, { id: number; city: string; currency: string; items: { id: number; expenseTypeId: number; expenseTypeName: string; limitAmount: string }[] }>();
+  for (const row of rows) {
+    const profile = grouped.get(row.profileId) ?? { id: row.profileId, city: row.city, currency: row.currency, items: [] };
+    if (row.itemId && row.expenseTypeId && row.expenseTypeName) profile.items.push({ id: row.itemId, expenseTypeId: row.expenseTypeId, expenseTypeName: row.expenseTypeName, limitAmount: String(row.limitAmount ?? '') });
+    grouped.set(row.profileId, profile);
+  }
+  const query = search?.replaceAll('%', '').toLowerCase();
+  const allProfiles = Array.from(grouped.values());
+  const filteredProfiles = query ? allProfiles.filter((profile) => profile.city.toLowerCase().includes(query) || profile.items.some((item) => item.expenseTypeName.toLowerCase().includes(query))) : allProfiles;
+  const items = filteredProfiles.slice(pageOffset(input), pageOffset(input) + input.pageSize);
+  return result(items, input, filteredProfiles.length);
+}
+
+export async function createReimbursementLimitProfile(input: ReimbursementProfileInput) {
+  const db = await requireDb();
+  return db.transaction(async (tx) => {
+    const profiles = await tx.insert(reimbursementLimitProfiles).values({ city: input.city.trim(), currency: input.currency.trim().toUpperCase() }).returning();
+    const profile = profiles[0];
+    if (!profile) throw new Error('Não foi possível criar o limite de reembolso.');
+    await tx.insert(reimbursementLimitProfileItems).values(input.items.map((item) => ({ profileId: profile.id, expenseTypeId: item.expenseTypeId, limitAmount: item.limitAmount.trim() })));
+    return { ...profile, items: input.items };
+  });
+}
+
+export async function updateReimbursementLimitProfile(id: number, input: ReimbursementProfileInput) {
+  const db = await requireDb();
+  return db.transaction(async (tx) => {
+    const existing = await tx.select().from(reimbursementLimitProfiles).where(eq(reimbursementLimitProfiles.id, id));
+    if (!existing[0]) return null;
+    const profiles = await tx.update(reimbursementLimitProfiles).set({ city: input.city.trim(), currency: input.currency.trim().toUpperCase(), updatedAt: new Date() }).where(eq(reimbursementLimitProfiles.id, id)).returning();
+    await tx.delete(reimbursementLimitProfileItems).where(eq(reimbursementLimitProfileItems.profileId, id));
+    await tx.insert(reimbursementLimitProfileItems).values(input.items.map((item) => ({ profileId: id, expenseTypeId: item.expenseTypeId, limitAmount: item.limitAmount.trim() })));
+    return { ...profiles[0], items: input.items };
+  });
+}
+
+export async function deleteReimbursementLimitProfile(id: number) {
+  const db = await requireDb();
+  const rows = await db.delete(reimbursementLimitProfiles).where(eq(reimbursementLimitProfiles.id, id)).returning();
+  return rows[0] ?? null;
+}
+
+export type CurrencyRateInput = { rateDate: string; fromCurrency: string; toCurrency: string; rate: string; rateType: 'venda' | 'referencial'; source: 'DNIT' | 'BCP' | 'Manual'; sourceUrl?: string | null };
+
+export async function listCurrencyRates(input: { rateDate?: string; page: number; pageSize: number }) {
+  const db = await requireDb();
+  const where = input.rateDate ? eq(currencyRates.rateDate, input.rateDate) : undefined;
+  const [items, countRows] = await Promise.all([
+    db.select().from(currencyRates).where(where).orderBy(desc(currencyRates.rateDate), asc(currencyRates.fromCurrency)).limit(input.pageSize).offset((input.page - 1) * input.pageSize),
+    db.select({ count: sql<number>`count(*)` }).from(currencyRates).where(where),
+  ]);
+  return result(items, { page: input.page, pageSize: input.pageSize }, Number(countRows[0]?.count ?? 0));
+}
+
+export async function upsertCurrencyRates(items: CurrencyRateInput[]) {
+  const db = await requireDb();
+  return db.transaction(async (tx) => {
+    const saved = [];
+    for (const item of items) {
+      const rows = await tx.insert(currencyRates).values({ ...item, fromCurrency: item.fromCurrency.toUpperCase(), toCurrency: item.toCurrency.toUpperCase(), rateType: item.rateType, source: item.source }).onConflictDoUpdate({ target: [currencyRates.rateDate, currencyRates.fromCurrency, currencyRates.toCurrency], set: { rate: item.rate, rateType: item.rateType, source: item.source, sourceUrl: item.sourceUrl ?? null, fetchedAt: new Date() } }).returning();
+      if (rows[0]) saved.push(rows[0]);
+    }
+    return saved;
+  });
+}
+
+export async function getCurrencyRatesForDate(rateDate: string) {
+  const db = await requireDb();
+  return db.select().from(currencyRates).where(eq(currencyRates.rateDate, rateDate)).orderBy(asc(currencyRates.fromCurrency));
+}
+
+export async function listLatestCurrencyRates() {
+  const db = await requireDb();
+  return db.select().from(currencyRates).orderBy(desc(currencyRates.rateDate), desc(currencyRates.fetchedAt), asc(currencyRates.fromCurrency)).limit(20);
+}
+
+export async function listClientBillingLimits(input: CatalogListInput) {
+  const db = await requireDb();
+  const search = normalizedSearch(input.search);
+  const where = search
+    ? or(ilike(clients.name, search), ilike(expenseTypes.name, search))
+    : undefined;
+  const order = input.direction === 'desc' ? desc(clients.name) : asc(clients.name);
+  const [rows, countRows] = await Promise.all([
+    db.select({ id: clientBillingLimits.id, clientId: clientBillingLimits.clientId, clientName: clients.name, expenseTypeId: clientBillingLimits.expenseTypeId, expenseTypeName: expenseTypes.name, limitAmount: clientBillingLimits.limitAmount })
+      .from(clientBillingLimits)
+      .innerJoin(clients, eq(clientBillingLimits.clientId, clients.id))
+      .innerJoin(expenseTypes, eq(clientBillingLimits.expenseTypeId, expenseTypes.id))
+      .where(where)
+      .orderBy(order)
+      .limit(input.pageSize)
+      .offset(pageOffset(input)),
+    db.select({ count: sql<number>`count(*)` })
+      .from(clientBillingLimits)
+      .innerJoin(clients, eq(clientBillingLimits.clientId, clients.id))
+      .innerJoin(expenseTypes, eq(clientBillingLimits.expenseTypeId, expenseTypes.id))
+      .where(where),
+  ]);
+  return result(rows, input, Number(countRows[0]?.count ?? 0));
+}
+
+export async function createClientBillingLimit(input: { clientId: number; expenseTypeId: number; limitAmount: string }) {
+  const db = await requireDb();
+  const rows = await db.insert(clientBillingLimits).values(input).returning();
+  return rows[0];
+}
+
+export async function updateClientBillingLimit(id: number, input: Partial<{ clientId: number; expenseTypeId: number; limitAmount: string }>) {
+  const db = await requireDb();
+  const rows = await db.update(clientBillingLimits).set(input).where(eq(clientBillingLimits.id, id)).returning();
+  return rows[0] ?? null;
+}
+
+export async function deleteClientBillingLimit(id: number) {
+  const db = await requireDb();
+  const rows = await db.delete(clientBillingLimits).where(eq(clientBillingLimits.id, id)).returning();
+  return rows[0] ?? null;
+}
+
+export type ClientBillingProfileItemInput = { expenseTypeId: number; limitAmount: string };
+export type ClientBillingProfileInput = { clientId: number; currency: string; items: ClientBillingProfileItemInput[] };
+
+export async function listClientBillingProfiles(input: CatalogListInput) {
+  const db = await requireDb();
+  const search = normalizedSearch(input.search);
+  const rows = await db
+    .select({
+      profileId: clientBillingProfiles.id,
+      clientId: clientBillingProfiles.clientId,
+      clientName: clients.name,
+      currency: clientBillingProfiles.currency,
+      itemId: clientBillingProfileItems.id,
+      expenseTypeId: clientBillingProfileItems.expenseTypeId,
+      expenseTypeName: expenseTypes.name,
+      limitAmount: clientBillingProfileItems.limitAmount,
+    })
+    .from(clientBillingProfiles)
+    .innerJoin(clients, eq(clientBillingProfiles.clientId, clients.id))
+    .leftJoin(clientBillingProfileItems, eq(clientBillingProfileItems.profileId, clientBillingProfiles.id))
+    .leftJoin(expenseTypes, eq(clientBillingProfileItems.expenseTypeId, expenseTypes.id))
+    .orderBy(input.direction === 'desc' ? desc(clients.name) : asc(clients.name));
+
+  const grouped = new Map<number, { id: number; clientId: number; clientName: string; currency: string; items: Array<{ id: number; expenseTypeId: number; expenseTypeName: string; limitAmount: string }> }>();
+  for (const row of rows) {
+    const profile = grouped.get(row.profileId) ?? { id: row.profileId, clientId: row.clientId, clientName: row.clientName, currency: row.currency, items: [] };
+    if (row.itemId && row.expenseTypeId && row.expenseTypeName) profile.items.push({ id: row.itemId, expenseTypeId: row.expenseTypeId, expenseTypeName: row.expenseTypeName, limitAmount: String(row.limitAmount ?? '') });
+    grouped.set(row.profileId, profile);
+  }
+  const allProfiles = Array.from(grouped.values());
+  const filteredProfiles = search ? allProfiles.filter((profile) => profile.clientName.toLowerCase().includes(search.replaceAll('%', '').toLowerCase()) || profile.items.some((item) => item.expenseTypeName.toLowerCase().includes(search.replaceAll('%', '').toLowerCase()))) : allProfiles;
+  const items = filteredProfiles.slice(pageOffset(input), pageOffset(input) + input.pageSize);
+  return result(items, input, filteredProfiles.length);
+}
+
+export async function createClientBillingProfile(input: ClientBillingProfileInput) {
+  const db = await requireDb();
+  return db.transaction(async (tx) => {
+    const profiles = await tx.insert(clientBillingProfiles).values({ clientId: input.clientId, currency: input.currency.trim().toUpperCase() }).returning();
+    const profile = profiles[0];
+    if (!profile) throw new Error('Não foi possível criar o limite por cliente.');
+    await tx.insert(clientBillingProfileItems).values(input.items.map((item) => ({ profileId: profile.id, expenseTypeId: item.expenseTypeId, limitAmount: item.limitAmount.trim() })));
+    return { ...profile, items: input.items };
+  });
+}
+
+export async function updateClientBillingProfile(id: number, input: ClientBillingProfileInput) {
+  const db = await requireDb();
+  return db.transaction(async (tx) => {
+    const existing = await tx.select().from(clientBillingProfiles).where(eq(clientBillingProfiles.id, id));
+    if (!existing[0]) return null;
+    const profiles = await tx.update(clientBillingProfiles).set({ clientId: input.clientId, currency: input.currency.trim().toUpperCase(), updatedAt: new Date() }).where(eq(clientBillingProfiles.id, id)).returning();
+    await tx.delete(clientBillingProfileItems).where(eq(clientBillingProfileItems.profileId, id));
+    await tx.insert(clientBillingProfileItems).values(input.items.map((item) => ({ profileId: id, expenseTypeId: item.expenseTypeId, limitAmount: item.limitAmount.trim() })));
+    return { ...profiles[0], items: input.items };
+  });
+}
+
+export async function deleteClientBillingProfile(id: number) {
+  const db = await requireDb();
+  const rows = await db.delete(clientBillingProfiles).where(eq(clientBillingProfiles.id, id)).returning();
+  return rows[0] ?? null;
+}
+
+export async function listMaintenanceReasons(input: CatalogListInput) {
+  const db = await requireDb();
+  const search = normalizedSearch(input.search);
+  const filters = [input.includeInactive ? undefined : eq(maintenanceReasons.active, true), search ? or(ilike(maintenanceReasons.name, search), ilike(maintenanceReasons.description, search)) : undefined].filter(Boolean);
+  const where = filters.length ? and(...filters) : undefined;
+  const order = input.direction === 'desc' ? desc(maintenanceReasons.name) : asc(maintenanceReasons.name);
+  const [items, countRows] = await Promise.all([
+    db.select().from(maintenanceReasons).where(where).orderBy(order).limit(input.pageSize).offset(pageOffset(input)),
+    db.select({ count: sql<number>`count(*)` }).from(maintenanceReasons).where(where),
+  ]);
+  return result(items, input, Number(countRows[0]?.count ?? 0));
+}
+
+export async function createMaintenanceReason(input: { name: string; description?: string | null; category: 'Preventiva' | 'Corretiva' }) {
+  const db = await requireDb();
+  const rows = await db.insert(maintenanceReasons).values({ ...input, active: true }).returning();
+  return rows[0];
+}
+
+export async function updateMaintenanceReason(id: number, input: Partial<{ name: string; description: string | null; category: 'Preventiva' | 'Corretiva'; active: boolean }>) {
+  const db = await requireDb();
+  const rows = await db.update(maintenanceReasons).set(input).where(eq(maintenanceReasons.id, id)).returning();
+  return rows[0] ?? null;
+}
+
+export async function archiveMaintenanceReason(id: number) {
+  return updateMaintenanceReason(id, { active: false });
 }

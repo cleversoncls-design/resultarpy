@@ -9,9 +9,15 @@ O arquivo `compose.yaml` não contém credenciais reais. Antes de iniciar o ambi
 | `POSTGRES_USER` | Não | Usuário do banco; padrão local `controle`. |
 | `POSTGRES_PASSWORD` | Sim em produção | Senha do PostgreSQL; o padrão existente serve somente para testes locais. |
 | `FRONTEND_PORT` | Não | Porta publicada pelo Nginx; padrão `8080`. |
+| `PUBLIC_APP_URL` | Sim em produção | URL pública do frontend, usada pelo callback OAuth para retornar ao navegador. |
 | `VITE_APP_ID` | Conforme OAuth | Identificador da aplicação usado pelo backend. |
-| `OAUTH_SERVER_URL` | Conforme OAuth | Servidor OAuth utilizado pelo login. |
-| `OWNER_OPEN_ID` | Conforme OAuth | Identidade do proprietário administrativo. |
+| `OAUTH_SERVER_URL` | Conforme OAuth | Servidor OAuth utilizado pelo login no backend. |
+| `OWNER_OPEN_ID` | Conforme OAuth | `openId` da conta que deve receber o papel Administrativo. |
+| `EXPO_PUBLIC_OAUTH_PORTAL_URL` | Conforme OAuth | Portal público que inicia o login OAuth no frontend. |
+| `EXPO_PUBLIC_OAUTH_SERVER_URL` | Conforme OAuth | URL pública do servidor OAuth usada pelo frontend. |
+| `EXPO_PUBLIC_APP_ID` | Conforme OAuth | Identificador público da aplicação no provedor OAuth. |
+| `EXPO_PUBLIC_OWNER_OPEN_ID` | Opcional | Identidade pública do proprietário, se o frontend precisar exibi-la. |
+| `EXPO_PUBLIC_DEMO_MODE` | Não | Use `false` no build do servidor; o valor padrão da produção é `false`. |
 | `BUILT_IN_FORGE_API_URL` | Opcional | Endpoint de serviços integrados. |
 | `BUILT_IN_FORGE_API_KEY` | Opcional | Chave do serviço integrado; nunca deve ser embutida no frontend. |
 
@@ -24,4 +30,4 @@ docker compose -f compose.yaml up -d --build
 bash scripts/docker-health.sh
 ```
 
-O frontend e a API compartilham o mesmo domínio através do Nginx. Por isso, `EXPO_PUBLIC_API_BASE_URL` pode permanecer vazio na imagem de produção; as chamadas `/api/*` são encaminhadas internamente para o serviço `api`.
+O frontend e a API compartilham o mesmo domínio através do Nginx. Por isso, `EXPO_PUBLIC_API_BASE_URL` pode permanecer vazio na imagem de produção; as chamadas `/api/*` são encaminhadas internamente para o serviço `api`. O build de produção usa `EXPO_PUBLIC_DEMO_MODE=false`; sem sessão OAuth válida, o navegador exibe a tela de login em vez dos dados demonstrativos. Para promover uma conta a Administrador, o `OWNER_OPEN_ID` do backend deve ser exatamente igual ao `openId` retornado pelo provedor OAuth para essa conta.

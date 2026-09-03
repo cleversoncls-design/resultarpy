@@ -58,6 +58,7 @@ function buildUserResponse(
     email: user?.email ?? null,
     loginMethod: user?.loginMethod ?? null,
     lastSignedIn: (user?.lastSignedIn ?? new Date()).toISOString(),
+    role: (user as any)?.role ?? "user",
   };
 }
 
@@ -86,6 +87,7 @@ export function registerOAuthRoutes(app: Express) {
       // Redirect to the frontend URL (Expo web on port 8081)
       // Cookie is set with parent domain so it works across both 3000 and 8081 subdomains
       const frontendUrl =
+        process.env.PUBLIC_APP_URL ||
         process.env.EXPO_WEB_PREVIEW_URL ||
         process.env.EXPO_PACKAGER_PROXY_URL ||
         "http://localhost:8081";
