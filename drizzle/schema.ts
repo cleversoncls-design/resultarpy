@@ -120,6 +120,20 @@ export const units = pgTable(
   (table) => ({ codeUnique: uniqueIndex("units_code_unique").on(table.code) }),
 );
 
+// Cadastro independente de cidades, usado como "Ciudad de atención" no
+// lançamento de despesas — nem toda cidade onde há gasto tem uma Unidade
+// própria cadastrada (ex.: atendimentos comerciais em várias cidades).
+export const cities = pgTable(
+  "cities",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ nameUnique: uniqueIndex("cities_name_unique").on(table.name) }),
+);
+
 export const travelers = pgTable(
   "travelers",
   {
@@ -448,6 +462,8 @@ export type ClientBillingProfile = typeof clientBillingProfiles.$inferSelect;
 export type ClientBillingProfileItem = typeof clientBillingProfileItems.$inferSelect;
 export type Unit = typeof units.$inferSelect;
 export type InsertUnit = typeof units.$inferInsert;
+export type City = typeof cities.$inferSelect;
+export type InsertCity = typeof cities.$inferInsert;
 export type Client = typeof clients.$inferSelect;
 export type InsertClient = typeof clients.$inferInsert;
 export type Traveler = typeof travelers.$inferSelect;

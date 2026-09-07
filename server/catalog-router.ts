@@ -46,6 +46,14 @@ const unitUpdate = unitCreate.partial().extend({ id: idSchema }).refine(
   "Informe ao menos um campo para atualizar",
 );
 
+const cityCreate = z.object({
+  name: z.string().trim().min(1).max(120),
+});
+const cityUpdate = cityCreate.partial().extend({ id: idSchema, active: z.boolean().optional() }).refine(
+  ({ id: _id, ...data }) => Object.values(data).some((value) => value !== undefined),
+  "Informe ao menos um campo para atualizar",
+);
+
 const clientCreate = z.object({
   name: z.string().trim().min(1).max(180),
   billingCurrency: z.string().trim().length(3).default("BRL"),
@@ -98,6 +106,23 @@ export const catalogRouter = router({
     }),
     archive: adminProcedure.input(z.object({ id: idSchema })).mutation(({ input }) =>
       withCatalogErrors(async () => requireFound(await catalog.archiveUnit(input.id), "Unidade")),
+    ),
+  }),
+  cities: router({
+    // protectedProcedure no list: qualquer usuário autenticado precisa
+    // conseguir ler a lista de cidades para escolher no formulário de
+    // despesa, não só o Administrativo.
+    list: protectedProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listCities(input))),
+    get: adminProcedure.input(z.object({ id: idSchema })).query(({ input }) =>
+      withCatalogErrors(async () => requireFound(await catalog.getCity(input.id), "Cidade")),
+    ),
+    create: adminProcedure.input(cityCreate).mutation(({ input }) => withCatalogErrors(() => catalog.createCity(input))),
+    update: adminProcedure.input(cityUpdate).mutation(({ input }) => {
+      const { id, ...data } = input;
+      return withCatalogErrors(() => catalog.updateCity(id, data));
+    }),
+    archive: adminProcedure.input(z.object({ id: idSchema })).mutation(({ input }) =>
+      withCatalogErrors(async () => requireFound(await catalog.archiveCity(input.id), "Cidade")),
     ),
   }),
   clients: router({

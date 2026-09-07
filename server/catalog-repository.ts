@@ -4,6 +4,7 @@ import {
   clientBillingLimits,
   clientBillingProfiles,
   clientBillingProfileItems,
+  cities,
   expenseTypes,
   maintenanceReasons,
   reimbursementLimits,
@@ -15,6 +16,7 @@ import {
   units,
   translationEntries,
   type InsertClient,
+  type InsertCity,
   type InsertExpenseType,
   type InsertTraveler,
   type InsertUnit,
@@ -122,6 +124,44 @@ export async function updateUnit(id: number, input: Partial<Pick<InsertUnit, "co
 
 export async function archiveUnit(id: number) {
   return updateUnit(id, { active: false });
+}
+
+// --- Cidades (independentes de Unidade) ---
+export async function listCities(input: CatalogListInput) {
+  const db = await requireDb();
+  const search = normalizedSearch(input.search);
+  const filters = [];
+  if (!input.includeInactive) filters.push(eq(cities.active, true));
+  if (search) filters.push(ilike(cities.name, search));
+  const where = filters.length ? and(...filters) : undefined;
+  const order = input.direction === "desc" ? desc(cities.name) : asc(cities.name);
+  const [items, countRows] = await Promise.all([
+    db.select().from(cities).where(where).orderBy(order).limit(input.pageSize).offset(pageOffset(input)),
+    db.select({ count: sql<number>`count(*)` }).from(cities).where(where),
+  ]);
+  return result(items, input, Number(countRows[0]?.count ?? 0));
+}
+
+export async function getCity(id: number) {
+  const db = await requireDb();
+  const rows = await db.select().from(cities).where(eq(cities.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function createCity(input: Pick<InsertCity, "name">) {
+  const db = await requireDb();
+  const rows = await db.insert(cities).values({ ...input, active: true }).returning();
+  return rows[0];
+}
+
+export async function updateCity(id: number, input: Partial<Pick<InsertCity, "name" | "active">>) {
+  const db = await requireDb();
+  const rows = await db.update(cities).set(input).where(eq(cities.id, id)).returning();
+  return rows[0] ?? null;
+}
+
+export async function archiveCity(id: number) {
+  return updateCity(id, { active: false });
 }
 
 export async function listClients(input: CatalogListInput) {

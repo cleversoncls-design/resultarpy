@@ -257,6 +257,10 @@ export async function listReimbursementReport(input: ReimbursementReportInput) {
     input.userId && !input.admin ? eq(travelers.userId, input.userId) : undefined,
     input.from ? gte(tripExpenses.occurredOn, input.from) : undefined,
     input.to ? lte(tripExpenses.occurredOn, input.to) : undefined,
+    // Só despesas "Pago com adiantamento" (o viajante pagou do próprio
+    // bolso) geram reembolso. Despesas "Pago Administrativo" (a empresa já
+    // pagou direto) não entram nesse total.
+    eq(tripExpenses.prepaid, true),
   ].filter(Boolean);
   const expensesRows = await db.select({
     expense: tripExpenses,
