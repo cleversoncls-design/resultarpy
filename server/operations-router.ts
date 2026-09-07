@@ -59,6 +59,21 @@ export const operationsRouter = router({
     create: protectedProcedure.input(tripFields).mutation(async ({ ctx, input }) => { const isAdmin = ctx.user.role === 'admin' || ctx.user.profile === 'admin'; const travelerId = isAdmin ? input.travelerId : await operations.ensureTravelerIdByUserId(ctx.user.id); if (!travelerId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Não foi possível identificar o viajante da sessão.' }); return operations.createTrip({ ...input, travelerId }); }),
     update: protectedProcedure.input(tripFields.partial().extend({ id: idInput.shape.id })).mutation(async ({ ctx, input }) => { const { id, ...changes } = input; const trip = await operations.updateTrip(id, changes, scopeFor(ctx.user)); if (!trip) throw notFound(); return trip; }),
     delete: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => { const deleted = await operations.deleteTrip(input.id, scopeFor(ctx.user)); if (!deleted) throw notFound(); return deleted; }),
+    // Confirma que o depósito do adiantamento foi realizado, com o valor
+    // efetivamente depositado (pode diferir do solicitado). Registra a
+    // data automaticamente e reavalia se a viagem já pode ser liberada.
+    confirmAdvance: adminProcedure.input(z.object({ id: idInput.shape.id, depositedAmount: z.string().min(1, 'Informe o valor depositado') })).mutation(async ({ input }) => {
+      const trip = await operations.confirmTripAdvance(input.id, input.depositedAmount, { admin: true });
+      if (!trip) throw notFound();
+      return trip;
+    }),
+    // Salva a observação com os dados da reserva de hotel (texto livre) e
+    // reavalia se a viagem já pode ser liberada.
+    updateHotelNote: adminProcedure.input(z.object({ id: idInput.shape.id, hotelNote: z.string().max(4000).nullable() })).mutation(async ({ input }) => {
+      const trip = await operations.updateTripHotelNote(input.id, input.hotelNote, { admin: true });
+      if (!trip) throw notFound();
+      return trip;
+    }),
   }),
   approvals: router({
     list: protectedProcedure.input(pageInput.extend({ status: z.enum(['Pendiente', 'Aprovada', 'Rejeitada']).default('Pendiente') })).query(({ ctx, input }) => operations.listTripApprovals({ ...input, userId: ctx.user.id, admin: ctx.user.role === 'admin' || ctx.user.profile === 'admin', approver: ctx.user.profile === 'approver' || ctx.user.profile === 'traveler_approver' })),
@@ -99,6 +114,14 @@ export const operationsRouter = router({
     }),
     reservations: router({
       list: adminProcedure.input(pageInput.extend({ status: reservationStatus.optional() })).query(({ input }) => operations.listFleetReservations(input)),
+      // Retorna a reserva de frota vinculada a uma viagem específica (com
+      // dados do veículo e do condutor), para exibição na tela de detalhes
+      // da viagem. Respeita o mesmo escopo de acesso de trips.get.
+      byTrip: protectedProcedure.input(idInput).query(async ({ ctx, input }) => {
+        const reservation = await operations.getFleetReservationForTrip(input.id, scopeFor(ctx.user));
+        if (reservation === undefined) throw notFound();
+        return reservation;
+      }),
       create: adminProcedure.input(z.object({ tripId: z.number().int().positive(), vehicleId: z.number().int().positive().nullable().optional(), driverId: z.number().int().positive(), status: reservationStatus.default('Aguardando veículo'), plannedStartOn: z.string().date(), plannedEndOn: z.string().date() })).mutation(({ input }) => operations.createFleetReservation(input)),
       update: adminProcedure.input(z.object({ id: z.number().int().positive(), vehicleId: z.number().int().positive().nullable().optional(), status: reservationStatus.optional(), departureAt: z.coerce.date().nullable().optional(), departureKm: z.number().int().min(0).nullable().optional(), returnAt: z.coerce.date().nullable().optional(), returnKm: z.number().int().min(0).nullable().optional() })).mutation(({ input: { id, ...input } }) => operations.updateFleetReservation(id, input)),
     }),

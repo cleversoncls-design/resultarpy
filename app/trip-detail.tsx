@@ -7,15 +7,13 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { PrimaryButton, SectionHeader, StatusPill } from "@/components/app-ui";
 import {
   expenses,
-  fleetReservations,
   formatCurrency,
   parseKm,
-  vehicles,
 } from "@/lib/demo-data";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
@@ -24,21 +22,55 @@ import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
 import { ReportExportActions } from "@/components/report-export-actions";
 
+const STATUS_ORDER = [
+  "Aguardando aprovação",
+  "Aprovada",
+  "Em preparação",
+  "Liberada para viagem",
+  "Em prestação",
+  "Finalizada",
+] as const;
+
 export default function TripDetailScreen() {
   const colors = useColors();
   const { t } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.profile === "admin";
   const params = useLocalSearchParams<{ tripId?: string }>();
   const tripId = typeof params.tripId === "string" && /^\d+$/.test(params.tripId) ? Number(params.tripId) : undefined;
+
   const tripQuery = trpc.operations.trips.get.useQuery({ id: tripId as number }, { enabled: isAuthenticated && tripId !== undefined });
   const trip = tripQuery.data;
 
+  const reservationQuery = trpc.operations.fleet.reservations.byTrip.useQuery(
+    { id: tripId as number },
+    { enabled: isAuthenticated && tripId !== undefined },
+  );
+  const reservation = reservationQuery.data ?? null;
+
+  const availableVehiclesQuery = trpc.operations.fleet.vehicles.list.useQuery(
+    { page: 1, pageSize: 50, status: "Disponível" },
+    { enabled: isAdmin && Boolean(trip?.requiresFleetVehicle) },
+  );
+
+  const confirmAdvanceMutation = trpc.operations.trips.confirmAdvance.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+  const updateHotelNoteMutation = trpc.operations.trips.updateHotelNote.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+  const updateTransportMutation = trpc.operations.trips.update.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+  const createReservationMutation = trpc.operations.fleet.reservations.create.useMutation({
+    onSuccess: () => { tripQuery.refetch(); reservationQuery.refetch(); },
+  });
+  const updateReservationMutation = trpc.operations.fleet.reservations.update.useMutation({
+    onSuccess: () => { tripQuery.refetch(); reservationQuery.refetch(); },
+  });
+
   // Todos os hooks abaixo são sempre chamados, em toda renderização,
   // independentemente de a viagem já ter chegado ou não (regra do React).
-  const reservation = fleetReservations.find(
-    (item) => item.tripId === String(trip?.id),
-  );
-  const vehicle = vehicles.find((item) => item.id === reservation?.vehicleId);
   const tripExpenses = expenses.filter(
     (expense) => expense.tripId === String(trip?.id),
   );
@@ -54,6 +86,24 @@ export default function TripDetailScreen() {
   const [returnKm, setReturnKm] = useState("");
   const [hasEvent, setHasEvent] = useState(false);
   const [eventNote, setEventNote] = useState("");
+  const [showVehiclePicker, setShowVehiclePicker] = useState(false);
+  const [hotelNoteDraft, setHotelNoteDraft] = useState<string | null>(null);
+  const [depositAmountDraft, setDepositAmountDraft] = useState<string | null>(null);
+
+  // Sempre que o usuário navega para outra viagem (tripId muda), sem que a
+  // tela seja desmontada, limpamos os rascunhos locais — senão o valor
+  // digitado numa viagem (ex.: valor do depósito) "vaza" para a próxima.
+  useEffect(() => {
+    setShowVehiclePicker(false);
+    setHotelNoteDraft(null);
+    setDepositAmountDraft(null);
+    setStarted(false);
+    setFinished(false);
+    setDepartureKm("");
+    setReturnKm("");
+    setHasEvent(false);
+    setEventNote("");
+  }, [tripId]);
 
   // Só a partir daqui decidimos o que renderizar.
   if (!tripId) {
@@ -97,6 +147,12 @@ export default function TripDetailScreen() {
     travelerName?: string | null;
     advanceAmount?: string;
     notes?: string | null;
+    advanceConfirmedAt?: string | null;
+    advanceConfirmedAmount?: string | null;
+    hotelNote?: string | null;
+    requiresFleetVehicle?: boolean;
+    hasAdvance?: boolean;
+    needsHotel?: boolean;
     flightDetails?: {
       passengerName?: string;
       passengerDocument?: string;
@@ -108,8 +164,57 @@ export default function TripDetailScreen() {
     } | null;
   };
   const clientLabel = tripRecord.clientName ?? tripRecord.travelerName ?? "—";
-  const advanceValue = tripRecord.advanceAmount ?? ('amount' in trip ? String(trip.amount) : '0');
+  const advanceValue = tripRecord.advanceAmount ?? "0";
   const flightDetails = tripRecord.flightDetails ?? undefined;
+
+  // --- Pendências para liberação da viagem ---
+  const vehicleAllocated = Boolean(reservation?.vehicleId);
+  const vehiclePending = Boolean(tripRecord.requiresFleetVehicle) && !vehicleAllocated;
+  const advancePending = Boolean(tripRecord.hasAdvance) && !tripRecord.advanceConfirmedAt;
+  const depositAmountValue = depositAmountDraft ?? advanceValue;
+  const hotelNoteValue = hotelNoteDraft ?? tripRecord.hotelNote ?? "";
+  const hotelPending = Boolean(tripRecord.needsHotel) && hotelNoteValue.trim() === "";
+  const showPendenciesBlock = isAdmin && (
+    tripRecord.requiresFleetVehicle || tripRecord.hasAdvance || tripRecord.needsHotel
+  );
+
+  const statusIndex = STATUS_ORDER.indexOf(trip.status as (typeof STATUS_ORDER)[number]);
+  const isApprovedOrLater = statusIndex >= STATUS_ORDER.indexOf("Aprovada");
+  const isReleasedOrLater = statusIndex >= STATUS_ORDER.indexOf("Liberada para viagem");
+  const isFinishedStatus = statusIndex >= STATUS_ORDER.indexOf("Finalizada");
+
+  const allocateVehicle = (vehicleId: number) => {
+    if (reservation) {
+      updateReservationMutation.mutate({ id: reservation.id, vehicleId, status: "Reservada" });
+    } else {
+      createReservationMutation.mutate({
+        tripId: trip.id,
+        vehicleId,
+        driverId: trip.travelerId,
+        status: "Reservada",
+        plannedStartOn: trip.startsOn,
+        plannedEndOn: trip.endsOn,
+      });
+    }
+    setShowVehiclePicker(false);
+  };
+
+  const changeTransportMode = (mode: "Veículo próprio" | "Ônibus") => {
+    updateTransportMutation.mutate({ id: trip.id, transport: mode, requiresFleetVehicle: false });
+  };
+
+  const confirmAdvance = () => {
+    const normalized = depositAmountValue.trim().replace(",", ".");
+    if (!normalized || Number.isNaN(Number(normalized))) {
+      Alert.alert("Informe um valor válido", "Digite o valor efetivamente depositado antes de confirmar.");
+      return;
+    }
+    confirmAdvanceMutation.mutate({ id: trip.id, depositedAmount: normalized });
+  };
+
+  const saveHotelNote = () => {
+    updateHotelNoteMutation.mutate({ id: trip.id, hotelNote: hotelNoteValue.trim() || null });
+  };
 
   const startTrip = () => {
     const km = parseKm(departureKm);
@@ -222,6 +327,179 @@ export default function TripDetailScreen() {
             </View>
           </View>
 
+          {showPendenciesBlock ? (
+            <>
+              <SectionHeader title="Pendências para liberação" />
+              <View className="rounded-2xl border border-border bg-surface p-5 gap-5">
+                {tripRecord.requiresFleetVehicle ? (
+                  <View>
+                    <View className="flex-row items-center justify-between">
+                      <Text className="font-bold text-foreground">🚗 Veículo da frota</Text>
+                      <Text className={vehiclePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
+                        {vehiclePending ? "PENDENTE" : "CONFIRMADO"}
+                      </Text>
+                    </View>
+                    {vehicleAllocated ? (
+                      <Text className="mt-1 text-sm text-muted">
+                        {reservation?.vehicleBrand} {reservation?.vehicleModel} · {reservation?.vehiclePlate}
+                      </Text>
+                    ) : (
+                      <View className="mt-3 gap-2">
+                        <PrimaryButton
+                          label={showVehiclePicker ? "Ocultar veículos disponíveis" : "Alocar veículo"}
+                          onPress={createReservationMutation.isPending || updateReservationMutation.isPending ? undefined : () => setShowVehiclePicker((current) => !current)}
+                        />
+                        <MutationFeedback
+                          isPending={createReservationMutation.isPending || updateReservationMutation.isPending}
+                          isSuccess={createReservationMutation.isSuccess || updateReservationMutation.isSuccess}
+                          isError={createReservationMutation.isError || updateReservationMutation.isError}
+                          errorMessage={createReservationMutation.error?.message ?? updateReservationMutation.error?.message}
+                          pendingLabel="Alocando veículo..."
+                          successLabel="Veículo alocado."
+                        />
+                        {showVehiclePicker ? (
+                          <View className="gap-2 rounded-xl border border-border overflow-hidden">
+                            {availableVehiclesQuery.isLoading ? (
+                              <Text className="p-4 text-sm text-muted">Carregando veículos disponíveis...</Text>
+                            ) : availableVehiclesQuery.data?.items.length ? (
+                              availableVehiclesQuery.data.items.map((item, index) => (
+                                <Pressable
+                                  key={item.id}
+                                  onPress={() => allocateVehicle(item.id)}
+                                  style={({ pressed }) => ({
+                                    opacity: pressed ? 0.6 : 1,
+                                    backgroundColor: pressed ? colors.background : colors.surface,
+                                  })}
+                                  className={`flex-row items-center justify-between px-4 py-3 ${index > 0 ? "border-t border-border" : ""}`}
+                                >
+                                  <View className="flex-row items-center flex-1">
+                                    <View
+                                      style={{ backgroundColor: `${colors.primary}18` }}
+                                      className="h-10 w-10 items-center justify-center rounded-xl"
+                                    >
+                                      <IconSymbol name="car.fill" size={18} color={colors.primary} />
+                                    </View>
+                                    <View className="ml-3">
+                                      <Text className="font-semibold text-foreground">{item.brand} {item.model}</Text>
+                                      <Text className="text-xs text-muted">{item.plate}</Text>
+                                    </View>
+                                  </View>
+                                  <View
+                                    style={{ backgroundColor: colors.primary }}
+                                    className="rounded-lg px-3 py-2"
+                                  >
+                                    <Text className="text-xs font-bold text-white">Selecionar</Text>
+                                  </View>
+                                </Pressable>
+                              ))
+                            ) : (
+                              <Text className="p-4 text-sm text-muted">Nenhum veículo disponível no momento.</Text>
+                            )}
+                          </View>
+                        ) : null}
+                        <View className="flex-row gap-2">
+                          <Pressable
+                            onPress={updateTransportMutation.isPending ? undefined : () => changeTransportMode("Veículo próprio")}
+                            className="flex-1 rounded-xl border border-border px-3 py-2"
+                          >
+                            <Text className="text-center text-xs font-bold text-primary">Alterar para Veículo Próprio</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={updateTransportMutation.isPending ? undefined : () => changeTransportMode("Ônibus")}
+                            className="flex-1 rounded-xl border border-border px-3 py-2"
+                          >
+                            <Text className="text-center text-xs font-bold text-primary">Alterar para Ônibus</Text>
+                          </Pressable>
+                        </View>
+                        <MutationFeedback
+                          isPending={updateTransportMutation.isPending}
+                          isSuccess={updateTransportMutation.isSuccess}
+                          isError={updateTransportMutation.isError}
+                          errorMessage={updateTransportMutation.error?.message}
+                          pendingLabel="Alterando modalidade..."
+                          successLabel="Modalidade alterada."
+                        />
+                      </View>
+                    )}
+                  </View>
+                ) : null}
+
+                {tripRecord.hasAdvance ? (
+                  <View className="border-t border-border pt-5">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="font-bold text-foreground">💰 Adiantamento</Text>
+                      <Text className={advancePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
+                        {advancePending ? "PENDENTE" : "CONFIRMADO"}
+                      </Text>
+                    </View>
+                    {advancePending ? (
+                      <View className="mt-3 gap-2">
+                        <Text className="text-xs text-muted">Valor efetivamente depositado</Text>
+                        <TextInput
+                          value={depositAmountValue}
+                          onChangeText={setDepositAmountDraft}
+                          keyboardType="decimal-pad"
+                          placeholder="Ex.: 1000000.00"
+                          placeholderTextColor={colors.muted}
+                          className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
+                        />
+                        <PrimaryButton
+                          label={confirmAdvanceMutation.isPending ? "Confirmando..." : "Confirmar depósito realizado"}
+                          onPress={confirmAdvanceMutation.isPending ? undefined : confirmAdvance}
+                        />
+                        <MutationFeedback
+                          isPending={confirmAdvanceMutation.isPending}
+                          isSuccess={confirmAdvanceMutation.isSuccess}
+                          isError={confirmAdvanceMutation.isError}
+                          errorMessage={confirmAdvanceMutation.error?.message}
+                          pendingLabel="Confirmando depósito..."
+                          successLabel="Depósito confirmado."
+                        />
+                      </View>
+                    ) : (
+                      <Text className="mt-1 text-sm text-muted">
+                        {formatCurrency(Number(tripRecord.advanceConfirmedAmount ?? advanceValue))} depositado em {new Date(tripRecord.advanceConfirmedAt as string).toLocaleString("pt-BR")}.
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
+
+                {tripRecord.needsHotel ? (
+                  <View className="border-t border-border pt-5">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="font-bold text-foreground">🏨 Hotel</Text>
+                      <Text className={hotelPending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
+                        {hotelPending ? "PENDENTE" : "CONFIRMADO"}
+                      </Text>
+                    </View>
+                    <View className="mt-3 gap-2">
+                      <TextInput
+                        value={hotelNoteValue}
+                        onChangeText={setHotelNoteDraft}
+                        multiline
+                        placeholder="Cole aqui os dados da reserva de hotel..."
+                        placeholderTextColor={colors.muted}
+                        className="min-h-[80px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
+                      />
+                      <PrimaryButton
+                        label={updateHotelNoteMutation.isPending ? "Salvando..." : "Salvar dados do hotel"}
+                        onPress={updateHotelNoteMutation.isPending ? undefined : saveHotelNote}
+                      />
+                      <MutationFeedback
+                        isPending={updateHotelNoteMutation.isPending}
+                        isSuccess={updateHotelNoteMutation.isSuccess}
+                        isError={updateHotelNoteMutation.isError}
+                        errorMessage={updateHotelNoteMutation.error?.message}
+                        pendingLabel="Salvando dados do hotel..."
+                        successLabel="Dados do hotel salvos."
+                      />
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            </>
+          ) : null}
+
           <SectionHeader title="Controle da viagem de frota" />
           <View className="rounded-2xl border border-border bg-surface p-5">
             <View className="flex-row items-center">
@@ -233,13 +511,13 @@ export default function TripDetailScreen() {
               </View>
               <View className="ml-3 flex-1">
                 <Text className="font-bold text-foreground">
-                  {vehicle
-                    ? `${vehicle.brand} ${vehicle.model}`
+                  {vehicleAllocated
+                    ? `${reservation?.vehicleBrand} ${reservation?.vehicleModel}`
                     : "Veículo não associado"}
                 </Text>
                 <Text className="mt-1 text-sm text-muted">
-                  {vehicle
-                    ? `${vehicle.plate} · Condutor: ${reservation?.driver}`
+                  {vehicleAllocated
+                    ? `${reservation?.vehiclePlate} · Condutor: ${reservation?.driverName}`
                     : "Solicitação enviada ao Administrativo"}
                 </Text>
               </View>
@@ -363,23 +641,23 @@ export default function TripDetailScreen() {
           <View className="rounded-2xl border border-border bg-surface p-5">
             <TimelineItem
               title="Solicitação criada"
-              detail="12 ago · Viajante"
+              detail="Registrada pelo viajante"
               done
             />
             <TimelineItem
-              title="Aprovada pela área"
-              detail="13 ago · Carlos Mendes"
-              done
+              title="Aprovada"
+              detail={isApprovedOrLater ? "Concluída" : "Aguardando aprovação"}
+              done={isApprovedOrLater}
             />
             <TimelineItem
               title="Liberada para viagem"
-              detail="17 ago · Administrativo"
-              done
+              detail={isReleasedOrLater ? "Concluída" : "Aguardando pendências"}
+              done={isReleasedOrLater}
             />
             <TimelineItem
               title="Prestação de contas"
-              detail={finished ? "Finalizada agora" : "Em andamento"}
-              done={finished}
+              detail={finished || isFinishedStatus ? "Finalizada" : "Em andamento"}
+              done={finished || isFinishedStatus}
               last
             />
           </View>
@@ -397,7 +675,27 @@ export default function TripDetailScreen() {
   );
 }
 
-function TimelineItem({
+function MutationFeedback({
+  isPending,
+  isSuccess,
+  isError,
+  errorMessage,
+  pendingLabel,
+  successLabel,
+}: {
+  isPending: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  errorMessage?: string;
+  pendingLabel: string;
+  successLabel: string;
+}) {
+  const colors = useColors();
+  if (isPending) return <Text className="mt-2 text-xs font-semibold text-muted">{pendingLabel}</Text>;
+  if (isError) return <Text style={{ color: colors.error }} className="mt-2 text-xs font-semibold">{errorMessage ?? "Ocorreu um erro. Tente novamente."}</Text>;
+  if (isSuccess) return <Text style={{ color: colors.success }} className="mt-2 text-xs font-semibold">✓ {successLabel}</Text>;
+  return null;
+}
   title,
   detail,
   done,

@@ -62,10 +62,37 @@ export async function createTrip(input: typeof trips.$inferInsert) {
   return created;
 }
 
+// Verifica se todas as pendências aplicáveis a uma viagem foram resolvidas
+// (veículo alocado quando exigido, adiantamento confirmado quando existe,
+// nota de hotel preenchida quando necessária) e, nesse caso, avança o
+// status da viagem para "Liberada para viagem" automaticamente.
+export async function maybeReleaseTrip(id: number) {
+  const db = await requireDb();
+  const [trip] = await db.select().from(trips).where(eq(trips.id, id)).limit(1);
+  if (!trip) return undefined;
+  if (trip.status !== 'Aprovada' && trip.status !== 'Em preparação') return trip;
+
+  const vehicleOk = !trip.requiresFleetVehicle || (await getFleetReservationForTrip(id))?.vehicleId != null;
+  const advanceOk = !trip.hasAdvance || trip.advanceConfirmedAt != null;
+  const hotelOk = !trip.needsHotel || Boolean(trip.hotelNote && trip.hotelNote.trim() !== '');
+
+  if (vehicleOk && advanceOk && hotelOk) {
+    const [updated] = await db.update(trips).set({ status: 'Liberada para viagem' }).where(eq(trips.id, id)).returning();
+    return updated;
+  }
+  return trip;
+}
+
 export async function updateTrip(id: number, input: Partial<typeof trips.$inferInsert>, scope: Scope = {}) {
   const db = await requireDb();
   if (!(await getTrip(id, scope))) return undefined;
   const [updated] = await db.update(trips).set(input).where(eq(trips.id, id)).returning();
+  // Se a modalidade de transporte ou a exigência de veículo mudou (ex.: admin
+  // trocou de "frota" para "próprio"/"ônibus"), reavalia se a viagem já pode
+  // ser liberada.
+  if (updated && ('transport' in input || 'requiresFleetVehicle' in input)) {
+    return (await maybeReleaseTrip(id)) ?? updated;
+  }
   return updated;
 }
 
@@ -74,6 +101,49 @@ export async function deleteTrip(id: number, scope: Scope = {}) {
   if (!(await getTrip(id, scope))) return undefined;
   const [deleted] = await db.delete(trips).where(eq(trips.id, id)).returning({ id: trips.id });
   return deleted;
+}
+
+// Confirma que o depósito do adiantamento foi realizado, registrando o
+// valor efetivamente depositado (que pode diferir do valor solicitado,
+// para permitir encontro de contas) e a data automaticamente. Reavalia se
+// a viagem pode ser liberada.
+export async function confirmTripAdvance(id: number, depositedAmount: string, scope: Scope = {}) {
+  const db = await requireDb();
+  if (!(await getTrip(id, scope))) return undefined;
+  await db.update(trips).set({ advanceConfirmedAt: new Date(), advanceConfirmedAmount: depositedAmount }).where(eq(trips.id, id));
+  return maybeReleaseTrip(id);
+}
+
+// Salva a observação com os dados da reserva de hotel e reavalia se a
+// viagem pode ser liberada.
+export async function updateTripHotelNote(id: number, hotelNote: string | null, scope: Scope = {}) {
+  const db = await requireDb();
+  if (!(await getTrip(id, scope))) return undefined;
+  await db.update(trips).set({ hotelNote }).where(eq(trips.id, id));
+  return maybeReleaseTrip(id);
+}
+
+// Busca a reserva de frota vinculada a uma viagem específica, já com os
+// dados do veículo e do condutor (para exibição na tela de detalhes).
+export async function getFleetReservationForTrip(tripId: number, scope: Scope = {}) {
+  const db = await requireDb();
+  if (!(await getTrip(tripId, scope))) return undefined;
+  const [row] = await db
+    .select({
+      reservation: fleetReservations,
+      vehicleBrand: vehicles.brand,
+      vehicleModel: vehicles.model,
+      vehiclePlate: vehicles.plate,
+      driverName: travelers.name,
+    })
+    .from(fleetReservations)
+    .leftJoin(vehicles, eq(fleetReservations.vehicleId, vehicles.id))
+    .leftJoin(travelers, eq(fleetReservations.driverId, travelers.id))
+    .where(eq(fleetReservations.tripId, tripId))
+    .orderBy(desc(fleetReservations.createdAt))
+    .limit(1);
+  if (!row) return null;
+  return { ...row.reservation, vehicleBrand: row.vehicleBrand, vehicleModel: row.vehicleModel, vehiclePlate: row.vehiclePlate, driverName: row.driverName };
 }
 
 export type ApprovalQueueStatus = 'Pendiente' | 'Aprovada' | 'Rejeitada';
@@ -282,12 +352,16 @@ export async function listFleetReservations(input: PageInput & { status?: string
 export async function createFleetReservation(input: typeof fleetReservations.$inferInsert) {
   const db = await requireDb();
   const [created] = await db.insert(fleetReservations).values(input).returning();
+  if (created?.vehicleId) await maybeReleaseTrip(created.tripId);
   return created;
 }
 
 export async function updateFleetReservation(id: number, input: Partial<typeof fleetReservations.$inferInsert>) {
   const db = await requireDb();
   const [updated] = await db.update(fleetReservations).set(input).where(eq(fleetReservations.id, id)).returning();
+  // Se um veículo acabou de ser associado a esta reserva, reavalia se a
+  // viagem correspondente já pode ser liberada.
+  if (updated && 'vehicleId' in input) await maybeReleaseTrip(updated.tripId);
   return updated;
 }
 

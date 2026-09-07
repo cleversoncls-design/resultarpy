@@ -120,6 +120,13 @@
       "when": 1787937197054,
       "tag": "0016_burly_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788523259059,
+      "tag": "0017_yellow_smiling_tiger",
+      "breakpoints": true
     }
   ]
 }
