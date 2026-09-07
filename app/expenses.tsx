@@ -1,130 +1,776 @@
-import { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import { ScreenContainer } from '@/components/screen-container';
-import { PrimaryButton, SecondaryButton, StatusPill } from '@/components/app-ui';
-import { CURRENCY_OPTIONS, formatCurrency, type Currency } from '@/lib/currency';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useColors } from '@/hooks/use-colors';
-import { useAuth } from '@/hooks/use-auth';
-import { useLanguage } from '@/lib/language-provider';
-import { useCurrency } from '@/lib/currency-provider';
-import { trpc } from '@/lib/trpc';
-import { isValidExpenseForm } from '@/lib/expense-form';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
+import { ScreenContainer } from "@/components/screen-container";
+import { PrimaryButton, SectionHeader, StatusPill } from "@/components/app-ui";
+import {
+  formatCurrency,
+  parseKm,
+} from "@/lib/demo-data";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useColors } from "@/hooks/use-colors";
+import { useLanguage } from "@/lib/language-provider";
+import { useAuth } from "@/hooks/use-auth";
+import { trpc } from "@/lib/trpc";
+import { ReportExportActions } from "@/components/report-export-actions";
 
-function validExpenseCurrency(value: string): Currency {
-  return value === 'USD' || value === 'PYG' ? value : 'BRL';
-}
+const STATUS_ORDER = [
+  "Aguardando aprovação",
+  "Aprovada",
+  "Em preparação",
+  "Liberada para viagem",
+  "Em prestação",
+  "Finalizada",
+] as const;
 
-type ExpenseDraft = {
-  tripId: number;
-  expenseTypeId: number;
-  occurredOn: string;
-  city: string;
-  quantity: string;
-  unitValue: string;
-  currency: Currency;
-  expenseGroup: string;
-  prepaid: boolean;
-  billable: boolean;
-};
-
-const defaultDraft: ExpenseDraft = {
-  tripId: 0,
-  expenseTypeId: 0,
-  occurredOn: '',
-  city: '',
-  quantity: '1',
-  unitValue: '',
-  currency: 'BRL',
-  expenseGroup: 'Viáticos',
-  prepaid: true,
-  billable: true,
-};
-
-export default function ExpensesScreen() {
+export default function TripDetailScreen() {
   const colors = useColors();
   const { t } = useLanguage();
-  const { currency } = useCurrency();
-  const { isAuthenticated } = useAuth();
-  const params = useLocalSearchParams<{ expenseId?: string; tripId?: string }>();
-  const editId = typeof params.expenseId === 'string' && /^\d+$/.test(params.expenseId) ? Number(params.expenseId) : undefined;
-  const routeTripId = typeof params.tripId === 'string' && /^\d+$/.test(params.tripId) ? Number(params.tripId) : undefined;
-  const [showForm, setShowForm] = useState(editId !== undefined);
-  const [draft, setDraft] = useState<ExpenseDraft>({ ...defaultDraft, ...(routeTripId ? { tripId: routeTripId } : {}) });
-  const query = trpc.operations.expenses.list.useQuery({ page: 1, pageSize: 50, direction: 'desc' }, { enabled: isAuthenticated });
-  const expenseTypesQuery = trpc.catalogs.expenseTypes.list.useQuery({ page: 1, pageSize: 100, includeInactive: false, direction: 'asc' }, { enabled: isAuthenticated });
-  const tripsQuery = trpc.operations.trips.list.useQuery({ page: 1, pageSize: 100, direction: 'asc' }, { enabled: isAuthenticated });
-  const unitsQuery = trpc.catalogs.units.list.useQuery({ page: 1, pageSize: 100, includeInactive: false, direction: 'asc' }, { enabled: isAuthenticated });
-  const cities = Array.from(new Set((unitsQuery.data?.items ?? []).map((unit) => unit.city.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  const expenseQuery = trpc.operations.expenses.get.useQuery({ id: editId as number }, { enabled: isAuthenticated && editId !== undefined });
-  const createExpense = trpc.operations.expenses.create.useMutation();
-  const updateExpense = trpc.operations.expenses.update.useMutation();
-  const persistedExpenses = query.data?.items.map((expense) => ({
-    id: String(expense.id),
-    tripId: String(expense.tripId),
-    date: expense.occurredOn,
-    city: expense.city,
-    client: 'Cliente vinculado',
-    concept: 'Gasto registrado',
-    group: expense.expenseGroup ?? 'Despesas',
-    quantity: Number(expense.quantity),
-    unitValue: Number(expense.unitValue),
-    prepaid: expense.prepaid,
-    billable: expense.billable,
-    limit: Number(expense.amount),
-    reviewNote: expense.reviewNote ?? undefined,
-    currency: expense.currency,
-  }));
-  const rows = persistedExpenses ?? [];
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.profile === "admin";
+  const params = useLocalSearchParams<{ tripId?: string }>();
+  const tripId = typeof params.tripId === "string" && /^\d+$/.test(params.tripId) ? Number(params.tripId) : undefined;
 
+  const tripQuery = trpc.operations.trips.get.useQuery({ id: tripId as number }, { enabled: isAuthenticated && tripId !== undefined });
+  const trip = tripQuery.data;
+
+  const reservationQuery = trpc.operations.fleet.reservations.byTrip.useQuery(
+    { id: tripId as number },
+    { enabled: isAuthenticated && tripId !== undefined },
+  );
+  const reservation = reservationQuery.data ?? null;
+
+  const availableVehiclesQuery = trpc.operations.fleet.vehicles.list.useQuery(
+    { page: 1, pageSize: 50, status: "Disponível" },
+    { enabled: isAdmin && Boolean(trip?.requiresFleetVehicle) },
+  );
+
+  // Despesas reais lançadas para esta viagem (antes calculávamos isso a
+  // partir de uma lista de demonstração vazia, que nunca refletia o valor
+  // real lançado).
+  const tripExpensesQuery = trpc.operations.expenses.list.useQuery(
+    { tripId: tripId as number, page: 1, pageSize: 200 },
+    { enabled: isAuthenticated && tripId !== undefined },
+  );
+
+  const recordKmMutation = trpc.operations.fleet.reservations.recordKm.useMutation({
+    onSuccess: () => { reservationQuery.refetch(); },
+  });
+
+  const confirmAdvanceMutation = trpc.operations.trips.confirmAdvance.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+  const updateHotelNoteMutation = trpc.operations.trips.updateHotelNote.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+  const updateTransportMutation = trpc.operations.trips.update.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+  const createReservationMutation = trpc.operations.fleet.reservations.create.useMutation({
+    onSuccess: () => { tripQuery.refetch(); reservationQuery.refetch(); },
+  });
+  const updateReservationMutation = trpc.operations.fleet.reservations.update.useMutation({
+    onSuccess: () => { tripQuery.refetch(); reservationQuery.refetch(); },
+  });
+
+  // Todos os hooks abaixo são sempre chamados, em toda renderização,
+  // independentemente de a viagem já ter chegado ou não (regra do React).
+  const tripExpenses = tripExpensesQuery.data?.items ?? [];
+  const spent = tripExpenses.reduce(
+    (sum, expense) => sum + Number(expense.quantity) * Number(expense.unitValue),
+    0,
+  );
+  const [started, setStarted] = useState(Boolean(reservation?.departureKm));
+  const [finished, setFinished] = useState(false);
+  const [departureKm, setDepartureKm] = useState(
+    reservation?.departureKm?.toString() ?? "",
+  );
+  const [returnKm, setReturnKm] = useState("");
+  const [hasEvent, setHasEvent] = useState(false);
+  const [eventNote, setEventNote] = useState("");
+  const [showVehiclePicker, setShowVehiclePicker] = useState(false);
+  const [hotelNoteDraft, setHotelNoteDraft] = useState<string | null>(null);
+  const [depositAmountDraft, setDepositAmountDraft] = useState<string | null>(null);
+
+  // Sempre que o usuário navega para outra viagem (tripId muda), sem que a
+  // tela seja desmontada, limpamos os rascunhos locais — senão o valor
+  // digitado numa viagem (ex.: valor do depósito) "vaza" para a próxima.
   useEffect(() => {
-    const expense = expenseQuery.data;
-    if (!expense) return;
-    setDraft({ tripId: expense.tripId, expenseTypeId: expense.expenseTypeId, occurredOn: expense.occurredOn, city: expense.city, quantity: expense.quantity, unitValue: expense.unitValue, currency: expense.currency === 'USD' || expense.currency === 'PYG' ? expense.currency : 'BRL', expenseGroup: expense.expenseGroup ?? 'Despesas', prepaid: expense.prepaid, billable: expense.billable });
-  }, [expenseQuery.data]);
+    setShowVehiclePicker(false);
+    setHotelNoteDraft(null);
+    setDepositAmountDraft(null);
+    setStarted(false);
+    setFinished(false);
+    setDepartureKm("");
+    setReturnKm("");
+    setHasEvent(false);
+    setEventNote("");
+  }, [tripId]);
 
-  const finishForm = () => {
-    setShowForm(false);
-    void query.refetch();
-    router.replace('/expenses');
+  // Assim que os dados da reserva chegam (ou mudam), refletimos o KM já
+  // registrado no banco — antes isso só funcionava na primeira renderização.
+  useEffect(() => {
+    if (reservation?.departureKm) {
+      setStarted(true);
+      setDepartureKm(String(reservation.departureKm));
+    }
+    if (reservation?.returnKm) {
+      setFinished(true);
+      setReturnKm(String(reservation.returnKm));
+    }
+  }, [reservation?.departureKm, reservation?.returnKm]);
+
+  // Só a partir daqui decidimos o que renderizar.
+  if (!tripId) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
+        <Pressable onPress={() => router.back()} className="mb-5">
+          <Text className="font-semibold text-primary">‹ Voltar</Text>
+        </Pressable>
+        <Text className="text-foreground">Nenhuma viagem informada para exibir.</Text>
+      </ScreenContainer>
+    );
+  }
+
+  if (tripQuery.isLoading) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
+        <Text className="text-foreground">Carregando viagem...</Text>
+      </ScreenContainer>
+    );
+  }
+
+  if (tripQuery.isError || !trip) {
+    return (
+      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
+        <Pressable onPress={() => router.back()} className="mb-5">
+          <Text className="font-semibold text-primary">‹ Voltar</Text>
+        </Pressable>
+        <Text className="text-foreground">
+          Não foi possível carregar os detalhes desta viagem.
+        </Text>
+        {tripQuery.error ? (
+          <Text className="mt-2 text-sm text-muted">{tripQuery.error.message}</Text>
+        ) : null}
+      </ScreenContainer>
+    );
+  }
+
+  // A partir daqui, `trip` está garantidamente preenchido.
+  const tripRecord = trip as typeof trip & {
+    clientName?: string | null;
+    travelerName?: string | null;
+    advanceAmount?: string;
+    notes?: string | null;
+    advanceConfirmedAt?: string | null;
+    advanceConfirmedAmount?: string | null;
+    hotelNote?: string | null;
+    requiresFleetVehicle?: boolean;
+    hasAdvance?: boolean;
+    needsHotel?: boolean;
+    flightDetails?: {
+      passengerName?: string;
+      passengerDocument?: string;
+      passengerBirthDate?: string;
+      airline?: string;
+      flightNumber?: string;
+      departureAirport?: string;
+      arrivalAirport?: string;
+    } | null;
+  };
+  const clientLabel = tripRecord.clientName ?? tripRecord.travelerName ?? "—";
+  const advanceValue = tripRecord.advanceAmount ?? "0";
+  const flightDetails = tripRecord.flightDetails ?? undefined;
+
+  // --- Pendências para liberação da viagem ---
+  const vehicleAllocated = Boolean(reservation?.vehicleId);
+  const vehiclePending = Boolean(tripRecord.requiresFleetVehicle) && !vehicleAllocated;
+  const advancePending = Boolean(tripRecord.hasAdvance) && !tripRecord.advanceConfirmedAt;
+  const depositAmountValue = depositAmountDraft ?? advanceValue;
+  const hotelNoteValue = hotelNoteDraft ?? tripRecord.hotelNote ?? "";
+  const hotelPending = Boolean(tripRecord.needsHotel) && hotelNoteValue.trim() === "";
+  const showPendenciesBlock = isAdmin && (
+    tripRecord.requiresFleetVehicle || tripRecord.hasAdvance || tripRecord.needsHotel
+  );
+
+  const statusIndex = STATUS_ORDER.indexOf(trip.status as (typeof STATUS_ORDER)[number]);
+  const isApprovedOrLater = statusIndex >= STATUS_ORDER.indexOf("Aprovada");
+  const isReleasedOrLater = statusIndex >= STATUS_ORDER.indexOf("Liberada para viagem");
+  const isFinishedStatus = statusIndex >= STATUS_ORDER.indexOf("Finalizada");
+
+  const allocateVehicle = (vehicleId: number) => {
+    if (reservation) {
+      updateReservationMutation.mutate({ id: reservation.id, vehicleId, status: "Reservada" });
+    } else {
+      createReservationMutation.mutate({
+        tripId: trip.id,
+        vehicleId,
+        driverId: trip.travelerId,
+        status: "Reservada",
+        plannedStartOn: trip.startsOn,
+        plannedEndOn: trip.endsOn,
+      });
+    }
+    setShowVehiclePicker(false);
   };
 
-  if (showForm || editId !== undefined) return <NewExpense draft={draft} setDraft={setDraft} expenseTypes={expenseTypesQuery.data?.items ?? []} trips={tripsQuery.data?.items ?? []} cities={cities} editing={editId !== undefined} isAuthenticated={isAuthenticated} saving={createExpense.isPending || updateExpense.isPending} onCancel={() => { setShowForm(false); router.replace('/expenses'); }} onSave={async () => {
-    const payload = { tripId: draft.tripId, expenseTypeId: draft.expenseTypeId, occurredOn: draft.occurredOn, city: draft.city.trim(), quantity: draft.quantity, unitValue: draft.unitValue.replace(',', '.'), currency: draft.currency, expenseGroup: draft.expenseGroup.trim() || null, prepaid: draft.prepaid, billable: draft.billable, notes: null, reviewNote: null };
-    try {
-      if (editId !== undefined) await updateExpense.mutateAsync({ id: editId, ...payload }); else await createExpense.mutateAsync(payload);
-      Alert.alert(editId !== undefined ? t('Despesa atualizada') : t('Despesa adicionada'), t('O lançamento foi salvo na prestação.'));
-      finishForm();
-    } catch (error) {
-      Alert.alert(t('Não foi possível salvar'), error instanceof Error ? error.message : t('Tente novamente.'));
-    }
-  }} />;
+  const changeTransportMode = (mode: "Veículo próprio" | "Ônibus") => {
+    updateTransportMutation.mutate({ id: trip.id, transport: mode, requiresFleetVehicle: false });
+  };
 
-  const totalsByCurrency = new Map<string, number>();
-  rows.forEach((expense) => totalsByCurrency.set(expense.currency, (totalsByCurrency.get(expense.currency) ?? 0) + expense.quantity * expense.unitValue));
-  const total = Array.from(totalsByCurrency.entries()).map(([code, value]) => formatCurrency(value, validExpenseCurrency(code))).join(' · ') || formatCurrency(0, currency);
-  return <ScreenContainer edges={['top', 'bottom', 'left', 'right']} className="px-5 pt-4"><Pressable onPress={() => router.back()} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="mb-5"><Text className="font-semibold text-primary">‹ Voltar</Text></Pressable><View className="flex-row items-end justify-between"><View><Text className="text-sm font-medium text-muted">{t('Lançamentos persistidos')}</Text><Text className="mt-1 text-3xl font-bold text-foreground">{t('Despesas')}</Text></View><Pressable onPress={() => setShowForm(true)} style={({ pressed }) => [{ backgroundColor: colors.primary, opacity: pressed ? 0.75 : 1 }]} className="h-11 w-11 items-center justify-center rounded-2xl"><IconSymbol name="plus" size={22} color="white" /></Pressable></View><View className="mt-6 flex-row gap-3"><View className="flex-1 rounded-2xl border border-border bg-surface p-4"><Text className="text-xs text-muted">{t('Total lançado')}</Text><Text className="mt-2 text-xl font-bold text-foreground">{total}</Text></View><View className="flex-1 rounded-2xl border border-border bg-surface p-4"><Text className="text-xs text-muted">{t('Itens pendentes')}</Text><Text className="mt-2 text-xl font-bold text-warning">{String(rows.filter((expense) => expense.quantity * expense.unitValue > expense.limit).length).padStart(2, '0')}</Text></View></View><Text className="mb-3 mt-8 text-base font-bold text-foreground">{t('Lançamentos recentes')}</Text><View className="gap-3">{rows.map((expense) => { const lineTotal = expense.quantity * expense.unitValue; const overLimit = lineTotal > expense.limit; const canEdit = /^\d+$/.test(expense.id); return <View key={expense.id} className="rounded-2xl border border-border bg-surface p-4"><View className="flex-row items-start"><View className="flex-1"><Text className="text-xs text-muted">{expense.date} · {expense.city}</Text><Text className="mt-1 font-bold text-foreground">{expense.concept}</Text><Text className="mt-1 text-xs text-muted">{expense.client} · {expense.quantity} × {formatCurrency(expense.unitValue, validExpenseCurrency(expense.currency))}</Text></View><View className="items-end"><Text className="font-bold text-foreground">{formatCurrency(lineTotal, validExpenseCurrency(expense.currency))}</Text>{canEdit ? <Pressable onPress={() => router.push({ pathname: '/expenses', params: { expenseId: expense.id } })} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })} className="mt-2"><Text className="text-xs font-bold text-primary">{t('Editar')}</Text></Pressable> : null}</View></View><View className="mt-3 flex-row items-center"><StatusPill status={overLimit ? 'Revisão necessária' : 'Pronto para envio'} /><Text className="ml-auto text-xs text-muted">{expense.prepaid ? 'Adiantado' : 'Administrativo'}</Text></View>{expense.reviewNote ? <Text className="mt-3 rounded-xl bg-warning/10 p-3 text-xs leading-4 text-warning">Observação: {expense.reviewNote}</Text> : null}</View>; })}</View><View className="mt-6"><PrimaryButton label={t('Enviar fechamento')} onPress={() => Alert.alert(t('Fechamento enviado'), t('O administrativo foi notificado para revisar os lançamentos.'))} /><View className="mt-2"><SecondaryButton label={t('Adicionar outro lançamento')} onPress={() => setShowForm(true)} /></View></View></ScreenContainer>;
+  const confirmAdvance = () => {
+    const normalized = depositAmountValue.trim().replace(",", ".");
+    if (!normalized || Number.isNaN(Number(normalized))) {
+      Alert.alert("Informe um valor válido", "Digite o valor efetivamente depositado antes de confirmar.");
+      return;
+    }
+    confirmAdvanceMutation.mutate({ id: trip.id, depositedAmount: normalized });
+  };
+
+  const saveHotelNote = () => {
+    updateHotelNoteMutation.mutate({ id: trip.id, hotelNote: hotelNoteValue.trim() || null });
+  };
+
+  const startTrip = () => {
+    const km = parseKm(departureKm);
+    if (!km) {
+      Alert.alert(
+        "Informe o KM de saída",
+        "Digite a quilometragem antes de iniciar a viagem.",
+      );
+      return;
+    }
+    setStarted(true);
+    if (reservation?.id) {
+      recordKmMutation.mutate({ reservationId: reservation.id, departureKm: km });
+    }
+    Alert.alert(
+      "Viagem iniciada",
+      `Saída registrada em ${km.toLocaleString("pt-BR")} km.`,
+    );
+  };
+
+  const finishTrip = () => {
+    const km = parseKm(returnKm);
+    if (!km || km < parseKm(departureKm)) {
+      Alert.alert(
+        "Confira o KM de retorno",
+        "O KM de retorno deve ser maior ou igual ao KM de saída.",
+      );
+      return;
+    }
+    setFinished(true);
+    if (reservation?.id) {
+      recordKmMutation.mutate({ reservationId: reservation.id, returnKm: km });
+    }
+    Alert.alert(
+      hasEvent ? "Viagem finalizada com evento" : "Viagem finalizada",
+      hasEvent
+        ? "O veículo foi sinalizado para avaliação do Administrativo."
+        : `Percurso registrado: ${(km - parseKm(departureKm)).toLocaleString("pt-BR")} km.`,
+    );
+  };
+
+  return (
+    <ScreenContainer
+      edges={["top", "bottom", "left", "right"]}
+      className="px-5 pt-4"
+    >
+      <View className="w-full max-w-5xl flex-1 self-center">
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 32 }}
+        >
+          <Pressable onPress={() => router.back()} className="mb-5">
+            <Text className="font-semibold text-primary">‹ Voltar</Text>
+          </Pressable>
+          <View className="flex-row items-start justify-between">
+            <View>
+              <Text className="text-xs font-bold tracking-wider text-muted">
+                {trip.id}
+              </Text>
+              <Text className="mt-2 text-3xl font-bold text-foreground">
+                {trip.destination}
+              </Text>
+              <Text className="mt-1 text-sm text-muted">
+                  {trip.startsOn} — {trip.endsOn} · {clientLabel}
+              </Text>
+            </View>
+            <StatusPill
+              status={
+                finished ? "Finalizada" : started ? "Em prestação" : trip.status
+              }
+            />
+          </View>
+          {tripRecord.notes ? (
+            <View className="mt-5 rounded-2xl border border-border bg-surface p-5">
+              <Text className="text-lg font-bold text-foreground">{t('Observações')}</Text>
+              <Text className="mt-3 text-sm leading-6 text-foreground">{tripRecord.notes}</Text>
+            </View>
+          ) : null}
+          {flightDetails ? (
+            <View className="mt-5 rounded-2xl border border-border bg-surface p-5">
+              <Text className="text-lg font-bold text-foreground">{t('Dados do voo')}</Text>
+              <View className="mt-3 gap-2">
+                <Text className="text-sm text-muted">{t('Passageiro')}: <Text className="font-semibold text-foreground">{flightDetails.passengerName || t('Não informado')}</Text></Text>
+                <Text className="text-sm text-muted">{t('Documento / Passaporte')}: <Text className="font-semibold text-foreground">{flightDetails.passengerDocument || t('Não informado')}</Text></Text>
+                <Text className="text-sm text-muted">{t('Companhia aérea')}: <Text className="font-semibold text-foreground">{flightDetails.airline || t('Não informado')}</Text></Text>
+                <Text className="text-sm text-muted">{t('Voo')}: <Text className="font-semibold text-foreground">{flightDetails.flightNumber || t('Não informado')}</Text></Text>
+                <Text className="text-sm text-muted">{t('Trecho')}: <Text className="font-semibold text-foreground">{flightDetails.departureAirport || '—'} → {flightDetails.arrivalAirport || '—'}</Text></Text>
+              </View>
+              <ReportExportActions
+                title={t('Dados do voo')}
+                filename={`viagem-${trip.id}-voo`}
+                columns={[{ key: 'campo', label: t('Campo') }, { key: 'valor', label: t('Valor') }]}
+                rows={[
+                  { campo: t('Passageiro'), valor: flightDetails.passengerName || t('Não informado') },
+                  { campo: t('Documento / Passaporte'), valor: flightDetails.passengerDocument || t('Não informado') },
+                  { campo: t('Data de nascimento'), valor: flightDetails.passengerBirthDate || t('Não informado') },
+                  { campo: t('Companhia aérea'), valor: flightDetails.airline || t('Não informado') },
+                  { campo: t('Voo'), valor: flightDetails.flightNumber || t('Não informado') },
+                  { campo: t('Trecho'), valor: `${flightDetails.departureAirport || '—'} → ${flightDetails.arrivalAirport || '—'}` },
+                ]}
+              />
+            </View>
+          ) : null}
+          <View className="mt-6 flex-row gap-3">
+            <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
+              <Text className="text-xs text-muted">Adiantamento</Text>
+              <Text className="mt-2 text-lg font-bold text-foreground">
+                {formatCurrency(Number(advanceValue))}
+              </Text>
+              {tripRecord.advanceConfirmedAt ? (
+                <Text className="mt-1 text-xs text-success">
+                  {formatCurrency(Number(tripRecord.advanceConfirmedAmount ?? advanceValue))} depositado em {new Date(tripRecord.advanceConfirmedAt as string).toLocaleDateString("pt-BR")}
+                </Text>
+              ) : null}
+            </View>
+            <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
+              <Text className="text-xs text-muted">Despesas lançadas</Text>
+              <Text className="mt-2 text-lg font-bold text-primary">
+                {formatCurrency(spent)}
+              </Text>
+            </View>
+          </View>
+
+          {showPendenciesBlock ? (
+            <>
+              <SectionHeader title="Pendências para liberação" />
+              <View className="rounded-2xl border border-border bg-surface p-5 gap-5">
+                {tripRecord.requiresFleetVehicle ? (
+                  <View>
+                    <View className="flex-row items-center justify-between">
+                      <Text className="font-bold text-foreground">🚗 Veículo da frota</Text>
+                      <Text className={vehiclePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
+                        {vehiclePending ? "PENDENTE" : "CONFIRMADO"}
+                      </Text>
+                    </View>
+                    {vehicleAllocated ? (
+                      <Text className="mt-1 text-sm text-muted">
+                        {reservation?.vehicleBrand} {reservation?.vehicleModel} · {reservation?.vehiclePlate}
+                      </Text>
+                    ) : (
+                      <View className="mt-3 gap-2">
+                        <PrimaryButton
+                          label={showVehiclePicker ? "Ocultar veículos disponíveis" : "Alocar veículo"}
+                          onPress={createReservationMutation.isPending || updateReservationMutation.isPending ? undefined : () => setShowVehiclePicker((current) => !current)}
+                        />
+                        <MutationFeedback
+                          isPending={createReservationMutation.isPending || updateReservationMutation.isPending}
+                          isSuccess={createReservationMutation.isSuccess || updateReservationMutation.isSuccess}
+                          isError={createReservationMutation.isError || updateReservationMutation.isError}
+                          errorMessage={createReservationMutation.error?.message ?? updateReservationMutation.error?.message}
+                          pendingLabel="Alocando veículo..."
+                          successLabel="Veículo alocado."
+                        />
+                        {showVehiclePicker ? (
+                          <View className="gap-2 rounded-xl border border-border overflow-hidden">
+                            {availableVehiclesQuery.isLoading ? (
+                              <Text className="p-4 text-sm text-muted">Carregando veículos disponíveis...</Text>
+                            ) : availableVehiclesQuery.data?.items.length ? (
+                              availableVehiclesQuery.data.items.map((item, index) => (
+                                <Pressable
+                                  key={item.id}
+                                  onPress={() => allocateVehicle(item.id)}
+                                  style={({ pressed }) => ({
+                                    opacity: pressed ? 0.6 : 1,
+                                    backgroundColor: pressed ? colors.background : colors.surface,
+                                  })}
+                                  className={`flex-row items-center justify-between px-4 py-3 ${index > 0 ? "border-t border-border" : ""}`}
+                                >
+                                  <View className="flex-row items-center flex-1">
+                                    <View
+                                      style={{ backgroundColor: `${colors.primary}18` }}
+                                      className="h-10 w-10 items-center justify-center rounded-xl"
+                                    >
+                                      <IconSymbol name="car.fill" size={18} color={colors.primary} />
+                                    </View>
+                                    <View className="ml-3">
+                                      <Text className="font-semibold text-foreground">{item.brand} {item.model}</Text>
+                                      <Text className="text-xs text-muted">{item.plate}</Text>
+                                    </View>
+                                  </View>
+                                  <View
+                                    style={{ backgroundColor: colors.primary }}
+                                    className="rounded-lg px-3 py-2"
+                                  >
+                                    <Text className="text-xs font-bold text-white">Selecionar</Text>
+                                  </View>
+                                </Pressable>
+                              ))
+                            ) : (
+                              <Text className="p-4 text-sm text-muted">Nenhum veículo disponível no momento.</Text>
+                            )}
+                          </View>
+                        ) : null}
+                        <View className="flex-row gap-2">
+                          <Pressable
+                            onPress={updateTransportMutation.isPending ? undefined : () => changeTransportMode("Veículo próprio")}
+                            className="flex-1 rounded-xl border border-border px-3 py-2"
+                          >
+                            <Text className="text-center text-xs font-bold text-primary">Alterar para Veículo Próprio</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={updateTransportMutation.isPending ? undefined : () => changeTransportMode("Ônibus")}
+                            className="flex-1 rounded-xl border border-border px-3 py-2"
+                          >
+                            <Text className="text-center text-xs font-bold text-primary">Alterar para Ônibus</Text>
+                          </Pressable>
+                        </View>
+                        <MutationFeedback
+                          isPending={updateTransportMutation.isPending}
+                          isSuccess={updateTransportMutation.isSuccess}
+                          isError={updateTransportMutation.isError}
+                          errorMessage={updateTransportMutation.error?.message}
+                          pendingLabel="Alterando modalidade..."
+                          successLabel="Modalidade alterada."
+                        />
+                      </View>
+                    )}
+                  </View>
+                ) : null}
+
+                {tripRecord.hasAdvance ? (
+                  <View className="border-t border-border pt-5">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="font-bold text-foreground">💰 Adiantamento</Text>
+                      <Text className={advancePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
+                        {advancePending ? "PENDENTE" : "CONFIRMADO"}
+                      </Text>
+                    </View>
+                    {advancePending ? (
+                      <View className="mt-3 gap-2">
+                        <Text className="text-xs text-muted">Valor efetivamente depositado</Text>
+                        <TextInput
+                          value={depositAmountValue}
+                          onChangeText={setDepositAmountDraft}
+                          keyboardType="decimal-pad"
+                          placeholder="Ex.: 1000000.00"
+                          placeholderTextColor={colors.muted}
+                          className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
+                        />
+                        <PrimaryButton
+                          label={confirmAdvanceMutation.isPending ? "Confirmando..." : "Confirmar depósito realizado"}
+                          onPress={confirmAdvanceMutation.isPending ? undefined : confirmAdvance}
+                        />
+                        <MutationFeedback
+                          isPending={confirmAdvanceMutation.isPending}
+                          isSuccess={confirmAdvanceMutation.isSuccess}
+                          isError={confirmAdvanceMutation.isError}
+                          errorMessage={confirmAdvanceMutation.error?.message}
+                          pendingLabel="Confirmando depósito..."
+                          successLabel="Depósito confirmado."
+                        />
+                      </View>
+                    ) : (
+                      <Text className="mt-1 text-sm text-muted">
+                        {formatCurrency(Number(tripRecord.advanceConfirmedAmount ?? advanceValue))} depositado em {new Date(tripRecord.advanceConfirmedAt as string).toLocaleString("pt-BR")}.
+                      </Text>
+                    )}
+                  </View>
+                ) : null}
+
+                {tripRecord.needsHotel ? (
+                  <View className="border-t border-border pt-5">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="font-bold text-foreground">🏨 Hotel</Text>
+                      <Text className={hotelPending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
+                        {hotelPending ? "PENDENTE" : "CONFIRMADO"}
+                      </Text>
+                    </View>
+                    <View className="mt-3 gap-2">
+                      <TextInput
+                        value={hotelNoteValue}
+                        onChangeText={setHotelNoteDraft}
+                        multiline
+                        placeholder="Cole aqui os dados da reserva de hotel..."
+                        placeholderTextColor={colors.muted}
+                        className="min-h-[80px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
+                      />
+                      <PrimaryButton
+                        label={updateHotelNoteMutation.isPending ? "Salvando..." : "Salvar dados do hotel"}
+                        onPress={updateHotelNoteMutation.isPending ? undefined : saveHotelNote}
+                      />
+                      <MutationFeedback
+                        isPending={updateHotelNoteMutation.isPending}
+                        isSuccess={updateHotelNoteMutation.isSuccess}
+                        isError={updateHotelNoteMutation.isError}
+                        errorMessage={updateHotelNoteMutation.error?.message}
+                        pendingLabel="Salvando dados do hotel..."
+                        successLabel="Dados do hotel salvos."
+                      />
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            </>
+          ) : null}
+
+          <SectionHeader title="Controle da viagem de frota" />
+          <View className="rounded-2xl border border-border bg-surface p-5">
+            <View className="flex-row items-center">
+              <View
+                style={{ backgroundColor: `${colors.primary}18` }}
+                className="h-11 w-11 items-center justify-center rounded-xl"
+              >
+                <IconSymbol name="car.fill" size={22} color={colors.primary} />
+              </View>
+              <View className="ml-3 flex-1">
+                <Text className="font-bold text-foreground">
+                  {vehicleAllocated
+                    ? `${reservation?.vehicleBrand} ${reservation?.vehicleModel}`
+                    : "Veículo não associado"}
+                </Text>
+                <Text className="mt-1 text-sm text-muted">
+                  {vehicleAllocated
+                    ? `${reservation?.vehiclePlate} · Condutor: ${reservation?.driverName}`
+                    : "Solicitação enviada ao Administrativo"}
+                </Text>
+              </View>
+            </View>
+            <View className="mt-5 gap-3">
+              <Text className="text-xs font-bold uppercase tracking-widest text-muted">
+                KM do veículo
+              </Text>
+              <View className="flex-row gap-3">
+                <View className="flex-1">
+                  <Text className="mb-2 text-xs text-muted">Saída</Text>
+                  <TextInput
+                    value={departureKm}
+                    onChangeText={setDepartureKm}
+                    editable={!started}
+                    keyboardType="numeric"
+                    placeholder="Ex.: 74101"
+                    placeholderTextColor={colors.muted}
+                    className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="mb-2 text-xs text-muted">Retorno</Text>
+                  <TextInput
+                    value={returnKm}
+                    onChangeText={setReturnKm}
+                    editable={started && !finished}
+                    keyboardType="numeric"
+                    placeholder="Ex.: 74820"
+                    placeholderTextColor={colors.muted}
+                    className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
+                  />
+                </View>
+              </View>
+              {!isAdmin ? (
+                !started ? (
+                  <PrimaryButton label="Iniciar viagem" onPress={startTrip} />
+                ) : !finished ? (
+                  <PrimaryButton label="Finalizar viagem" onPress={finishTrip} />
+                ) : (
+                  <View
+                    style={{ backgroundColor: `${colors.success}18` }}
+                    className="rounded-xl p-3"
+                  >
+                    <Text className="font-semibold text-success">
+                      Viagem finalizada e quilometragem registrada.
+                    </Text>
+                  </View>
+                )
+              ) : null}
+            </View>
+            <View className="mt-6 border-t border-border pt-5">
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <Text className="font-bold text-foreground">
+                    Registro de eventos
+                  </Text>
+                  <Text className="mt-1 text-xs text-muted">
+                    Multas, avarias ou outros acontecimentos
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setHasEvent((current) => !current)}
+                  style={{
+                    backgroundColor: hasEvent ? colors.warning : colors.border,
+                  }}
+                  className="h-7 w-12 justify-center rounded-full px-1"
+                >
+                  <View
+                    style={{
+                      backgroundColor: hasEvent ? "white" : colors.muted,
+                      alignSelf: hasEvent ? "flex-end" : "flex-start",
+                    }}
+                    className="h-5 w-5 rounded-full"
+                  />
+                </Pressable>
+              </View>
+              {hasEvent ? (
+                <View className="mt-4 gap-3">
+                  <TextInput
+                    value={eventNote}
+                    onChangeText={setEventNote}
+                    multiline
+                    placeholder="Descreva a multa, avaria ou outro evento..."
+                    placeholderTextColor={colors.muted}
+                    className="min-h-[90px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
+                  />
+                  <Pressable
+                    onPress={() =>
+                      Alert.alert(
+                        "Anexo de fotos",
+                        "A seleção de fotos da avaria será aberta neste ponto.",
+                      )
+                    }
+                    style={({ pressed }) => [
+                      {
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        borderRadius: 12,
+                        padding: 12,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        opacity: pressed ? 0.7 : 1,
+                      },
+                    ]}
+                  >
+                    <IconSymbol
+                      name="camera.fill"
+                      size={18}
+                      color={colors.primary}
+                    />
+                    <Text className="ml-2 font-bold text-primary">
+                      Anexar fotos da avaria
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          </View>
+
+          <SectionHeader title="Linha do tempo" />
+          <View className="rounded-2xl border border-border bg-surface p-5">
+            <TimelineItem
+              title="Solicitação criada"
+              detail="Registrada pelo viajante"
+              done
+            />
+            <TimelineItem
+              title="Aprovada"
+              detail={isApprovedOrLater ? "Concluída" : "Aguardando aprovação"}
+              done={isApprovedOrLater}
+            />
+            <TimelineItem
+              title="Liberada para viagem"
+              detail={isReleasedOrLater ? "Concluída" : "Aguardando pendências"}
+              done={isReleasedOrLater}
+            />
+            <TimelineItem
+              title="Prestação de contas"
+              detail={finished || isFinishedStatus ? "Finalizada" : "Em andamento"}
+              done={finished || isFinishedStatus}
+              last
+            />
+          </View>
+          <SectionHeader
+            title="Despesas"
+            action={`${tripExpenses.length} itens`}
+          />
+          {!isAdmin ? (
+            <PrimaryButton
+              label="Adicionar despesa"
+              onPress={() => router.push("/expenses")}
+            />
+          ) : null}
+        </ScrollView>
+      </View>
+    </ScreenContainer>
+  );
 }
 
-function NewExpense({ draft, setDraft, expenseTypes, trips, cities, editing, isAuthenticated, saving, onCancel, onSave }: { draft: ExpenseDraft; setDraft: (draft: ExpenseDraft) => void; expenseTypes: { id: number; name: string }[]; trips: { id: number; tripCode: string; destination: string; startsOn: string; endsOn: string; status: string }[]; cities: string[]; editing: boolean; isAuthenticated: boolean; saving: boolean; onCancel: () => void; onSave: () => Promise<void> }) {
+function MutationFeedback({
+  isPending,
+  isSuccess,
+  isError,
+  errorMessage,
+  pendingLabel,
+  successLabel,
+}: {
+  isPending: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  errorMessage?: string;
+  pendingLabel: string;
+  successLabel: string;
+}) {
   const colors = useColors();
-  const { t } = useLanguage();
-  const setField = <K extends keyof ExpenseDraft>(field: K, value: ExpenseDraft[K]) => setDraft({ ...draft, [field]: value });
-  const submit = async () => {
-    if (!isValidExpenseForm(draft)) {
-      Alert.alert(t('Confira os dados da despesa'), t('Informe viagem, cidade, data, quantidade e valor válidos.'));
-      return;
-    }
-    if (!isAuthenticated) {
-      Alert.alert(editing ? t('Alteração simulada') : t('Despesa adicionada'), t('A alteração exige uma sessão local autenticada.'), [{ text: t('Voltar para despesas'), onPress: onCancel }]);
-      return;
-    }
-    await onSave();
-  };
-  return <ScreenContainer edges={['top', 'bottom', 'left', 'right']} className="px-5 pt-4"><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}><Pressable onPress={onCancel} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="mb-5"><Text className="font-semibold text-primary">‹ {t('Voltar para despesas')}</Text></Pressable><Text className="text-3xl font-bold text-foreground">{editing ? t('Editar despesa') : t('Nova despesa')}</Text><Text className="mt-2 text-sm leading-5 text-muted">{t('Anexe o comprovante para manter a prestação pronta para revisão.')}</Text><Label text="Viagem vinculada" /><CatalogChoice value={draft.tripId} options={trips.map((trip) => ({ id: trip.id, label: `${trip.tripCode} · ${trip.destination}` }))} emptyLabel={t('Nenhuma viagem criada')} onChange={(value) => setField('tripId', Number(value))} /><Text className="mt-1 text-xs text-muted">{t('Selecione uma viagem previamente criada para lançar o gasto.')}</Text><Label text="Conceito do gasto" /><CatalogChoice value={draft.expenseTypeId} options={expenseTypes.map((item) => ({ id: item.id, label: item.name }))} emptyLabel={t('Nenhum tipo de gasto cadastrado')} onChange={(value) => setField('expenseTypeId', Number(value))} /><Label text="Cidade do atendimento" /><CatalogChoice value={draft.city} options={cities.map((city) => ({ id: city, label: city }))} emptyLabel={t('Nenhuma cidade cadastrada')} onChange={(value) => setField('city', String(value))} /><Text className="mt-1 text-xs text-muted">{t('As cidades são carregadas do cadastro persistido de unidades.')}</Text><Label text="Data do gasto" /><CalendarField value={draft.occurredOn} onChange={(value) => setField('occurredOn', value)} /><View className="flex-row gap-3"><View className="flex-1"><Label text="Quantidade" /><TextInput value={draft.quantity} onChangeText={(value) => setField('quantity', value)} keyboardType="numeric" placeholderTextColor={colors.muted} className="rounded-2xl border border-border bg-surface px-4 py-4 text-foreground" /></View><View className="flex-1"><Label text="Valor unitário" /><TextInput value={draft.unitValue} onChangeText={(value) => setField('unitValue', value)} keyboardType="decimal-pad" placeholder={t('0,00')} placeholderTextColor={colors.muted} className="rounded-2xl border border-border bg-surface px-4 py-4 text-foreground" /></View></View><Label text="Moeda do gasto" /><View className="flex-row gap-2">{CURRENCY_OPTIONS.map((option) => <Choice key={option.key} label={`${option.symbol} ${option.key}`} selected={draft.currency === option.key} onPress={() => setField('currency', option.key)} />)}</View><Label text="Comprovante" /><Pressable onPress={() => Alert.alert(t('Selecionar comprovante'), t('Na integração nativa, este botão abrirá câmera/galeria e comprimirá imagens, incluindo HEIC, antes do upload.'))} style={({ pressed }) => [{ borderColor: colors.primary, opacity: pressed ? 0.7 : 1 }]} className="flex-row items-center rounded-2xl border border-dashed bg-surface p-5"><View style={{ backgroundColor: `${colors.primary}18` }} className="h-11 w-11 items-center justify-center rounded-xl"><IconSymbol name="camera.fill" size={22} color={colors.primary} /></View><View className="ml-3"><Text className="font-bold text-foreground">{t('Adicionar foto ou fatura')}</Text><Text className="mt-1 text-xs text-muted">JPG, PNG, PDF ou HEIC</Text></View></Pressable><Label text="Pagamento" /><View className="flex-row gap-2"><Choice label={t('Pago com adiantamento')} selected={draft.prepaid} onPress={() => setField('prepaid', true)} /><Choice label={t('Administrativo')} selected={!draft.prepaid} onPress={() => setField('prepaid', false)} /></View><View className="mt-6"><PrimaryButton label={saving ? t('Salvando...') : editing ? t('Salvar alterações') : t('Salvar despesa')} onPress={() => void submit()} /></View></ScrollView></ScreenContainer>;
+  if (isPending) return <Text className="mt-2 text-xs font-semibold text-muted">{pendingLabel}</Text>;
+  if (isError) return <Text style={{ color: colors.error }} className="mt-2 text-xs font-semibold">{errorMessage ?? "Ocorreu um erro. Tente novamente."}</Text>;
+  if (isSuccess) return <Text style={{ color: colors.success }} className="mt-2 text-xs font-semibold">✓ {successLabel}</Text>;
+  return null;
 }
-function CalendarField({ value, onChange }: { value: string; onChange: (value: string) => void }) { const colors = useColors(); const { t } = useLanguage(); const [open, setOpen] = useState(false); const parse = (input: string) => /^\\d{4}-\\d{2}-\\d{2}$/.test(input) ? new Date(`${input}T12:00:00`) : new Date(); const [month, setMonth] = useState(() => { const date = parse(value); return new Date(date.getFullYear(), date.getMonth(), 1); }); const year = month.getFullYear(); const monthIndex = month.getMonth(); const daysInMonth = new Date(year, monthIndex + 1, 0).getDate(); const firstDay = new Date(year, monthIndex, 1).getDay(); const days = Array.from({ length: firstDay + daysInMonth }, (_, index) => index < firstDay ? null : index - firstDay + 1); const iso = (day: number) => `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; return <><Pressable onPress={() => setOpen(true)} style={({ pressed }) => ({ borderColor: colors.border, backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 })} className="flex-row items-center justify-between rounded-2xl border px-4 py-4"><Text className={value ? 'text-foreground' : 'text-muted'}>{value || t('Selecionar data')}</Text><IconSymbol name="calendar" size={20} color={colors.primary} /></Pressable><Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}><View className="flex-1 items-center justify-center bg-black/40 px-5"><View className="w-full max-w-md rounded-2xl bg-background p-5"><View className="flex-row items-center justify-between"><Pressable onPress={() => setMonth(new Date(year, monthIndex - 1, 1))} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}><Text className="px-3 py-2 text-2xl text-primary">‹</Text></Pressable><Text className="text-base font-bold text-foreground">{year}-{String(monthIndex + 1).padStart(2, '0')}</Text><Pressable onPress={() => setMonth(new Date(year, monthIndex + 1, 1))} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}><Text className="px-3 py-2 text-2xl text-primary">›</Text></Pressable></View><View className="mt-4 flex-row flex-wrap">{days.map((day, index) => day === null ? <View key={`blank-${index}`} className="w-[14.28%] p-1" /> : <Pressable key={day} onPress={() => { onChange(iso(day)); setOpen(false); }} style={({ pressed }) => ({ backgroundColor: value === iso(day) ? colors.primary : colors.surface, opacity: pressed ? 0.65 : 1 })} className="m-1 w-[12.28%] items-center rounded-lg p-2"><Text style={{ color: value === iso(day) ? 'white' : colors.foreground }} className="text-sm font-semibold">{day}</Text></Pressable>)}</View><Pressable onPress={() => setOpen(false)} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="mt-4 items-center rounded-xl border border-border p-3"><Text className="font-bold text-primary">{t('Cancelar')}</Text></Pressable></View></View></Modal></>; }
-function Label({ text }: { text: string }) { const { t } = useLanguage(); return <Text className="mb-2 mt-5 text-sm font-bold text-foreground">{t(text)}</Text>; }
-function CatalogChoice({ value, options, emptyLabel, onChange }: { value: number | string; options: { id: number | string; label: string }[]; emptyLabel: string; onChange: (value: number | string) => void }) { const colors = useColors(); return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>{options.length ? options.map((option) => <Pressable key={option.id} onPress={() => onChange(option.id)} style={({ pressed }) => ({ borderColor: value === option.id ? colors.primary : colors.border, backgroundColor: value === option.id ? `${colors.primary}14` : colors.surface, opacity: pressed ? 0.72 : 1 })} className="rounded-xl border px-3 py-3"><Text style={{ color: value === option.id ? colors.primary : colors.foreground }} className="text-sm font-semibold">{option.label}</Text></Pressable>) : <Text className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">{emptyLabel}</Text>}</ScrollView>; }
-function Choice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) { const colors = useColors(); return <Pressable onPress={onPress} style={({ pressed }) => ({ flex: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? `${colors.primary}14` : colors.surface, opacity: pressed ? 0.72 : 1 })} className="rounded-xl border p-3"><Text style={{ color: selected ? colors.primary : colors.foreground }} className="text-center text-xs font-bold">{label}</Text></Pressable>; }
+
+function TimelineItem({
+  title,
+  detail,
+  done,
+  last,
+}: {
+  title: string;
+  detail: string;
+  done: boolean;
+  last?: boolean;
+}) {
+  const colors = useColors();
+  return (
+    <View className="flex-row">
+      <View className="items-center">
+        <View
+          style={{
+            backgroundColor: done ? colors.success : colors.background,
+            borderColor: done ? colors.success : colors.border,
+          }}
+          className="h-6 w-6 items-center justify-center rounded-full border"
+        >
+          {done ? (
+            <IconSymbol name="checkmark" size={14} color="white" />
+          ) : null}
+        </View>
+        {!last ? (
+          <View
+            style={{ backgroundColor: colors.border }}
+            className="h-9 w-px"
+          />
+        ) : null}
+      </View>
+      <View className="ml-3 pb-3">
+        <Text className="font-bold text-foreground">{title}</Text>
+        <Text className="mt-1 text-xs text-muted">{detail}</Text>
+      </View>
+    </View>
+  );
+}

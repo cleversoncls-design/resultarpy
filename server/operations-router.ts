@@ -124,6 +124,13 @@ export const operationsRouter = router({
       }),
       create: adminProcedure.input(z.object({ tripId: z.number().int().positive(), vehicleId: z.number().int().positive().nullable().optional(), driverId: z.number().int().positive(), status: reservationStatus.default('Aguardando veículo'), plannedStartOn: z.string().date(), plannedEndOn: z.string().date() })).mutation(({ input }) => operations.createFleetReservation(input)),
       update: adminProcedure.input(z.object({ id: z.number().int().positive(), vehicleId: z.number().int().positive().nullable().optional(), status: reservationStatus.optional(), departureAt: z.coerce.date().nullable().optional(), departureKm: z.number().int().min(0).nullable().optional(), returnAt: z.coerce.date().nullable().optional(), returnKm: z.number().int().min(0).nullable().optional() })).mutation(({ input: { id, ...input } }) => operations.updateFleetReservation(id, input)),
+      // O próprio viajante registra o KM de saída/retorno da sua reserva.
+      recordKm: protectedProcedure.input(z.object({ reservationId: z.number().int().positive(), departureKm: z.number().int().min(0).optional(), returnKm: z.number().int().min(0).optional() })).mutation(async ({ ctx, input }) => {
+        const { reservationId, ...changes } = input;
+        const updated = await operations.recordReservationKm(reservationId, changes, ctx.user.id);
+        if (!updated) throw forbidden();
+        return updated;
+      }),
     }),
     events: router({
       list: adminProcedure.input(pageInput.extend({ reservationId: z.number().int().positive().optional() })).query(({ input }) => operations.listFleetEvents(input.reservationId, input)),

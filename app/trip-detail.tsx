@@ -11,7 +11,6 @@ import { useEffect, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { PrimaryButton, SectionHeader, StatusPill } from "@/components/app-ui";
 import {
-  expenses,
   formatCurrency,
   parseKm,
 } from "@/lib/demo-data";
@@ -53,6 +52,18 @@ export default function TripDetailScreen() {
     { enabled: isAdmin && Boolean(trip?.requiresFleetVehicle) },
   );
 
+  // Despesas reais lançadas para esta viagem (antes calculávamos isso a
+  // partir de uma lista de demonstração vazia, que nunca refletia o valor
+  // real lançado).
+  const tripExpensesQuery = trpc.operations.expenses.list.useQuery(
+    { tripId: tripId as number, page: 1, pageSize: 200 },
+    { enabled: isAuthenticated && tripId !== undefined },
+  );
+
+  const recordKmMutation = trpc.operations.fleet.reservations.recordKm.useMutation({
+    onSuccess: () => { reservationQuery.refetch(); },
+  });
+
   const confirmAdvanceMutation = trpc.operations.trips.confirmAdvance.useMutation({
     onSuccess: () => { tripQuery.refetch(); },
   });
@@ -71,11 +82,9 @@ export default function TripDetailScreen() {
 
   // Todos os hooks abaixo são sempre chamados, em toda renderização,
   // independentemente de a viagem já ter chegado ou não (regra do React).
-  const tripExpenses = expenses.filter(
-    (expense) => expense.tripId === String(trip?.id),
-  );
+  const tripExpenses = tripExpensesQuery.data?.items ?? [];
   const spent = tripExpenses.reduce(
-    (sum, expense) => sum + expense.quantity * expense.unitValue,
+    (sum, expense) => sum + Number(expense.quantity) * Number(expense.unitValue),
     0,
   );
   const [started, setStarted] = useState(Boolean(reservation?.departureKm));
@@ -104,6 +113,19 @@ export default function TripDetailScreen() {
     setHasEvent(false);
     setEventNote("");
   }, [tripId]);
+
+  // Assim que os dados da reserva chegam (ou mudam), refletimos o KM já
+  // registrado no banco — antes isso só funcionava na primeira renderização.
+  useEffect(() => {
+    if (reservation?.departureKm) {
+      setStarted(true);
+      setDepartureKm(String(reservation.departureKm));
+    }
+    if (reservation?.returnKm) {
+      setFinished(true);
+      setReturnKm(String(reservation.returnKm));
+    }
+  }, [reservation?.departureKm, reservation?.returnKm]);
 
   // Só a partir daqui decidimos o que renderizar.
   if (!tripId) {
@@ -226,6 +248,9 @@ export default function TripDetailScreen() {
       return;
     }
     setStarted(true);
+    if (reservation?.id) {
+      recordKmMutation.mutate({ reservationId: reservation.id, departureKm: km });
+    }
     Alert.alert(
       "Viagem iniciada",
       `Saída registrada em ${km.toLocaleString("pt-BR")} km.`,
@@ -242,6 +267,9 @@ export default function TripDetailScreen() {
       return;
     }
     setFinished(true);
+    if (reservation?.id) {
+      recordKmMutation.mutate({ reservationId: reservation.id, returnKm: km });
+    }
     Alert.alert(
       hasEvent ? "Viagem finalizada com evento" : "Viagem finalizada",
       hasEvent
@@ -318,6 +346,11 @@ export default function TripDetailScreen() {
               <Text className="mt-2 text-lg font-bold text-foreground">
                 {formatCurrency(Number(advanceValue))}
               </Text>
+              {tripRecord.advanceConfirmedAt ? (
+                <Text className="mt-1 text-xs text-success">
+                  {formatCurrency(Number(tripRecord.advanceConfirmedAmount ?? advanceValue))} depositado em {new Date(tripRecord.advanceConfirmedAt as string).toLocaleDateString("pt-BR")}
+                </Text>
+              ) : null}
             </View>
             <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
               <Text className="text-xs text-muted">Despesas lançadas</Text>
@@ -552,20 +585,22 @@ export default function TripDetailScreen() {
                   />
                 </View>
               </View>
-              {!started ? (
-                <PrimaryButton label="Iniciar viagem" onPress={startTrip} />
-              ) : !finished ? (
-                <PrimaryButton label="Finalizar viagem" onPress={finishTrip} />
-              ) : (
-                <View
-                  style={{ backgroundColor: `${colors.success}18` }}
-                  className="rounded-xl p-3"
-                >
-                  <Text className="font-semibold text-success">
-                    Viagem finalizada e quilometragem registrada.
-                  </Text>
-                </View>
-              )}
+              {!isAdmin ? (
+                !started ? (
+                  <PrimaryButton label="Iniciar viagem" onPress={startTrip} />
+                ) : !finished ? (
+                  <PrimaryButton label="Finalizar viagem" onPress={finishTrip} />
+                ) : (
+                  <View
+                    style={{ backgroundColor: `${colors.success}18` }}
+                    className="rounded-xl p-3"
+                  >
+                    <Text className="font-semibold text-success">
+                      Viagem finalizada e quilometragem registrada.
+                    </Text>
+                  </View>
+                )
+              ) : null}
             </View>
             <View className="mt-6 border-t border-border pt-5">
               <View className="flex-row items-center justify-between">
@@ -665,10 +700,12 @@ export default function TripDetailScreen() {
             title="Despesas"
             action={`${tripExpenses.length} itens`}
           />
-          <PrimaryButton
-            label="Adicionar despesa"
-            onPress={() => router.push("/expenses")}
-          />
+          {!isAdmin ? (
+            <PrimaryButton
+              label="Adicionar despesa"
+              onPress={() => router.push("/expenses")}
+            />
+          ) : null}
         </ScrollView>
       </View>
     </ScreenContainer>
@@ -696,6 +733,8 @@ function MutationFeedback({
   if (isSuccess) return <Text style={{ color: colors.success }} className="mt-2 text-xs font-semibold">✓ {successLabel}</Text>;
   return null;
 }
+
+function TimelineItem({
   title,
   detail,
   done,

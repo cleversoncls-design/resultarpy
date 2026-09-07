@@ -365,6 +365,34 @@ export async function updateFleetReservation(id: number, input: Partial<typeof f
   return updated;
 }
 
+// Permite que o próprio viajante registre o KM de saída/retorno do veículo
+// da sua reserva — diferente de updateFleetReservation (admin-only), aqui
+// verificamos que o usuário logado é de fato o viajante dono da viagem
+// associada a essa reserva antes de gravar qualquer coisa.
+export async function recordReservationKm(reservationId: number, input: { departureKm?: number; returnKm?: number }, userId: number) {
+  const db = await requireDb();
+  const [row] = await db
+    .select({ reservation: fleetReservations, travelerUserId: travelers.userId })
+    .from(fleetReservations)
+    .innerJoin(trips, eq(fleetReservations.tripId, trips.id))
+    .innerJoin(travelers, eq(trips.travelerId, travelers.id))
+    .where(eq(fleetReservations.id, reservationId))
+    .limit(1);
+  if (!row || row.travelerUserId !== userId) return undefined;
+  const changes: Partial<typeof fleetReservations.$inferInsert> = {};
+  if (input.departureKm !== undefined) {
+    changes.departureKm = input.departureKm;
+    changes.departureAt = new Date();
+  }
+  if (input.returnKm !== undefined) {
+    changes.returnKm = input.returnKm;
+    changes.returnAt = new Date();
+    changes.status = 'Finalizada';
+  }
+  const [updated] = await db.update(fleetReservations).set(changes).where(eq(fleetReservations.id, reservationId)).returning();
+  return updated;
+}
+
 export async function listFleetEvents(reservationId: number | undefined, input: PageInput) {
   const db = await requireDb();
   const filters = reservationId ? [eq(fleetEvents.reservationId, reservationId)] : [];

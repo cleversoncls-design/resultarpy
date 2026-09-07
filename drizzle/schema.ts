@@ -1,649 +1,456 @@
 import {
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { ScreenContainer } from "@/components/screen-container";
-import { PrimaryButton, SectionHeader, StatusPill } from "@/components/app-ui";
-import {
-  expenses,
-  formatCurrency,
-  parseKm,
-} from "@/lib/demo-data";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useColors } from "@/hooks/use-colors";
-import { useLanguage } from "@/lib/language-provider";
-import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
-import { ReportExportActions } from "@/components/report-export-actions";
+  bigint,
+  bigserial,
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 
-const STATUS_ORDER = [
+export const organizationSettings = pgTable("organization_settings", {
+  id: integer("id").primaryKey().default(1),
+  globalCurrency: varchar("global_currency", { length: 3 }).default("BRL").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const authRoleEnum = pgEnum("auth_role", ["user", "admin"]);
+export const tripStatusEnum = pgEnum("trip_status", [
+  "Rascunho",
   "Aguardando aprovação",
   "Aprovada",
   "Em preparação",
   "Liberada para viagem",
   "Em prestação",
   "Finalizada",
-] as const;
+  "Rejeitada",
+  "Devolvida",
+]);
+export const approvalDecisionEnum = pgEnum("approval_decision", ["Aprovada", "Rejeitada", "Devolvida"]);
+export const maintenanceCategoryEnum = pgEnum("maintenance_category", ["Preventiva", "Corretiva"]);
+export const vehicleStatusEnum = pgEnum("vehicle_status", [
+  "Disponível",
+  "Reservado",
+  "Em viagem",
+  "Realizar Manutenção",
+  "Em manutenção",
+  "Extintor próximo do vencimento",
+  "Avaria registrada",
+]);
+export const reservationStatusEnum = pgEnum("reservation_status", [
+  "Aguardando veículo",
+  "Reservado",
+  "Reservada",
+  "Em viagem",
+  "Finalizada",
+  "Cancelada",
+]);
+export const fleetWorkOrderStatusEnum = pgEnum("fleet_work_order_status", ["Em andamento", "Concluída", "Cancelada"]);
+export const fleetEventTypeEnum = pgEnum("fleet_event_type", ["Multa", "Avaria", "Outro"]);
 
-export default function TripDetailScreen() {
-  const colors = useColors();
-  const { t } = useLanguage();
-  const { isAuthenticated, user } = useAuth();
-  const isAdmin = user?.role === "admin" || user?.profile === "admin";
-  const params = useLocalSearchParams<{ tripId?: string }>();
-  const tripId = typeof params.tripId === "string" && /^\d+$/.test(params.tripId) ? Number(params.tripId) : undefined;
+export const users = pgTable(
+  "users",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    openId: varchar("openId", { length: 64 }).notNull(),
+    name: text("name"),
+    email: varchar("email", { length: 320 }),
+    loginMethod: varchar("loginMethod", { length: 64 }),
+    role: authRoleEnum("role").default("user").notNull(),
+    profile: varchar("profile", { length: 32 }).default("traveler_approver").notNull(),
+    birthDate: date("birth_date"),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+    lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    openIdUnique: uniqueIndex("users_open_id_unique").on(table.openId),
+  }),
+);
 
-  const tripQuery = trpc.operations.trips.get.useQuery({ id: tripId as number }, { enabled: isAuthenticated && tripId !== undefined });
-  const trip = tripQuery.data;
+export const localAuthCredentials = pgTable(
+  "local_auth_credentials",
+  {
+    userId: bigint("user_id", { mode: "number" })
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    normalizedEmail: varchar("normalized_email", { length: 320 }).notNull(),
+    passwordHash: text("password_hash").notNull(),
+    failedAttempts: integer("failed_attempts").default(0).notNull(),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    passwordChangedAt: timestamp("password_changed_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ emailUnique: uniqueIndex("local_auth_credentials_email_unique").on(table.normalizedEmail) }),
+);
 
-  const reservationQuery = trpc.operations.fleet.reservations.byTrip.useQuery(
-    { id: tripId as number },
-    { enabled: isAuthenticated && tripId !== undefined },
-  );
-  const reservation = reservationQuery.data ?? null;
+export const localAuthSessions = pgTable(
+  "local_auth_sessions",
+  {
+    tokenHash: varchar("token_hash", { length: 128 }).primaryKey(),
+    userId: bigint("user_id", { mode: "number" })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (table) => ({ userExpiryIndex: index("local_auth_sessions_user_expiry_idx").on(table.userId, table.expiresAt) }),
+);
 
-  const availableVehiclesQuery = trpc.operations.fleet.vehicles.list.useQuery(
-    { page: 1, pageSize: 50, status: "Disponível" },
-    { enabled: isAdmin && Boolean(trip?.requiresFleetVehicle) },
-  );
+export const units = pgTable(
+  "units",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    code: varchar("code", { length: 32 }).notNull(),
+    name: varchar("name", { length: 160 }).notNull(),
+    city: varchar("city", { length: 120 }).notNull(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ codeUnique: uniqueIndex("units_code_unique").on(table.code) }),
+);
 
-  const confirmAdvanceMutation = trpc.operations.trips.confirmAdvance.useMutation({
-    onSuccess: () => { tripQuery.refetch(); Alert.alert("Adiantamento confirmado", "O depósito foi registrado com sucesso."); },
-    onError: (err) => { Alert.alert("Não foi possível confirmar o depósito", err.message); },
-  });
-  const updateHotelNoteMutation = trpc.operations.trips.updateHotelNote.useMutation({
-    onSuccess: () => { tripQuery.refetch(); Alert.alert("Dados do hotel salvos", "A observação foi atualizada com sucesso."); },
-    onError: (err) => { Alert.alert("Não foi possível salvar os dados do hotel", err.message); },
-  });
-  const updateTransportMutation = trpc.operations.trips.update.useMutation({
-    onSuccess: () => { tripQuery.refetch(); Alert.alert("Modalidade atualizada", "A forma de transporte da viagem foi alterada."); },
-    onError: (err) => { Alert.alert("Não foi possível alterar a modalidade", err.message); },
-  });
-  const createReservationMutation = trpc.operations.fleet.reservations.create.useMutation({
-    onSuccess: () => { tripQuery.refetch(); reservationQuery.refetch(); Alert.alert("Veículo alocado", "O veículo foi vinculado à viagem."); },
-    onError: (err) => { Alert.alert("Não foi possível alocar o veículo", err.message); },
-  });
-  const updateReservationMutation = trpc.operations.fleet.reservations.update.useMutation({
-    onSuccess: () => { tripQuery.refetch(); reservationQuery.refetch(); Alert.alert("Veículo alocado", "O veículo foi vinculado à viagem."); },
-    onError: (err) => { Alert.alert("Não foi possível alocar o veículo", err.message); },
-  });
+export const travelers = pgTable(
+  "travelers",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    userId: bigint("user_id", { mode: "number" }).references(() => users.id),
+    unitId: bigint("unit_id", { mode: "number" }).references(() => units.id),
+    name: varchar("name", { length: 160 }).notNull(),
+    documentNumber: varchar("document_number", { length: 40 }),
+    canDrive: boolean("can_drive").default(false).notNull(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    nameIndex: index("travelers_name_idx").on(table.name),
+    activeIndex: index("travelers_active_idx").on(table.active),
+  }),
+);
 
-  // Todos os hooks abaixo são sempre chamados, em toda renderização,
-  // independentemente de a viagem já ter chegado ou não (regra do React).
-  const tripExpenses = expenses.filter(
-    (expense) => expense.tripId === String(trip?.id),
-  );
-  const spent = tripExpenses.reduce(
-    (sum, expense) => sum + expense.quantity * expense.unitValue,
-    0,
-  );
-  const [started, setStarted] = useState(Boolean(reservation?.departureKm));
-  const [finished, setFinished] = useState(false);
-  const [departureKm, setDepartureKm] = useState(
-    reservation?.departureKm?.toString() ?? "",
-  );
-  const [returnKm, setReturnKm] = useState("");
-  const [hasEvent, setHasEvent] = useState(false);
-  const [eventNote, setEventNote] = useState("");
-  const [showVehiclePicker, setShowVehiclePicker] = useState(false);
-  const [hotelNoteDraft, setHotelNoteDraft] = useState<string | null>(null);
-  const [depositAmountDraft, setDepositAmountDraft] = useState<string | null>(null);
+export const clients = pgTable(
+  "clients",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    name: varchar("name", { length: 180 }).notNull(),
+    billingCurrency: varchar("billing_currency", { length: 3 }).default("BRL").notNull(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("clients_name_unique").on(table.name),
+    activeIndex: index("clients_active_idx").on(table.active),
+  }),
+);
 
-  // Só a partir daqui decidimos o que renderizar.
-  if (!tripId) {
-    return (
-      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
-        <Pressable onPress={() => router.back()} className="mb-5">
-          <Text className="font-semibold text-primary">‹ Voltar</Text>
-        </Pressable>
-        <Text className="text-foreground">Nenhuma viagem informada para exibir.</Text>
-      </ScreenContainer>
-    );
-  }
+export const expenseTypes = pgTable(
+  "expense_types",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("expense_types_name_unique").on(table.name),
+    activeIndex: index("expense_types_active_idx").on(table.active),
+  }),
+);
 
-  if (tripQuery.isLoading) {
-    return (
-      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
-        <Text className="text-foreground">Carregando viagem...</Text>
-      </ScreenContainer>
-    );
-  }
+export const clientBillingLimits = pgTable(
+  "client_billing_limits",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    clientId: bigint("client_id", { mode: "number" }).notNull().references(() => clients.id, { onDelete: "cascade" }),
+    expenseTypeId: bigint("expense_type_id", { mode: "number" }).notNull().references(() => expenseTypes.id),
+    limitAmount: numeric("limit_amount", { precision: 14, scale: 2 }).notNull(),
+  },
+  (table) => ({
+    clientExpenseUnique: uniqueIndex("client_billing_limits_client_expense_unique").on(
+      table.clientId,
+      table.expenseTypeId,
+    ),
+  }),
+);
 
-  if (tripQuery.isError || !trip) {
-    return (
-      <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
-        <Pressable onPress={() => router.back()} className="mb-5">
-          <Text className="font-semibold text-primary">‹ Voltar</Text>
-        </Pressable>
-        <Text className="text-foreground">
-          Não foi possível carregar os detalhes desta viagem.
-        </Text>
-        {tripQuery.error ? (
-          <Text className="mt-2 text-sm text-muted">{tripQuery.error.message}</Text>
-        ) : null}
-      </ScreenContainer>
-    );
-  }
+export const clientBillingProfiles = pgTable(
+  "client_billing_profiles",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    clientId: bigint("client_id", { mode: "number" }).notNull().references(() => clients.id, { onDelete: "cascade" }),
+    currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ clientUnique: uniqueIndex("client_billing_profiles_client_unique").on(table.clientId) }),
+);
 
-  // A partir daqui, `trip` está garantidamente preenchido.
-  const tripRecord = trip as typeof trip & {
-    clientName?: string | null;
-    travelerName?: string | null;
-    advanceAmount?: string;
-    notes?: string | null;
-    advanceConfirmedAt?: string | null;
-    advanceConfirmedAmount?: string | null;
-    hotelNote?: string | null;
-    requiresFleetVehicle?: boolean;
-    hasAdvance?: boolean;
-    needsHotel?: boolean;
-    flightDetails?: {
-      passengerName?: string;
-      passengerDocument?: string;
-      passengerBirthDate?: string;
-      airline?: string;
-      flightNumber?: string;
-      departureAirport?: string;
-      arrivalAirport?: string;
-    } | null;
-  };
-  const clientLabel = tripRecord.clientName ?? tripRecord.travelerName ?? "—";
-  const advanceValue = tripRecord.advanceAmount ?? "0";
-  const flightDetails = tripRecord.flightDetails ?? undefined;
+export const clientBillingProfileItems = pgTable(
+  "client_billing_profile_items",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    profileId: bigint("profile_id", { mode: "number" }).notNull().references(() => clientBillingProfiles.id, { onDelete: "cascade" }),
+    expenseTypeId: bigint("expense_type_id", { mode: "number" }).notNull().references(() => expenseTypes.id),
+    limitAmount: numeric("limit_amount", { precision: 14, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ profileExpenseUnique: uniqueIndex("client_billing_profile_items_profile_expense_unique").on(table.profileId, table.expenseTypeId) }),
+);
 
-  // --- Pendências para liberação da viagem ---
-  const vehicleAllocated = Boolean(reservation?.vehicleId);
-  const vehiclePending = Boolean(tripRecord.requiresFleetVehicle) && !vehicleAllocated;
-  const advancePending = Boolean(tripRecord.hasAdvance) && !tripRecord.advanceConfirmedAt;
-  const depositAmountValue = depositAmountDraft ?? advanceValue;
-  const hotelNoteValue = hotelNoteDraft ?? tripRecord.hotelNote ?? "";
-  const hotelPending = Boolean(tripRecord.needsHotel) && hotelNoteValue.trim() === "";
-  const showPendenciesBlock = isAdmin && (
-    tripRecord.requiresFleetVehicle || tripRecord.hasAdvance || tripRecord.needsHotel
-  );
+export const reimbursementLimits = pgTable(
+  "reimbursement_limits",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    expenseTypeId: bigint("expense_type_id", { mode: "number" }).notNull().references(() => expenseTypes.id),
+    city: varchar("city", { length: 120 }).notNull(),
+    limitAmount: numeric("limit_amount", { precision: 14, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+  },
+  (table) => ({
+    expenseCityUnique: uniqueIndex("reimbursement_limits_expense_city_unique").on(table.expenseTypeId, table.city),
+  }),
+);
 
-  const statusIndex = STATUS_ORDER.indexOf(trip.status as (typeof STATUS_ORDER)[number]);
-  const isApprovedOrLater = statusIndex >= STATUS_ORDER.indexOf("Aprovada");
-  const isReleasedOrLater = statusIndex >= STATUS_ORDER.indexOf("Liberada para viagem");
-  const isFinishedStatus = statusIndex >= STATUS_ORDER.indexOf("Finalizada");
+export const reimbursementLimitProfiles = pgTable(
+  "reimbursement_limit_profiles",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    city: varchar("city", { length: 120 }).default("").notNull(),
+    currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ cityCurrencyUnique: uniqueIndex("reimbursement_limit_profiles_city_currency_unique").on(table.city, table.currency) }),
+);
 
-  const allocateVehicle = (vehicleId: number) => {
-    if (reservation) {
-      updateReservationMutation.mutate({ id: reservation.id, vehicleId, status: "Reservada" });
-    } else {
-      createReservationMutation.mutate({
-        tripId: trip.id,
-        vehicleId,
-        driverId: trip.travelerId,
-        status: "Reservada",
-        plannedStartOn: trip.startsOn,
-        plannedEndOn: trip.endsOn,
-      });
-    }
-    setShowVehiclePicker(false);
-  };
+export const reimbursementLimitProfileItems = pgTable(
+  "reimbursement_limit_profile_items",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    profileId: bigint("profile_id", { mode: "number" }).notNull().references(() => reimbursementLimitProfiles.id, { onDelete: "cascade" }),
+    expenseTypeId: bigint("expense_type_id", { mode: "number" }).notNull().references(() => expenseTypes.id),
+    limitAmount: numeric("limit_amount", { precision: 14, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ profileExpenseUnique: uniqueIndex("reimbursement_limit_profile_items_profile_expense_unique").on(table.profileId, table.expenseTypeId) }),
+);
 
-  const changeTransportMode = (mode: "Veículo próprio" | "Ônibus") => {
-    updateTransportMutation.mutate({ id: trip.id, transport: mode, requiresFleetVehicle: false });
-  };
+export const currencyRates = pgTable(
+  "currency_rates",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    rateDate: date("rate_date").notNull(),
+    fromCurrency: varchar("from_currency", { length: 3 }).notNull(),
+    toCurrency: varchar("to_currency", { length: 3 }).default("PYG").notNull(),
+    rate: numeric("rate", { precision: 20, scale: 8 }).notNull(),
+    rateType: varchar("rate_type", { length: 20 }).default("venda").notNull(),
+    source: varchar("source", { length: 20 }).notNull(),
+    sourceUrl: text("source_url"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ rateDateCurrencyUnique: uniqueIndex("currency_rates_date_from_to_unique").on(table.rateDate, table.fromCurrency, table.toCurrency), rateDateIndex: index("currency_rates_date_idx").on(table.rateDate) }),
+);
 
-  const confirmAdvance = () => {
-    const normalized = depositAmountValue.trim().replace(",", ".");
-    if (!normalized || Number.isNaN(Number(normalized))) {
-      Alert.alert("Informe um valor válido", "Digite o valor efetivamente depositado antes de confirmar.");
-      return;
-    }
-    confirmAdvanceMutation.mutate({ id: trip.id, depositedAmount: normalized });
-  };
+export const translationEntries = pgTable(
+  "translation_entries",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    translationKey: varchar("translation_key", { length: 240 }).notNull(),
+    spanish: text("spanish").notNull(),
+    updatedBy: bigint("updated_by", { mode: "number" }).references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ keyUnique: uniqueIndex("translation_entries_key_unique").on(table.translationKey) }),
+);
 
-  const saveHotelNote = () => {
-    updateHotelNoteMutation.mutate({ id: trip.id, hotelNote: hotelNoteValue.trim() || null });
-  };
+export const trips = pgTable(
+  "trips",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    tripCode: varchar("trip_code", { length: 40 }).notNull(),
+    travelerId: bigint("traveler_id", { mode: "number" }).notNull().references(() => travelers.id),
+    approverId: bigint("approver_id", { mode: "number" }).references(() => users.id),
+    clientId: bigint("client_id", { mode: "number" }).references(() => clients.id),
+    unitId: bigint("unit_id", { mode: "number" }).references(() => units.id),
+    origin: varchar("origin", { length: 120 }).notNull(),
+    destination: varchar("destination", { length: 120 }).notNull(),
+    country: varchar("country", { length: 80 }),
+    area: varchar("area", { length: 120 }),
+    transport: varchar("transport", { length: 120 }),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    status: tripStatusEnum("status").notNull(),
+    requiresFleetVehicle: boolean("requires_fleet_vehicle").default(false).notNull(),
+    hasAdvance: boolean("has_advance").default(false).notNull(),
+    needsHotel: boolean("needs_hotel").default(false).notNull(),
+    advanceAmount: numeric("advance_amount", { precision: 14, scale: 2 }).default("0").notNull(),
+    advanceConfirmedAt: timestamp("advance_confirmed_at", { withTimezone: true }),
+    advanceConfirmedAmount: numeric("advance_confirmed_amount", { precision: 14, scale: 2 }),
+    hotelNote: text("hotel_note"),
+    flightDetails: jsonb("flight_details").$type<{ passengerName?: string; passengerDocument?: string; passengerBirthDate?: string; airline?: string; flightNumber?: string; departureAirport?: string; arrivalAirport?: string } | null>(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    tripCodeUnique: uniqueIndex("trips_trip_code_unique").on(table.tripCode),
+    statusIndex: index("trips_status_idx").on(table.status),
+  }),
+);
 
-  const startTrip = () => {
-    const km = parseKm(departureKm);
-    if (!km) {
-      Alert.alert(
-        "Informe o KM de saída",
-        "Digite a quilometragem antes de iniciar a viagem.",
-      );
-      return;
-    }
-    setStarted(true);
-    Alert.alert(
-      "Viagem iniciada",
-      `Saída registrada em ${km.toLocaleString("pt-BR")} km.`,
-    );
-  };
+export const tripExpenses = pgTable(
+  "trip_expenses",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    tripId: bigint("trip_id", { mode: "number" }).notNull().references(() => trips.id, { onDelete: "cascade" }),
+    expenseTypeId: bigint("expense_type_id", { mode: "number" }).notNull().references(() => expenseTypes.id),
+    occurredOn: date("occurred_on").notNull(),
+    city: varchar("city", { length: 120 }).notNull(),
+    quantity: numeric("quantity", { precision: 12, scale: 2 }).default("1").notNull(),
+    unitValue: numeric("unit_value", { precision: 14, scale: 2 }).notNull(),
+    amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
+    expenseGroup: varchar("expense_group", { length: 120 }),
+    prepaid: boolean("prepaid").default(false).notNull(),
+    billable: boolean("billable").default(true).notNull(),
+    receiptUri: text("receipt_uri"),
+    notes: text("notes"),
+    reviewNote: text("review_note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    tripDateIndex: index("trip_expenses_trip_date_idx").on(table.tripId, table.occurredOn),
+  }),
+);
 
-  const finishTrip = () => {
-    const km = parseKm(returnKm);
-    if (!km || km < parseKm(departureKm)) {
-      Alert.alert(
-        "Confira o KM de retorno",
-        "O KM de retorno deve ser maior ou igual ao KM de saída.",
-      );
-      return;
-    }
-    setFinished(true);
-    Alert.alert(
-      hasEvent ? "Viagem finalizada com evento" : "Viagem finalizada",
-      hasEvent
-        ? "O veículo foi sinalizado para avaliação do Administrativo."
-        : `Percurso registrado: ${(km - parseKm(departureKm)).toLocaleString("pt-BR")} km.`,
-    );
-  };
+export const tripApprovals = pgTable(
+  "trip_approvals",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    tripId: bigint("trip_id", { mode: "number" }).notNull().references(() => trips.id, { onDelete: "cascade" }),
+    approverId: bigint("approver_id", { mode: "number" }).notNull().references(() => users.id),
+    decision: approvalDecisionEnum("decision").notNull(),
+    comment: text("comment"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({ tripApproverUnique: uniqueIndex("trip_approvals_trip_approver_unique").on(table.tripId, table.approverId) }),
+);
 
-  return (
-    <ScreenContainer
-      edges={["top", "bottom", "left", "right"]}
-      className="px-5 pt-4"
-    >
-      <View className="w-full max-w-5xl flex-1 self-center">
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 32 }}
-        >
-          <Pressable onPress={() => router.back()} className="mb-5">
-            <Text className="font-semibold text-primary">‹ Voltar</Text>
-          </Pressable>
-          <View className="flex-row items-start justify-between">
-            <View>
-              <Text className="text-xs font-bold tracking-wider text-muted">
-                {trip.id}
-              </Text>
-              <Text className="mt-2 text-3xl font-bold text-foreground">
-                {trip.destination}
-              </Text>
-              <Text className="mt-1 text-sm text-muted">
-                  {trip.startsOn} — {trip.endsOn} · {clientLabel}
-              </Text>
-            </View>
-            <StatusPill
-              status={
-                finished ? "Finalizada" : started ? "Em prestação" : trip.status
-              }
-            />
-          </View>
-          {tripRecord.notes ? (
-            <View className="mt-5 rounded-2xl border border-border bg-surface p-5">
-              <Text className="text-lg font-bold text-foreground">{t('Observações')}</Text>
-              <Text className="mt-3 text-sm leading-6 text-foreground">{tripRecord.notes}</Text>
-            </View>
-          ) : null}
-          {flightDetails ? (
-            <View className="mt-5 rounded-2xl border border-border bg-surface p-5">
-              <Text className="text-lg font-bold text-foreground">{t('Dados do voo')}</Text>
-              <View className="mt-3 gap-2">
-                <Text className="text-sm text-muted">{t('Passageiro')}: <Text className="font-semibold text-foreground">{flightDetails.passengerName || t('Não informado')}</Text></Text>
-                <Text className="text-sm text-muted">{t('Documento / Passaporte')}: <Text className="font-semibold text-foreground">{flightDetails.passengerDocument || t('Não informado')}</Text></Text>
-                <Text className="text-sm text-muted">{t('Companhia aérea')}: <Text className="font-semibold text-foreground">{flightDetails.airline || t('Não informado')}</Text></Text>
-                <Text className="text-sm text-muted">{t('Voo')}: <Text className="font-semibold text-foreground">{flightDetails.flightNumber || t('Não informado')}</Text></Text>
-                <Text className="text-sm text-muted">{t('Trecho')}: <Text className="font-semibold text-foreground">{flightDetails.departureAirport || '—'} → {flightDetails.arrivalAirport || '—'}</Text></Text>
-              </View>
-              <ReportExportActions
-                title={t('Dados do voo')}
-                filename={`viagem-${trip.id}-voo`}
-                columns={[{ key: 'campo', label: t('Campo') }, { key: 'valor', label: t('Valor') }]}
-                rows={[
-                  { campo: t('Passageiro'), valor: flightDetails.passengerName || t('Não informado') },
-                  { campo: t('Documento / Passaporte'), valor: flightDetails.passengerDocument || t('Não informado') },
-                  { campo: t('Data de nascimento'), valor: flightDetails.passengerBirthDate || t('Não informado') },
-                  { campo: t('Companhia aérea'), valor: flightDetails.airline || t('Não informado') },
-                  { campo: t('Voo'), valor: flightDetails.flightNumber || t('Não informado') },
-                  { campo: t('Trecho'), valor: `${flightDetails.departureAirport || '—'} → ${flightDetails.arrivalAirport || '—'}` },
-                ]}
-              />
-            </View>
-          ) : null}
-          <View className="mt-6 flex-row gap-3">
-            <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
-              <Text className="text-xs text-muted">Adiantamento</Text>
-              <Text className="mt-2 text-lg font-bold text-foreground">
-                {formatCurrency(Number(advanceValue))}
-              </Text>
-            </View>
-            <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
-              <Text className="text-xs text-muted">Despesas lançadas</Text>
-              <Text className="mt-2 text-lg font-bold text-primary">
-                {formatCurrency(spent)}
-              </Text>
-            </View>
-          </View>
+export const maintenanceReasons = pgTable(
+  "maintenance_reasons",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    name: varchar("name", { length: 160 }).notNull(),
+    description: text("description"),
+    category: maintenanceCategoryEnum("category").notNull(),
+    active: boolean("active").default(true).notNull(),
+  },
+  (table) => ({ nameUnique: uniqueIndex("maintenance_reasons_name_unique").on(table.name) }),
+);
 
-          {showPendenciesBlock ? (
-            <>
-              <SectionHeader title="Pendências para liberação" />
-              <View className="rounded-2xl border border-border bg-surface p-5 gap-5">
-                {tripRecord.requiresFleetVehicle ? (
-                  <View>
-                    <View className="flex-row items-center justify-between">
-                      <Text className="font-bold text-foreground">🚗 Veículo da frota</Text>
-                      <Text className={vehiclePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
-                        {vehiclePending ? "PENDENTE" : "CONFIRMADO"}
-                      </Text>
-                    </View>
-                    {vehicleAllocated ? (
-                      <Text className="mt-1 text-sm text-muted">
-                        {reservation?.vehicleBrand} {reservation?.vehicleModel} · {reservation?.vehiclePlate}
-                      </Text>
-                    ) : (
-                      <View className="mt-3 gap-2">
-                        <PrimaryButton
-                          label={showVehiclePicker ? "Ocultar veículos disponíveis" : "Alocar veículo"}
-                          onPress={() => setShowVehiclePicker((current) => !current)}
-                        />
-                        {showVehiclePicker ? (
-                          <View className="gap-2">
-                            {availableVehiclesQuery.isLoading ? (
-                              <Text className="text-sm text-muted">Carregando veículos disponíveis...</Text>
-                            ) : availableVehiclesQuery.data?.items.length ? (
-                              availableVehiclesQuery.data.items.map((item) => (
-                                <Pressable
-                                  key={item.id}
-                                  onPress={() => allocateVehicle(item.id)}
-                                  className="rounded-xl border border-border bg-background px-4 py-3"
-                                >
-                                  <Text className="font-semibold text-foreground">{item.brand} {item.model}</Text>
-                                  <Text className="text-xs text-muted">{item.plate}</Text>
-                                </Pressable>
-                              ))
-                            ) : (
-                              <Text className="text-sm text-muted">Nenhum veículo disponível no momento.</Text>
-                            )}
-                          </View>
-                        ) : null}
-                        <View className="flex-row gap-2">
-                          <Pressable
-                            onPress={() => changeTransportMode("Veículo próprio")}
-                            className="flex-1 rounded-xl border border-border px-3 py-2"
-                          >
-                            <Text className="text-center text-xs font-bold text-primary">Alterar para Veículo Próprio</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => changeTransportMode("Ônibus")}
-                            className="flex-1 rounded-xl border border-border px-3 py-2"
-                          >
-                            <Text className="text-center text-xs font-bold text-primary">Alterar para Ônibus</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                ) : null}
+export const vehicles = pgTable(
+  "vehicles",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    plate: varchar("plate", { length: 16 }).notNull(),
+    brand: varchar("brand", { length: 80 }).notNull(),
+    model: varchar("model", { length: 100 }).notNull(),
+    modelYear: integer("model_year").notNull(),
+    color: varchar("color", { length: 60 }),
+    unitId: bigint("unit_id", { mode: "number" }).notNull().references(() => units.id),
+    currentKm: integer("current_km").default(0).notNull(),
+    lastMaintenanceKm: integer("last_maintenance_km").default(0).notNull(),
+    maintenanceIntervalKm: integer("maintenance_interval_km").notNull(),
+    fireExtinguisherExpiresOn: date("fire_extinguisher_expires_on"),
+    status: vehicleStatusEnum("status").default("Disponível").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    plateUnique: uniqueIndex("vehicles_plate_unique").on(table.plate),
+    statusIndex: index("vehicles_status_idx").on(table.status),
+  }),
+);
 
-                {tripRecord.hasAdvance ? (
-                  <View className="border-t border-border pt-5">
-                    <View className="flex-row items-center justify-between">
-                      <Text className="font-bold text-foreground">💰 Adiantamento</Text>
-                      <Text className={advancePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
-                        {advancePending ? "PENDENTE" : "CONFIRMADO"}
-                      </Text>
-                    </View>
-                    {advancePending ? (
-                      <View className="mt-3 gap-2">
-                        <Text className="text-xs text-muted">Valor efetivamente depositado</Text>
-                        <TextInput
-                          value={depositAmountValue}
-                          onChangeText={setDepositAmountDraft}
-                          keyboardType="decimal-pad"
-                          placeholder="Ex.: 1000000.00"
-                          placeholderTextColor={colors.muted}
-                          className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
-                        />
-                        <PrimaryButton label="Confirmar depósito realizado" onPress={confirmAdvance} />
-                      </View>
-                    ) : (
-                      <Text className="mt-1 text-sm text-muted">
-                        {formatCurrency(Number(tripRecord.advanceConfirmedAmount ?? advanceValue))} depositado em {new Date(tripRecord.advanceConfirmedAt as string).toLocaleString("pt-BR")}.
-                      </Text>
-                    )}
-                  </View>
-                ) : null}
+export const fleetReservations = pgTable(
+  "fleet_reservations",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    tripId: bigint("trip_id", { mode: "number" }).notNull().references(() => trips.id, { onDelete: "cascade" }),
+    vehicleId: bigint("vehicle_id", { mode: "number" }).references(() => vehicles.id),
+    driverId: bigint("driver_id", { mode: "number" }).notNull().references(() => travelers.id),
+    status: reservationStatusEnum("status").default("Reservado").notNull(),
+    plannedStartOn: date("planned_start_on").notNull(),
+    plannedEndOn: date("planned_end_on").notNull(),
+    departureAt: timestamp("departure_at", { withTimezone: true }),
+    departureKm: integer("departure_km"),
+    returnAt: timestamp("return_at", { withTimezone: true }),
+    returnKm: integer("return_km"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+);
 
-                {tripRecord.needsHotel ? (
-                  <View className="border-t border-border pt-5">
-                    <View className="flex-row items-center justify-between">
-                      <Text className="font-bold text-foreground">🏨 Hotel</Text>
-                      <Text className={hotelPending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
-                        {hotelPending ? "PENDENTE" : "CONFIRMADO"}
-                      </Text>
-                    </View>
-                    <View className="mt-3 gap-2">
-                      <TextInput
-                        value={hotelNoteValue}
-                        onChangeText={setHotelNoteDraft}
-                        multiline
-                        placeholder="Cole aqui os dados da reserva de hotel..."
-                        placeholderTextColor={colors.muted}
-                        className="min-h-[80px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
-                      />
-                      <PrimaryButton label="Salvar dados do hotel" onPress={saveHotelNote} />
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-            </>
-          ) : null}
+export const fleetEvents = pgTable(
+  "fleet_events",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    reservationId: bigint("reservation_id", { mode: "number" }).notNull().references(() => fleetReservations.id, { onDelete: "cascade" }),
+    eventType: fleetEventTypeEnum("event_type").notNull(),
+    description: text("description").notNull(),
+    photoUri: text("photo_uri"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+);
 
-          <SectionHeader title="Controle da viagem de frota" />
-          <View className="rounded-2xl border border-border bg-surface p-5">
-            <View className="flex-row items-center">
-              <View
-                style={{ backgroundColor: `${colors.primary}18` }}
-                className="h-11 w-11 items-center justify-center rounded-xl"
-              >
-                <IconSymbol name="car.fill" size={22} color={colors.primary} />
-              </View>
-              <View className="ml-3 flex-1">
-                <Text className="font-bold text-foreground">
-                  {vehicleAllocated
-                    ? `${reservation?.vehicleBrand} ${reservation?.vehicleModel}`
-                    : "Veículo não associado"}
-                </Text>
-                <Text className="mt-1 text-sm text-muted">
-                  {vehicleAllocated
-                    ? `${reservation?.vehiclePlate} · Condutor: ${reservation?.driverName}`
-                    : "Solicitação enviada ao Administrativo"}
-                </Text>
-              </View>
-            </View>
-            <View className="mt-5 gap-3">
-              <Text className="text-xs font-bold uppercase tracking-widest text-muted">
-                KM do veículo
-              </Text>
-              <View className="flex-row gap-3">
-                <View className="flex-1">
-                  <Text className="mb-2 text-xs text-muted">Saída</Text>
-                  <TextInput
-                    value={departureKm}
-                    onChangeText={setDepartureKm}
-                    editable={!started}
-                    keyboardType="numeric"
-                    placeholder="Ex.: 74101"
-                    placeholderTextColor={colors.muted}
-                    className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
-                  />
-                </View>
-                <View className="flex-1">
-                  <Text className="mb-2 text-xs text-muted">Retorno</Text>
-                  <TextInput
-                    value={returnKm}
-                    onChangeText={setReturnKm}
-                    editable={started && !finished}
-                    keyboardType="numeric"
-                    placeholder="Ex.: 74820"
-                    placeholderTextColor={colors.muted}
-                    className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
-                  />
-                </View>
-              </View>
-              {!started ? (
-                <PrimaryButton label="Iniciar viagem" onPress={startTrip} />
-              ) : !finished ? (
-                <PrimaryButton label="Finalizar viagem" onPress={finishTrip} />
-              ) : (
-                <View
-                  style={{ backgroundColor: `${colors.success}18` }}
-                  className="rounded-xl p-3"
-                >
-                  <Text className="font-semibold text-success">
-                    Viagem finalizada e quilometragem registrada.
-                  </Text>
-                </View>
-              )}
-            </View>
-            <View className="mt-6 border-t border-border pt-5">
-              <View className="flex-row items-center justify-between">
-                <View>
-                  <Text className="font-bold text-foreground">
-                    Registro de eventos
-                  </Text>
-                  <Text className="mt-1 text-xs text-muted">
-                    Multas, avarias ou outros acontecimentos
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => setHasEvent((current) => !current)}
-                  style={{
-                    backgroundColor: hasEvent ? colors.warning : colors.border,
-                  }}
-                  className="h-7 w-12 justify-center rounded-full px-1"
-                >
-                  <View
-                    style={{
-                      backgroundColor: hasEvent ? "white" : colors.muted,
-                      alignSelf: hasEvent ? "flex-end" : "flex-start",
-                    }}
-                    className="h-5 w-5 rounded-full"
-                  />
-                </Pressable>
-              </View>
-              {hasEvent ? (
-                <View className="mt-4 gap-3">
-                  <TextInput
-                    value={eventNote}
-                    onChangeText={setEventNote}
-                    multiline
-                    placeholder="Descreva a multa, avaria ou outro evento..."
-                    placeholderTextColor={colors.muted}
-                    className="min-h-[90px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
-                  />
-                  <Pressable
-                    onPress={() =>
-                      Alert.alert(
-                        "Anexo de fotos",
-                        "A seleção de fotos da avaria será aberta neste ponto.",
-                      )
-                    }
-                    style={({ pressed }) => [
-                      {
-                        borderColor: colors.border,
-                        borderWidth: 1,
-                        borderRadius: 12,
-                        padding: 12,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        opacity: pressed ? 0.7 : 1,
-                      },
-                    ]}
-                  >
-                    <IconSymbol
-                      name="camera.fill"
-                      size={18}
-                      color={colors.primary}
-                    />
-                    <Text className="ml-2 font-bold text-primary">
-                      Anexar fotos da avaria
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
-          </View>
+export const fleetEventPhotos = pgTable(
+  "fleet_event_photos",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    eventId: bigint("event_id", { mode: "number" }).notNull().references(() => fleetEvents.id, { onDelete: "cascade" }),
+    photoUri: text("photo_uri").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+);
 
-          <SectionHeader title="Linha do tempo" />
-          <View className="rounded-2xl border border-border bg-surface p-5">
-            <TimelineItem
-              title="Solicitação criada"
-              detail="Registrada pelo viajante"
-              done
-            />
-            <TimelineItem
-              title="Aprovada"
-              detail={isApprovedOrLater ? "Concluída" : "Aguardando aprovação"}
-              done={isApprovedOrLater}
-            />
-            <TimelineItem
-              title="Liberada para viagem"
-              detail={isReleasedOrLater ? "Concluída" : "Aguardando pendências"}
-              done={isReleasedOrLater}
-            />
-            <TimelineItem
-              title="Prestação de contas"
-              detail={finished || isFinishedStatus ? "Finalizada" : "Em andamento"}
-              done={finished || isFinishedStatus}
-              last
-            />
-          </View>
-          <SectionHeader
-            title="Despesas"
-            action={`${tripExpenses.length} itens`}
-          />
-          <PrimaryButton
-            label="Adicionar despesa"
-            onPress={() => router.push("/expenses")}
-          />
-        </ScrollView>
-      </View>
-    </ScreenContainer>
-  );
-}
+export const fleetWorkOrders = pgTable(
+  "fleet_work_orders",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    vehicleId: bigint("vehicle_id", { mode: "number" }).notNull().references(() => vehicles.id),
+    reasonId: bigint("reason_id", { mode: "number" }).references(() => maintenanceReasons.id),
+    maintenanceType: maintenanceCategoryEnum("maintenance_type").notNull(),
+    maintenanceDate: date("maintenance_date").notNull(),
+    vehicleKm: integer("vehicle_km").notNull(),
+    observation: text("observation"),
+    costAmount: numeric("cost_amount", { precision: 14, scale: 2 }).default("0").notNull(),
+    status: fleetWorkOrderStatusEnum("status").default("Concluída").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    vehicleDateIndex: index("fleet_work_orders_vehicle_date_idx").on(table.vehicleId, table.maintenanceDate),
+  }),
+);
 
-function TimelineItem({
-  title,
-  detail,
-  done,
-  last,
-}: {
-  title: string;
-  detail: string;
-  done: boolean;
-  last?: boolean;
-}) {
-  const colors = useColors();
-  return (
-    <View className="flex-row">
-      <View className="items-center">
-        <View
-          style={{
-            backgroundColor: done ? colors.success : colors.background,
-            borderColor: done ? colors.success : colors.border,
-          }}
-          className="h-6 w-6 items-center justify-center rounded-full border"
-        >
-          {done ? (
-            <IconSymbol name="checkmark" size={14} color="white" />
-          ) : null}
-        </View>
-        {!last ? (
-          <View
-            style={{ backgroundColor: colors.border }}
-            className="h-9 w-px"
-          />
-        ) : null}
-      </View>
-      <View className="ml-3 pb-3">
-        <Text className="font-bold text-foreground">{title}</Text>
-        <Text className="mt-1 text-xs text-muted">{detail}</Text>
-      </View>
-    </View>
-  );
-}
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type ClientBillingProfile = typeof clientBillingProfiles.$inferSelect;
+export type ClientBillingProfileItem = typeof clientBillingProfileItems.$inferSelect;
+export type Unit = typeof units.$inferSelect;
+export type InsertUnit = typeof units.$inferInsert;
+export type Client = typeof clients.$inferSelect;
+export type InsertClient = typeof clients.$inferInsert;
+export type Traveler = typeof travelers.$inferSelect;
+export type InsertTraveler = typeof travelers.$inferInsert;
+export type ExpenseType = typeof expenseTypes.$inferSelect;
+export type InsertExpenseType = typeof expenseTypes.$inferInsert;
