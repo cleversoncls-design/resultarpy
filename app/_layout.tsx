@@ -56,7 +56,7 @@ function AppSessionBoundary({ children }: { children: ReactNode }) {
 export default function RootLayout() {
   const pathname = usePathname();
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
-  const standaloneRoutes = ['/new-trip', '/expenses', '/fleet-reservation', '/maintenance-report', '/new-vehicle', '/new-work-order', '/fleet-cadastros', '/general-cadastros', '/admin-users', '/trip-detail', '/administrativo', '/aprovador', '/viajante'];
+  const standaloneRoutes = ['/new-trip', '/expenses', '/fleet-reservation', '/maintenance-report', '/new-vehicle', '/new-work-order', '/fleet-cadastros', '/general-cadastros', '/cadastro-detalhe', '/admin-users', '/trip-detail', '/administrativo', '/aprovador', '/viajante'];
   const useStandaloneShell = Platform.OS === 'web' && standaloneRoutes.some((route) => pathname.startsWith(route));
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 

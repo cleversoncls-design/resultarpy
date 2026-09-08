@@ -58,7 +58,7 @@ export default function ExpensesScreen() {
   // Antes, as cidades disponíveis vinham só das Unidades cadastradas — mas
   // nem todo lugar onde há gasto tem uma Unidade (ex.: atendimentos com
   // gastos em várias cidades). Agora usamos o cadastro próprio de Cidades.
-  const citiesQuery = trpc.catalogs.cities.list.useQuery({ page: 1, pageSize: 200, includeInactive: false, direction: 'asc' }, { enabled: isAuthenticated });
+  const citiesQuery = trpc.catalogs.cities.list.useQuery({ page: 1, pageSize: 100, includeInactive: false, direction: 'asc' }, { enabled: isAuthenticated });
   const cities = (citiesQuery.data?.items ?? []).map((item) => item.name);
   const expenseQuery = trpc.operations.expenses.get.useQuery({ id: editId as number }, { enabled: isAuthenticated && editId !== undefined });
   const createExpense = trpc.operations.expenses.create.useMutation();

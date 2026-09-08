@@ -127,6 +127,13 @@
       "when": 1788523259059,
       "tag": "0017_yellow_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788804814403,
+      "tag": "0018_thankful_iceman",
+      "breakpoints": true
     }
   ]
 }
