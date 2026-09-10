@@ -10,14 +10,17 @@ import { useThemeContext } from '@/lib/theme-provider';
 import { useLanguage } from '@/lib/language-provider';
 import { PreferenceDropdowns } from '@/components/preference-dropdown';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { trpc } from '@/lib/trpc';
 
 const moduleGroups = [
   { key: 'travel', label: 'Viagens', icon: 'airplane' as const, items: [
     { label: 'Visão geral', path: '/', icon: 'house.fill' as const },
     { label: 'Minhas viagens', path: '/trips', icon: 'airplane' as const },
+    { label: 'Minhas viagens', path: '/trips?mine=1', icon: 'airplane' as const },
     { label: 'Nova solicitação', path: '/new-trip', icon: 'plus' as const },
     { label: 'Cadastros gerais', path: '/general-cadastros', icon: 'building.2.fill' as const },
     { label: 'Aprovações', path: '/approvals', icon: 'checkmark.seal.fill' as const },
+    { label: 'Prestações pendentes', path: '/closure-queue', icon: 'checkmark.seal.fill' as const },
     { label: 'Operação', path: '/operations', icon: 'briefcase.fill' as const },
     { label: 'Relatório de reembolso', path: '/reimbursements', icon: 'wallet.pass.fill' as const },
     { label: 'Relatório de Faturamento', path: '/reports', icon: 'chart.bar.fill' as const },
@@ -46,12 +49,14 @@ export default function TabLayout() {
   const isCompactWeb = Platform.OS === 'web' && width < 900;
   const canApprove = profile === 'admin' || profile === 'approver' || profile === 'traveler_approver';
   const canAdmin = profile === 'admin';
+  const hasOwnTripsQuery = trpc.operations.trips.hasOwnTrips.useQuery(undefined, { enabled: canAdmin });
   const visibleModules = useMemo(() => moduleGroups.map((module) => ({ ...module, items: module.items.filter((item) => {
     if (module.key === 'fleet' && !canAdmin) return false;
     if (item.path === '/approvals') return canApprove;
-    if (['/operations', '/reports', '/general-cadastros', '/admin-users'].includes(item.path)) return canAdmin;
+    if (item.path === '/trips?mine=1') return canAdmin && Boolean(hasOwnTripsQuery.data);
+    if (['/operations', '/reports', '/general-cadastros', '/admin-users', '/closure-queue'].includes(item.path)) return canAdmin;
     return true;
-  }) })).filter((module) => module.items.length > 0), [canAdmin, canApprove]);
+  }).map((item) => item.path === '/trips' && canAdmin ? { ...item, label: 'Todas as viagens' } : item) })).filter((module) => module.items.length > 0), [canAdmin, canApprove, hasOwnTripsQuery.data]);
   const pathname = usePathname();
   const bottomPadding = Platform.OS === 'web' ? 12 : Math.max(insets.bottom, 8);
   useEffect(() => { AsyncStorage.getItem('controle-viagens-expanded-module').then((saved) => { if (saved && visibleModules.some((module) => module.key === saved)) { setExpandedModule(saved); setRenderedModules((current) => ({ ...current, [saved]: true })); moduleAnimations[saved]?.setValue(1); } }); }, [moduleAnimations, visibleModules]);

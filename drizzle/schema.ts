@@ -313,6 +313,13 @@ export const trips = pgTable(
     advanceConfirmedAt: timestamp("advance_confirmed_at", { withTimezone: true }),
     advanceConfirmedAmount: numeric("advance_confirmed_amount", { precision: 14, scale: 2 }),
     hotelNote: text("hotel_note"),
+    // Fluxo de fechamento da prestação de contas: o viajante envia, o
+    // Administrativo valida os comprovantes e depois fatura — só então a
+    // viagem vira "Finalizada". Sem enum novo: cada etapa é marcada pela
+    // data em que aconteceu (null = ainda não aconteceu).
+    closureSubmittedAt: timestamp("closure_submitted_at", { withTimezone: true }),
+    receiptsValidatedAt: timestamp("receipts_validated_at", { withTimezone: true }),
+    billedAt: timestamp("billed_at", { withTimezone: true }),
     flightDetails: jsonb("flight_details").$type<{ passengerName?: string; passengerDocument?: string; passengerBirthDate?: string; airline?: string; flightNumber?: string; departureAirport?: string; arrivalAirport?: string } | null>(),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

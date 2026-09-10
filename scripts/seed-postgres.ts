@@ -56,14 +56,13 @@ async function seed() {
     `);
 
     await client.query(`
-      INSERT INTO maintenance_reasons (name, category)
-      VALUES
-        ('Revisão periódica', 'Preventiva'),
-        ('Avaria mecânica', 'Corretiva'),
-        ('Troca de pneus', 'Preventiva')
-      ON CONFLICT (name) DO UPDATE SET
-        category = EXCLUDED.category,
-        active = true
+	INSERT INTO maintenance_reasons (name, category)
+	SELECT name, category::maintenance_category FROM (VALUES
+  	('Revisão periódica', 'Preventiva'),
+  	('Avaria mecânica', 'Corretiva'),
+  	('Troca de pneus', 'Preventiva')
+	) AS defaults(name, category)
+	WHERE NOT EXISTS (SELECT 1 FROM maintenance_reasons)     
     `);
 
     await client.query("COMMIT");

@@ -34,6 +34,10 @@ export function createTRPCClient() {
           return fetch(url, {
             ...options,
             credentials: "include",
+            // Evita que o navegador guarde em cache as consultas GET do
+            // tRPC — sem isso, um refetch() após uma mutação podia
+            // devolver dados antigos até um F5 forçado (Ctrl+Shift+R).
+            cache: "no-store",
           });
         },
       }),

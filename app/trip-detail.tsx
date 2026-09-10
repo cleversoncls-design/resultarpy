@@ -64,6 +64,29 @@ export default function TripDetailScreen() {
     onSuccess: () => { reservationQuery.refetch(); },
   });
 
+  // Marca a viagem como "Em prestação" — funciona mesmo sem veículo da
+  // frota (Veículo Próprio/Ônibus), diferente do recordKm acima que só
+  // existe quando há uma reserva de frota associada.
+  const startTripMutation = trpc.operations.trips.startTrip.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+
+  // O viajante envia o fechamento direto daqui — antes só existia dentro
+  // da tela de despesas, o que era menos natural e dependia do tripId
+  // chegar certinho por parâmetro de URL.
+  const submitClosureMutation = trpc.operations.trips.submitClosure.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+
+  // Fluxo de fechamento: validação de comprovantes e faturamento, feitos
+  // pelo Administrativo depois que o viajante envia a prestação de contas.
+  const validateReceiptsMutation = trpc.operations.trips.validateReceipts.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+  const billTripMutation = trpc.operations.trips.billTrip.useMutation({
+    onSuccess: () => { tripQuery.refetch(); },
+  });
+
   const confirmAdvanceMutation = trpc.operations.trips.confirmAdvance.useMutation({
     onSuccess: () => { tripQuery.refetch(); },
   });
@@ -97,6 +120,7 @@ export default function TripDetailScreen() {
   const [eventNote, setEventNote] = useState("");
   const [showVehiclePicker, setShowVehiclePicker] = useState(false);
   const [hotelNoteDraft, setHotelNoteDraft] = useState<string | null>(null);
+  const [editingHotel, setEditingHotel] = useState(false);
   const [depositAmountDraft, setDepositAmountDraft] = useState<string | null>(null);
 
   // Sempre que o usuário navega para outra viagem (tripId muda), sem que a
@@ -105,6 +129,7 @@ export default function TripDetailScreen() {
   useEffect(() => {
     setShowVehiclePicker(false);
     setHotelNoteDraft(null);
+    setEditingHotel(false);
     setDepositAmountDraft(null);
     setStarted(false);
     setFinished(false);
@@ -134,7 +159,7 @@ export default function TripDetailScreen() {
         <Pressable onPress={() => router.back()} className="mb-5">
           <Text className="font-semibold text-primary">‹ Voltar</Text>
         </Pressable>
-        <Text className="text-foreground">Nenhuma viagem informada para exibir.</Text>
+        <Text className="text-foreground">{t('Nenhuma viagem informada para exibir.')}</Text>
       </ScreenContainer>
     );
   }
@@ -142,7 +167,7 @@ export default function TripDetailScreen() {
   if (tripQuery.isLoading) {
     return (
       <ScreenContainer edges={["top", "bottom", "left", "right"]} className="px-5 pt-4">
-        <Text className="text-foreground">Carregando viagem...</Text>
+        <Text className="text-foreground">{t('Carregando viagem...')}</Text>
       </ScreenContainer>
     );
   }
@@ -171,6 +196,9 @@ export default function TripDetailScreen() {
     notes?: string | null;
     advanceConfirmedAt?: string | null;
     advanceConfirmedAmount?: string | null;
+    closureSubmittedAt?: string | null;
+    receiptsValidatedAt?: string | null;
+    billedAt?: string | null;
     hotelNote?: string | null;
     requiresFleetVehicle?: boolean;
     hasAdvance?: boolean;
@@ -239,8 +267,9 @@ export default function TripDetailScreen() {
   };
 
   const startTrip = () => {
+    const hasVehicle = Boolean(reservation?.id);
     const km = parseKm(departureKm);
-    if (!km) {
+    if (hasVehicle && !km) {
       Alert.alert(
         "Informe o KM de saída",
         "Digite a quilometragem antes de iniciar a viagem.",
@@ -248,12 +277,13 @@ export default function TripDetailScreen() {
       return;
     }
     setStarted(true);
-    if (reservation?.id) {
+    if (hasVehicle && reservation?.id) {
       recordKmMutation.mutate({ reservationId: reservation.id, departureKm: km });
     }
+    startTripMutation.mutate({ id: trip.id });
     Alert.alert(
       "Viagem iniciada",
-      `Saída registrada em ${km.toLocaleString("pt-BR")} km.`,
+      hasVehicle ? `Saída registrada em ${km.toLocaleString("pt-BR")} km.` : "A viagem foi marcada como em andamento.",
     );
   };
 
@@ -342,7 +372,7 @@ export default function TripDetailScreen() {
           ) : null}
           <View className="mt-6 flex-row gap-3">
             <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
-              <Text className="text-xs text-muted">Adiantamento</Text>
+              <Text className="text-xs text-muted">{t('Adiantamento')}</Text>
               <Text className="mt-2 text-lg font-bold text-foreground">
                 {formatCurrency(Number(advanceValue))}
               </Text>
@@ -353,7 +383,7 @@ export default function TripDetailScreen() {
               ) : null}
             </View>
             <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
-              <Text className="text-xs text-muted">Despesas lançadas</Text>
+              <Text className="text-xs text-muted">{t('Despesas lançadas')}</Text>
               <Text className="mt-2 text-lg font-bold text-primary">
                 {formatCurrency(spent)}
               </Text>
@@ -362,7 +392,7 @@ export default function TripDetailScreen() {
 
           {showPendenciesBlock ? (
             <>
-              <SectionHeader title="Pendências para liberação" />
+              <SectionHeader title={t('Pendências para liberação')} />
               <View className="rounded-2xl border border-border bg-surface p-5 gap-5">
                 {tripRecord.requiresFleetVehicle ? (
                   <View>
@@ -393,7 +423,7 @@ export default function TripDetailScreen() {
                         {showVehiclePicker ? (
                           <View className="gap-2 rounded-xl border border-border overflow-hidden">
                             {availableVehiclesQuery.isLoading ? (
-                              <Text className="p-4 text-sm text-muted">Carregando veículos disponíveis...</Text>
+                              <Text className="p-4 text-sm text-muted">{t('Carregando veículos disponíveis...')}</Text>
                             ) : availableVehiclesQuery.data?.items.length ? (
                               availableVehiclesQuery.data.items.map((item, index) => (
                                 <Pressable
@@ -421,12 +451,12 @@ export default function TripDetailScreen() {
                                     style={{ backgroundColor: colors.primary }}
                                     className="rounded-lg px-3 py-2"
                                   >
-                                    <Text className="text-xs font-bold text-white">Selecionar</Text>
+                                    <Text className="text-xs font-bold text-white">{t('Selecionar')}</Text>
                                   </View>
                                 </Pressable>
                               ))
                             ) : (
-                              <Text className="p-4 text-sm text-muted">Nenhum veículo disponível no momento.</Text>
+                              <Text className="p-4 text-sm text-muted">{t('Nenhum veículo disponível no momento.')}</Text>
                             )}
                           </View>
                         ) : null}
@@ -435,13 +465,13 @@ export default function TripDetailScreen() {
                             onPress={updateTransportMutation.isPending ? undefined : () => changeTransportMode("Veículo próprio")}
                             className="flex-1 rounded-xl border border-border px-3 py-2"
                           >
-                            <Text className="text-center text-xs font-bold text-primary">Alterar para Veículo Próprio</Text>
+                            <Text className="text-center text-xs font-bold text-primary">{t('Alterar para Veículo Próprio')}</Text>
                           </Pressable>
                           <Pressable
                             onPress={updateTransportMutation.isPending ? undefined : () => changeTransportMode("Ônibus")}
                             className="flex-1 rounded-xl border border-border px-3 py-2"
                           >
-                            <Text className="text-center text-xs font-bold text-primary">Alterar para Ônibus</Text>
+                            <Text className="text-center text-xs font-bold text-primary">{t('Alterar para Ônibus')}</Text>
                           </Pressable>
                         </View>
                         <MutationFeedback
@@ -467,12 +497,12 @@ export default function TripDetailScreen() {
                     </View>
                     {advancePending ? (
                       <View className="mt-3 gap-2">
-                        <Text className="text-xs text-muted">Valor efetivamente depositado</Text>
+                        <Text className="text-xs text-muted">{t('Valor efetivamente depositado')}</Text>
                         <TextInput
                           value={depositAmountValue}
                           onChangeText={setDepositAmountDraft}
                           keyboardType="decimal-pad"
-                          placeholder="Ex.: 1000000.00"
+                          placeholder={t('Ex.: 1000000.00')}
                           placeholderTextColor={colors.muted}
                           className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
                         />
@@ -505,35 +535,121 @@ export default function TripDetailScreen() {
                         {hotelPending ? "PENDENTE" : "CONFIRMADO"}
                       </Text>
                     </View>
-                    <View className="mt-3 gap-2">
-                      <TextInput
-                        value={hotelNoteValue}
-                        onChangeText={setHotelNoteDraft}
-                        multiline
-                        placeholder="Cole aqui os dados da reserva de hotel..."
-                        placeholderTextColor={colors.muted}
-                        className="min-h-[80px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
-                      />
-                      <PrimaryButton
-                        label={updateHotelNoteMutation.isPending ? "Salvando..." : "Salvar dados do hotel"}
-                        onPress={updateHotelNoteMutation.isPending ? undefined : saveHotelNote}
-                      />
-                      <MutationFeedback
-                        isPending={updateHotelNoteMutation.isPending}
-                        isSuccess={updateHotelNoteMutation.isSuccess}
-                        isError={updateHotelNoteMutation.isError}
-                        errorMessage={updateHotelNoteMutation.error?.message}
-                        pendingLabel="Salvando dados do hotel..."
-                        successLabel="Dados do hotel salvos."
-                      />
-                    </View>
+                    {hotelPending || editingHotel ? (
+                      <View className="mt-3 gap-2">
+                        <TextInput
+                          value={hotelNoteValue}
+                          onChangeText={setHotelNoteDraft}
+                          multiline
+                          placeholder={t('Cole aqui os dados da reserva de hotel...')}
+                          placeholderTextColor={colors.muted}
+                          className="min-h-[80px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
+                        />
+                        <PrimaryButton
+                          label={updateHotelNoteMutation.isPending ? "Salvando..." : "Salvar dados do hotel"}
+                          onPress={updateHotelNoteMutation.isPending ? undefined : () => { saveHotelNote(); setEditingHotel(false); }}
+                        />
+                        <MutationFeedback
+                          isPending={updateHotelNoteMutation.isPending}
+                          isSuccess={updateHotelNoteMutation.isSuccess}
+                          isError={updateHotelNoteMutation.isError}
+                          errorMessage={updateHotelNoteMutation.error?.message}
+                          pendingLabel="Salvando dados do hotel..."
+                          successLabel="Dados do hotel salvos."
+                        />
+                      </View>
+                    ) : (
+                      <View className="mt-3 gap-2">
+                        <Text className="text-sm text-muted">{hotelNoteValue}</Text>
+                        <Pressable onPress={() => setEditingHotel(true)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+                          <Text className="text-xs font-bold text-primary">{t('Editar')}</Text>
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                 ) : null}
               </View>
             </>
           ) : null}
 
-          <SectionHeader title="Controle da viagem de frota" />
+          {isAdmin && tripRecord.closureSubmittedAt ? (
+            <>
+              <SectionHeader title={t('Fechamento da prestação de contas')} />
+              <View className="rounded-2xl border border-border bg-surface p-5 gap-5">
+                <View>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="font-bold text-foreground">📥 Prestação enviada</Text>
+                    <Text className="text-xs font-bold text-success">CONFIRMADO</Text>
+                  </View>
+                  <Text className="mt-1 text-sm text-muted">
+                    Enviada pelo viajante em {new Date(tripRecord.closureSubmittedAt as string).toLocaleString("pt-BR")}.
+                  </Text>
+                </View>
+
+                <View className="border-t border-border pt-5">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="font-bold text-foreground">🧾 Validação dos comprovantes</Text>
+                    <Text className={tripRecord.receiptsValidatedAt ? "text-xs font-bold text-success" : "text-xs font-bold text-warning"}>
+                      {tripRecord.receiptsValidatedAt ? "CONFIRMADO" : "PENDENTE"}
+                    </Text>
+                  </View>
+                  {tripRecord.receiptsValidatedAt ? (
+                    <Text className="mt-1 text-sm text-muted">
+                      Validado em {new Date(tripRecord.receiptsValidatedAt as string).toLocaleString("pt-BR")}.
+                    </Text>
+                  ) : (
+                    <View className="mt-3">
+                      <PrimaryButton
+                        label={validateReceiptsMutation.isPending ? "Validando..." : "Validar comprovantes"}
+                        onPress={validateReceiptsMutation.isPending ? undefined : () => validateReceiptsMutation.mutate({ id: trip.id })}
+                      />
+                      <MutationFeedback
+                        isPending={validateReceiptsMutation.isPending}
+                        isSuccess={validateReceiptsMutation.isSuccess}
+                        isError={validateReceiptsMutation.isError}
+                        errorMessage={validateReceiptsMutation.error?.message}
+                        pendingLabel="Validando comprovantes..."
+                        successLabel="Comprovantes validados."
+                      />
+                    </View>
+                  )}
+                </View>
+
+                <View className="border-t border-border pt-5">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="font-bold text-foreground">💳 Faturamento ao cliente</Text>
+                    <Text className={tripRecord.billedAt ? "text-xs font-bold text-success" : "text-xs font-bold text-warning"}>
+                      {tripRecord.billedAt ? "CONFIRMADO" : "PENDENTE"}
+                    </Text>
+                  </View>
+                  {tripRecord.billedAt ? (
+                    <Text className="mt-1 text-sm text-muted">
+                      Faturado em {new Date(tripRecord.billedAt as string).toLocaleString("pt-BR")}. Viagem finalizada.
+                    </Text>
+                  ) : !tripRecord.receiptsValidatedAt ? (
+                    <Text className="mt-1 text-sm text-muted">{t('Valide os comprovantes antes de faturar.')}</Text>
+                  ) : (
+                    <View className="mt-3">
+                      <PrimaryButton
+                        label={billTripMutation.isPending ? "Faturando..." : "Faturar gastos"}
+                        onPress={billTripMutation.isPending ? undefined : () => billTripMutation.mutate({ id: trip.id })}
+                      />
+                      <MutationFeedback
+                        isPending={billTripMutation.isPending}
+                        isSuccess={billTripMutation.isSuccess}
+                        isError={billTripMutation.isError}
+                        errorMessage={billTripMutation.error?.message}
+                        pendingLabel="Faturando..."
+                        successLabel="Gastos faturados. Viagem finalizada."
+                      />
+                    </View>
+                  )}
+                </View>
+              </View>
+            </>
+          ) : null}
+
+          <SectionHeader title={t('Controle da viagem de frota')} />
           <View className="rounded-2xl border border-border bg-surface p-5">
             <View className="flex-row items-center">
               <View
@@ -561,25 +677,25 @@ export default function TripDetailScreen() {
               </Text>
               <View className="flex-row gap-3">
                 <View className="flex-1">
-                  <Text className="mb-2 text-xs text-muted">Saída</Text>
+                  <Text className="mb-2 text-xs text-muted">{t('Saída')}</Text>
                   <TextInput
                     value={departureKm}
                     onChangeText={setDepartureKm}
                     editable={!started}
                     keyboardType="numeric"
-                    placeholder="Ex.: 74101"
+                    placeholder={t('Ex.: 74101')}
                     placeholderTextColor={colors.muted}
                     className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="mb-2 text-xs text-muted">Retorno</Text>
+                  <Text className="mb-2 text-xs text-muted">{t('Retorno')}</Text>
                   <TextInput
                     value={returnKm}
                     onChangeText={setReturnKm}
                     editable={started && !finished}
                     keyboardType="numeric"
-                    placeholder="Ex.: 74820"
+                    placeholder={t('Ex.: 74820')}
                     placeholderTextColor={colors.muted}
                     className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
                   />
@@ -587,9 +703,9 @@ export default function TripDetailScreen() {
               </View>
               {!isAdmin ? (
                 !started ? (
-                  <PrimaryButton label="Iniciar viagem" onPress={startTrip} />
+                  <PrimaryButton label={t('Iniciar viagem')} onPress={startTrip} />
                 ) : !finished ? (
-                  <PrimaryButton label="Finalizar viagem" onPress={finishTrip} />
+                  <PrimaryButton label={t('Finalizar viagem')} onPress={finishTrip} />
                 ) : (
                   <View
                     style={{ backgroundColor: `${colors.success}18` }}
@@ -634,7 +750,7 @@ export default function TripDetailScreen() {
                     value={eventNote}
                     onChangeText={setEventNote}
                     multiline
-                    placeholder="Descreva a multa, avaria ou outro evento..."
+                    placeholder={t('Descreva a multa, avaria ou outro evento...')}
                     placeholderTextColor={colors.muted}
                     className="min-h-[90px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
                   />
@@ -672,39 +788,76 @@ export default function TripDetailScreen() {
             </View>
           </View>
 
-          <SectionHeader title="Linha do tempo" />
+          <SectionHeader title={t('Linha do tempo')} />
           <View className="rounded-2xl border border-border bg-surface p-5">
             <TimelineItem
-              title="Solicitação criada"
+              title={t('Solicitação criada')}
               detail="Registrada pelo viajante"
               done
             />
             <TimelineItem
-              title="Aprovada"
+              title={t('Aprovada')}
               detail={isApprovedOrLater ? "Concluída" : "Aguardando aprovação"}
               done={isApprovedOrLater}
             />
             <TimelineItem
-              title="Liberada para viagem"
+              title={t('Liberada para viagem')}
               detail={isReleasedOrLater ? "Concluída" : "Aguardando pendências"}
               done={isReleasedOrLater}
             />
             <TimelineItem
-              title="Prestação de contas"
-              detail={finished || isFinishedStatus ? "Finalizada" : "Em andamento"}
-              done={finished || isFinishedStatus}
+              title={t('Prestação de contas')}
+              detail={Boolean(tripRecord.closureSubmittedAt) ? "Concluída" : "Em andamento"}
+              done={Boolean(tripRecord.closureSubmittedAt)}
+            />
+            <TimelineItem
+              title={t('Validação dos comprovantes')}
+              detail={tripRecord.receiptsValidatedAt ? "Concluída" : "Aguardando envio/validação"}
+              done={Boolean(tripRecord.receiptsValidatedAt)}
+            />
+            <TimelineItem
+              title={t('Viagem finalizada')}
+              detail={tripRecord.billedAt ? "Faturada ao cliente" : "Aguardando faturamento"}
+              done={Boolean(tripRecord.billedAt) || isFinishedStatus}
               last
             />
           </View>
           <SectionHeader
-            title="Despesas"
+            title={t('Despesas')}
             action={`${tripExpenses.length} itens`}
           />
           {!isAdmin ? (
             <PrimaryButton
-              label="Adicionar despesa"
-              onPress={() => router.push("/expenses")}
+              label={t('Adicionar despesa')}
+              onPress={() => router.push({ pathname: "/expenses", params: { tripId: String(trip.id) } })}
             />
+          ) : null}
+
+          {!isAdmin ? (
+            <View className="mt-4">
+              {tripRecord.closureSubmittedAt ? (
+                <View style={{ backgroundColor: `${colors.success}18` }} className="rounded-xl p-3">
+                  <Text style={{ color: colors.success }} className="text-sm font-semibold">
+                    ✓ Fechamento enviado em {new Date(tripRecord.closureSubmittedAt as string).toLocaleString("pt-BR")}. Aguardando validação do Administrativo.
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <PrimaryButton
+                    label={submitClosureMutation.isPending ? "Enviando..." : "Enviar fechamento"}
+                    onPress={submitClosureMutation.isPending ? undefined : () => submitClosureMutation.mutate({ id: trip.id })}
+                  />
+                  <MutationFeedback
+                    isPending={submitClosureMutation.isPending}
+                    isSuccess={submitClosureMutation.isSuccess}
+                    isError={submitClosureMutation.isError}
+                    errorMessage={submitClosureMutation.error?.message}
+                    pendingLabel="Enviando fechamento..."
+                    successLabel="Fechamento enviado ao Administrativo."
+                  />
+                </>
+              )}
+            </View>
           ) : null}
         </ScrollView>
       </View>

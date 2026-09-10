@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { getDb } from './db';
 import { clients, clientBillingProfileItems, clientBillingProfiles, currencyRates, expenseTypes, fleetEvents, fleetReservations, fleetWorkOrders, reimbursementLimitProfileItems, reimbursementLimitProfiles, travelers, tripApprovals, tripExpenses, trips, users, vehicles } from '../drizzle/schema';
 
@@ -31,6 +31,15 @@ export async function ensureTravelerIdByUserId(userId: number) {
   const name = user.name?.trim() || user.email?.trim() || `Viajante ${userId}`;
   const [created] = await db.insert(travelers).values({ userId, name }).returning({ id: travelers.id });
   return created?.id;
+}
+
+// Usado para decidir se mostramos "Minhas viagens" no menu do
+// Administrativo — só faz sentido aparecer se ele mesmo já tiver alguma
+// viagem própria registrada.
+export async function hasOwnTrips(userId: number) {
+  const db = await requireDb();
+  const [row] = await db.select({ id: trips.id }).from(trips).innerJoin(travelers, eq(trips.travelerId, travelers.id)).where(eq(travelers.userId, userId)).limit(1);
+  return Boolean(row);
 }
 
 export async function listTrips(input: PageInput & { status?: string; travelerId?: number; userId?: number }) {
@@ -83,6 +92,18 @@ export async function maybeReleaseTrip(id: number) {
   return trip;
 }
 
+// O próprio viajante marca que a viagem começou de verdade — funciona
+// para qualquer modalidade de transporte (frota, próprio ou ônibus), não
+// só para quem tem veículo da frota associado.
+export async function startTrip(id: number, scope: Scope = {}) {
+  const db = await requireDb();
+  const trip = await getTrip(id, scope);
+  if (!trip) return undefined;
+  if (trip.status !== 'Liberada para viagem') return trip;
+  const [updated] = await db.update(trips).set({ status: 'Em prestação' }).where(eq(trips.id, id)).returning();
+  return updated;
+}
+
 export async function updateTrip(id: number, input: Partial<typeof trips.$inferInsert>, scope: Scope = {}) {
   const db = await requireDb();
   if (!(await getTrip(id, scope))) return undefined;
@@ -101,6 +122,57 @@ export async function deleteTrip(id: number, scope: Scope = {}) {
   if (!(await getTrip(id, scope))) return undefined;
   const [deleted] = await db.delete(trips).where(eq(trips.id, id)).returning({ id: trips.id });
   return deleted;
+}
+
+// --- Fluxo de fechamento da prestação de contas ---
+
+// O próprio viajante envia a prestação de contas para validação do
+// Administrativo. Só é permitido a partir de "Em prestação" e uma única
+// vez (não permite reenviar sem necessidade).
+export async function submitTripClosure(id: number, scope: Scope = {}) {
+  const db = await requireDb();
+  const trip = await getTrip(id, scope);
+  if (!trip) return undefined;
+  if (trip.closureSubmittedAt) throw new Error('O fechamento desta viagem já foi enviado anteriormente.');
+  if (trip.status !== 'Em prestação') throw new Error(`A viagem precisa estar "Em prestação" para enviar o fechamento (status atual: "${trip.status}"). Clique em "Iniciar viagem" antes.`);
+  const [updated] = await db.update(trips).set({ closureSubmittedAt: new Date() }).where(eq(trips.id, id)).returning();
+  return updated;
+}
+
+// O Administrativo confere os comprovantes lançados e valida a prestação.
+export async function validateTripReceipts(id: number) {
+  const db = await requireDb();
+  const [trip] = await db.select().from(trips).where(eq(trips.id, id)).limit(1);
+  if (!trip) return undefined;
+  if (!trip.closureSubmittedAt || trip.receiptsValidatedAt) return trip;
+  const [updated] = await db.update(trips).set({ receiptsValidatedAt: new Date() }).where(eq(trips.id, id)).returning();
+  return updated;
+}
+
+// O Administrativo fatura os gastos ao cliente — só depois de validar os
+// comprovantes. Essa é a etapa que efetivamente finaliza a viagem.
+export async function billTrip(id: number) {
+  const db = await requireDb();
+  const [trip] = await db.select().from(trips).where(eq(trips.id, id)).limit(1);
+  if (!trip) return undefined;
+  if (!trip.receiptsValidatedAt || trip.billedAt) return trip;
+  const [updated] = await db.update(trips).set({ billedAt: new Date(), status: 'Finalizada' }).where(eq(trips.id, id)).returning();
+  return updated;
+}
+
+// Fila do Administrativo: viagens com prestação enviada, aguardando
+// validação de comprovantes ou faturamento.
+export async function listClosureQueue(input: PageInput) {
+  const db = await requireDb();
+  const filters = [
+    isNotNull(trips.closureSubmittedAt),
+    isNull(trips.billedAt),
+    input.search ? or(ilike(trips.tripCode, `%${input.search}%`), ilike(trips.destination, `%${input.search}%`)) : undefined,
+  ].filter(Boolean);
+  const paging = page(input);
+  const rows = await db.select({ trip: trips, clientName: clients.name, travelerName: travelers.name }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).leftJoin(clients, eq(trips.clientId, clients.id)).where(and(...filters)).orderBy(asc(trips.closureSubmittedAt)).limit(paging.limit).offset(paging.offset);
+  const [{ total }] = await db.select({ total: count() }).from(trips).where(and(...filters));
+  return { items: rows.map(({ trip, clientName, travelerName }) => ({ ...trip, clientName, travelerName })), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
 
 // Confirma que o depósito do adiantamento foi realizado, registrando o
@@ -148,7 +220,7 @@ export async function getFleetReservationForTrip(tripId: number, scope: Scope = 
 
 export type ApprovalQueueStatus = 'Pendiente' | 'Aprovada' | 'Rejeitada';
 
-export async function listTripApprovals(input: PageInput & { userId?: number; admin?: boolean; approver?: boolean; status?: ApprovalQueueStatus }) {
+export async function listTripApprovals(input: PageInput & { userId?: number; admin?: boolean; approver?: boolean; status?: ApprovalQueueStatus; from?: string; to?: string }) {
   const db = await requireDb();
   const statusFilter = input.status === 'Aprovada'
     ? eq(trips.status, 'Aprovada')
@@ -159,6 +231,8 @@ export async function listTripApprovals(input: PageInput & { userId?: number; ad
     statusFilter,
     input.admin || input.approver ? undefined : input.userId ? eq(trips.approverId, input.userId) : undefined,
     input.search ? or(ilike(trips.tripCode, `%${input.search}%`), ilike(trips.destination, `%${input.search}%`)) : undefined,
+    input.from ? gte(trips.createdAt, new Date(`${input.from}T00:00:00.000Z`)) : undefined,
+    input.to ? lte(trips.createdAt, new Date(`${input.to}T23:59:59.999Z`)) : undefined,
   ].filter(Boolean);
   const paging = page(input);
   const rows = await db.select({ trip: trips }).from(trips).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(trips.createdAt) : asc(trips.createdAt)).limit(paging.limit).offset(paging.offset);
@@ -168,6 +242,36 @@ export async function listTripApprovals(input: PageInput & { userId?: number; ad
   const latestByTrip = new Map<number, (typeof approvals)[number]>();
   approvals.forEach((approval) => { if (!latestByTrip.has(approval.tripId)) latestByTrip.set(approval.tripId, approval); });
   return { items: rows.map(({ trip }) => ({ ...trip, latestApproval: latestByTrip.get(trip.id) ?? null })), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+}
+
+// Histórico global de decisões (aprovadas/rejeitadas) já tomadas, em todas
+// as viagens de uma vez — antes só existia um histórico por viagem
+// específica, exigindo abrir cada uma para ver a decisão.
+export async function listApprovalDecisionsGlobal(scope: Scope, filters: { decision?: typeof tripApprovals.decision.enumValues[number]; from?: string; to?: string; page: number; pageSize: number; exportAll?: boolean }) {
+  const db = await requireDb();
+  const conditions = [
+    filters.decision ? eq(tripApprovals.decision, filters.decision) : undefined,
+    filters.from ? gte(tripApprovals.decidedAt, new Date(`${filters.from}T00:00:00.000Z`)) : undefined,
+    filters.to ? lte(tripApprovals.decidedAt, new Date(`${filters.to}T23:59:59.999Z`)) : undefined,
+    scope.admin ? undefined : scope.userId ? eq(tripApprovals.approverId, scope.userId) : undefined,
+  ].filter(Boolean);
+  const where = conditions.length ? and(...conditions) : undefined;
+  const currentPage = Math.max(filters.page ?? 1, 1);
+  const pageSize = filters.exportAll ? 1000 : Math.min(Math.max(filters.pageSize ?? 10, 1), 100);
+  const offset = filters.exportAll ? 0 : (currentPage - 1) * pageSize;
+  const rows = await db
+    .select({ approval: tripApprovals, approverName: users.name, approverEmail: users.email, tripId: trips.id, tripCode: trips.tripCode, destination: trips.destination, clientName: clients.name })
+    .from(tripApprovals)
+    .innerJoin(trips, eq(tripApprovals.tripId, trips.id))
+    .leftJoin(users, eq(tripApprovals.approverId, users.id))
+    .leftJoin(clients, eq(trips.clientId, clients.id))
+    .where(where)
+    .orderBy(desc(tripApprovals.decidedAt))
+    .limit(pageSize)
+    .offset(offset);
+  const [{ total }] = await db.select({ total: count() }).from(tripApprovals).innerJoin(trips, eq(tripApprovals.tripId, trips.id)).where(where);
+  const items = rows.map(({ approval, approverName, approverEmail, tripId, tripCode, destination, clientName }) => ({ ...approval, tripId, tripCode, destination, clientName: clientName ?? 'Sem cliente', approverName: approverName ?? approverEmail ?? 'Usuário' }));
+  return { items, page: currentPage, pageSize, total: Number(total), totalPages: filters.exportAll ? 1 : Math.max(Math.ceil(Number(total) / pageSize), 1) };
 }
 
 export type ApprovalHistoryFilters = {
@@ -323,6 +427,12 @@ export async function deleteTripExpense(id: number, scope: Scope = {}) {
   return deleted;
 }
 
+export async function getVehicle(id: number) {
+  const db = await requireDb();
+  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, id)).limit(1);
+  return vehicle;
+}
+
 export async function listVehicles(input: PageInput & { status?: string }) {
   const db = await requireDb();
   const filters = [input.status ? eq(vehicles.status, input.status as typeof vehicles.status.enumValues[number]) : undefined, input.search ? or(ilike(vehicles.plate, `%${input.search}%`), ilike(vehicles.brand, `%${input.search}%`), ilike(vehicles.model, `%${input.search}%`)) : undefined].filter(Boolean);
@@ -394,6 +504,13 @@ export async function recordReservationKm(reservationId: number, input: { depart
     changes.status = 'Finalizada';
   }
   const [updated] = await db.update(fleetReservations).set(changes).where(eq(fleetReservations.id, reservationId)).returning();
+  // Registrar o KM de saída é, na prática, o momento em que a viagem
+  // "começa de verdade" — por isso é aqui que avançamos o status da
+  // viagem para "Em prestação" (nada mais no sistema fazia essa
+  // transição, o que deixava "Enviar fechamento" sem efeito nenhum).
+  if (updated && input.departureKm !== undefined) {
+    await db.update(trips).set({ status: 'Em prestação' }).where(and(eq(trips.id, updated.tripId), eq(trips.status, 'Liberada para viagem')));
+  }
   return updated;
 }
 
@@ -501,7 +618,10 @@ export async function listBillingReport(input: BillingReportInput) {
     const targetRate = rateFor(rateRows, limitCurrency, 'PYG', expense.occurredOn);
     const spent = sourceRate && targetRate ? Number(expense.amount) * sourceRate.value / targetRate.value : Number(expense.amount);
     const limit = configured?.limitAmount ?? null;
-    const billing = calculateBillingAmounts(spent, limit);
+    // Só gera faturamento quando o tipo de gasto está explicitamente
+    // vinculado ao cliente (na tela "Limites por cliente"). Antes, um tipo
+    // de gasto sem vínculo caía no valor cheio por engano.
+    const billing = configured ? calculateBillingAmounts(spent, limit) : { billable: 0, difference: spent };
     return { id: expense.id, tripId: expense.tripId, tripCode, clientId, clientName: clientName ?? 'Sem cliente', date: expense.occurredOn, city: expense.city, expenseTypeId: expense.expenseTypeId, expenseTypeName: expenseTypeName ?? 'Tipo de gasto', quantity: expense.quantity, sourceAmount: expense.amount, sourceCurrency, currency: limitCurrency, spent, limit, difference: billing.difference, billable: billing.billable, rateDate: sourceRate && targetRate ? (sourceRate.rateDate < targetRate.rateDate ? sourceRate.rateDate : targetRate.rateDate) : null, conversionAvailable: Boolean(sourceRate && targetRate) };
   });
   const paging = page(input);

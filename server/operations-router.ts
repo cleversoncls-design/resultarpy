@@ -54,10 +54,38 @@ const billingReportInput = pageInput.extend(reportPeriod).refine((input) => !inp
 
 export const operationsRouter = router({
   trips: router({
-    list: protectedProcedure.input(pageInput.extend({ status: tripStatus.optional(), travelerId: z.number().int().positive().optional() })).query(({ ctx, input }) => operations.listTrips({ ...input, travelerId: ctx.user.role === 'admin' ? input.travelerId : undefined, userId: ctx.user.role === 'admin' ? undefined : ctx.user.id })),
+    list: protectedProcedure.input(pageInput.extend({ status: tripStatus.optional(), travelerId: z.number().int().positive().optional(), mine: z.boolean().default(false) })).query(({ ctx, input }) => operations.listTrips({ ...input, travelerId: ctx.user.role === 'admin' && !input.mine ? input.travelerId : undefined, userId: ctx.user.role === 'admin' && !input.mine ? undefined : ctx.user.id })),
+    // Usado só para decidir se o menu do Administrativo mostra "Minhas
+    // viagens" (além de "Todas as viagens").
+    hasOwnTrips: protectedProcedure.query(({ ctx }) => operations.hasOwnTrips(ctx.user.id)),
     get: protectedProcedure.input(idInput).query(async ({ ctx, input }) => { const trip = await operations.getTrip(input.id, scopeFor(ctx.user)); if (!trip) throw notFound(); return trip; }),
     create: protectedProcedure.input(tripFields).mutation(async ({ ctx, input }) => { const isAdmin = ctx.user.role === 'admin' || ctx.user.profile === 'admin'; const travelerId = isAdmin ? input.travelerId : await operations.ensureTravelerIdByUserId(ctx.user.id); if (!travelerId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Não foi possível identificar o viajante da sessão.' }); return operations.createTrip({ ...input, travelerId }); }),
     update: protectedProcedure.input(tripFields.partial().extend({ id: idInput.shape.id })).mutation(async ({ ctx, input }) => { const { id, ...changes } = input; const trip = await operations.updateTrip(id, changes, scopeFor(ctx.user)); if (!trip) throw notFound(); return trip; }),
+    // Fluxo de fechamento: viajante envia -> admin valida comprovantes ->
+    // admin fatura (o que finaliza a viagem).
+    // O viajante marca que a viagem começou — funciona para qualquer
+    // modalidade de transporte, não só frota.
+    startTrip: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
+      const trip = await operations.startTrip(input.id, scopeFor(ctx.user));
+      if (!trip) throw notFound();
+      return trip;
+    }),
+    submitClosure: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
+      const trip = await operations.submitTripClosure(input.id, scopeFor(ctx.user));
+      if (!trip) throw notFound();
+      return trip;
+    }),
+    validateReceipts: adminProcedure.input(idInput).mutation(async ({ input }) => {
+      const trip = await operations.validateTripReceipts(input.id);
+      if (!trip) throw notFound();
+      return trip;
+    }),
+    billTrip: adminProcedure.input(idInput).mutation(async ({ input }) => {
+      const trip = await operations.billTrip(input.id);
+      if (!trip) throw notFound();
+      return trip;
+    }),
+    closureQueue: adminProcedure.input(pageInput).query(({ input }) => operations.listClosureQueue(input)),
     delete: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => { const deleted = await operations.deleteTrip(input.id, scopeFor(ctx.user)); if (!deleted) throw notFound(); return deleted; }),
     // Confirma que o depósito do adiantamento foi realizado, com o valor
     // efetivamente depositado (pode diferir do solicitado). Registra a
@@ -76,7 +104,7 @@ export const operationsRouter = router({
     }),
   }),
   approvals: router({
-    list: protectedProcedure.input(pageInput.extend({ status: z.enum(['Pendiente', 'Aprovada', 'Rejeitada']).default('Pendiente') })).query(({ ctx, input }) => operations.listTripApprovals({ ...input, userId: ctx.user.id, admin: ctx.user.role === 'admin' || ctx.user.profile === 'admin', approver: ctx.user.profile === 'approver' || ctx.user.profile === 'traveler_approver' })),
+    list: protectedProcedure.input(pageInput.extend({ status: z.enum(['Pendiente', 'Aprovada', 'Rejeitada']).default('Pendiente'), from: z.string().date().optional(), to: z.string().date().optional() })).query(({ ctx, input }) => operations.listTripApprovals({ ...input, userId: ctx.user.id, admin: ctx.user.role === 'admin' || ctx.user.profile === 'admin', approver: ctx.user.profile === 'approver' || ctx.user.profile === 'traveler_approver' })),
     history: protectedProcedure.input(approvalHistoryInput).query(async ({ ctx, input }) => {
       const { id, ...filters } = input;
       const history = await operations.listTripApprovalHistory(id, scopeFor(ctx.user), filters);
@@ -87,6 +115,13 @@ export const operationsRouter = router({
       const { id, ...filters } = input;
       const history = await operations.listTripApprovalHistory(id, scopeFor(ctx.user), { ...filters, exportAll: true });
       if (!history) throw notFound();
+      return history.items;
+    }),
+    // Histórico global — todas as viagens decididas de uma vez, sem
+    // precisar abrir cada viagem individualmente.
+    historyGlobal: protectedProcedure.input(z.object({ ...approvalHistoryFields, page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(10) }).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' })).query(({ ctx, input }) => operations.listApprovalDecisionsGlobal(scopeFor(ctx.user), input)),
+    historyGlobalExport: protectedProcedure.input(z.object(approvalHistoryFields).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' })).query(async ({ ctx, input }) => {
+      const history = await operations.listApprovalDecisionsGlobal(scopeFor(ctx.user), { ...input, page: 1, pageSize: 1000, exportAll: true });
       return history.items;
     }),
     decide: protectedProcedure.input(z.object({ tripId: idInput.shape.id, decision: approvalDecision, comment: z.string().trim().min(3, 'Comentário obrigatório').max(2000) })).mutation(async ({ ctx, input }) => {
@@ -109,8 +144,11 @@ export const operationsRouter = router({
   fleet: router({
     vehicles: router({
       list: adminProcedure.input(pageInput.extend({ status: vehicleStatus.optional() })).query(({ input }) => operations.listVehicles(input)),
+      get: adminProcedure.input(idInput).query(async ({ input }) => { const vehicle = await operations.getVehicle(input.id); if (!vehicle) throw notFound(); return vehicle; }),
       create: adminProcedure.input(z.object({ plate: z.string().min(3).max(16), brand: z.string().min(1).max(80), model: z.string().min(1).max(100), modelYear: z.number().int().min(1950).max(2200), color: z.string().max(60).nullable().optional(), unitId: z.number().int().positive(), currentKm: z.number().int().min(0).default(0), lastMaintenanceKm: z.number().int().min(0).default(0), maintenanceIntervalKm: z.number().int().positive(), fireExtinguisherExpiresOn: z.string().date().nullable().optional(), status: vehicleStatus.default('Disponível'), notes: z.string().max(2000).nullable().optional() })).mutation(({ input }) => operations.createVehicle(input)),
-      update: adminProcedure.input(z.object({ id: z.number().int().positive(), currentKm: z.number().int().min(0).optional(), status: vehicleStatus.optional(), notes: z.string().max(2000).nullable().optional() })).mutation(({ input: { id, ...input } }) => operations.updateVehicle(id, input)),
+      // Antes só aceitava mudar KM/status/observações — ampliado para
+      // permitir editar todos os campos coletados no formulário de veículo.
+      update: adminProcedure.input(z.object({ id: z.number().int().positive(), plate: z.string().min(3).max(16).optional(), brand: z.string().min(1).max(80).optional(), model: z.string().min(1).max(100).optional(), modelYear: z.number().int().min(1950).max(2200).optional(), color: z.string().max(60).nullable().optional(), unitId: z.number().int().positive().optional(), currentKm: z.number().int().min(0).optional(), lastMaintenanceKm: z.number().int().min(0).optional(), maintenanceIntervalKm: z.number().int().positive().optional(), fireExtinguisherExpiresOn: z.string().date().nullable().optional(), status: vehicleStatus.optional(), notes: z.string().max(2000).nullable().optional() })).mutation(({ input: { id, ...input } }) => operations.updateVehicle(id, input)),
     }),
     reservations: router({
       list: adminProcedure.input(pageInput.extend({ status: reservationStatus.optional() })).query(({ input }) => operations.listFleetReservations(input)),
