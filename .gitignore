@@ -67,3 +67,10 @@ Thumbs.db
 
 # arquivo com senhas reais -- nunca deve ir para o Git
 .env
+
+# Qualquer variacao de backup do .env (senhas reais) -- nunca deve
+# ir para o Git, sob nenhuma circunstancia.
+.env.backup*
+.env.incorreto*
+.env.*
+!.env.example
