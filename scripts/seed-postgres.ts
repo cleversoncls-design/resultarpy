@@ -12,6 +12,20 @@ async function seed() {
   try {
     await client.query("BEGIN");
 
+    // Usuarios fixos usados pelos testes automatizados (CI) -- sem
+    // eles, getUserByOpenId('seed-admin'/'seed-approver') retorna
+    // undefined e os testes falham.
+    await client.query(`
+      INSERT INTO users ("openId", name, role, profile)
+      VALUES
+        ('seed-admin', 'CI Admin', 'admin', 'admin'),
+        ('seed-approver', 'CI Approver', 'user', 'approver')
+      ON CONFLICT ("openId") DO UPDATE SET
+        name = EXCLUDED.name,
+        role = EXCLUDED.role,
+        profile = EXCLUDED.profile
+    `);
+
     await client.query(`
       INSERT INTO units (code, name, city)
       VALUES
