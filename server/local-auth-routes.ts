@@ -80,6 +80,10 @@ export function registerLocalAuthRoutes(app: Express) {
         respondValidation(res, "Informe a senha atual e a nova senha.");
         return;
       }
+      if (!user.email) {
+        res.status(400).json({ error: "Esta conta não possui e-mail configurado." });
+        return;
+      }
       const verified = await authenticateLocalUser(user.email, currentPassword);
       if (!verified) {
         res.status(400).json({ error: "A senha atual informada está incorreta." });
