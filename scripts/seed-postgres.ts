@@ -37,6 +37,18 @@ async function seed() {
         active = true
     `);
 
+    // Viajante de teste, vinculado ao usuario seed-approver e a unidade
+    // Sao Paulo -- necessario para os testes automatizados de CRUD de
+    // viagem (que exigem pelo menos um viajante, uma unidade, um
+    // cliente e um tipo de gasto ja cadastrados).
+    await client.query(`
+      INSERT INTO travelers (user_id, unit_id, name, document_number, can_drive, active)
+      SELECT u.id, un.id, 'Viajante Teste CI', '00000000000', true, true
+      FROM users u, units un
+      WHERE u."openId" = 'seed-approver' AND un.code = 'SP-CAP'
+      AND NOT EXISTS (SELECT 1 FROM travelers WHERE name = 'Viajante Teste CI')
+    `);
+
     await client.query(`
       INSERT INTO clients (name, billing_currency)
       VALUES

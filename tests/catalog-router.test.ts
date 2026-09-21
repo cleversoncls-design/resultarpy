@@ -33,7 +33,14 @@ describePostgres("Cadastros gerais via tRPC", () => {
   it("bloqueia os cadastros para usuário não administrativo", async () => {
     const approver = await getUserByOpenId("seed-approver");
     expect(approver?.role).toBe("user");
-    await expect(callerFor(approver!).catalogs.units.list({ page: 1, pageSize: 20, direction: "asc" })).rejects.toMatchObject({
+    // A listagem de unidades e aberta a qualquer usuario autenticado de
+    // proposito -- o viajante comum depende dela para criar uma nova
+    // solicitacao de viagem (ver app/new-trip.tsx). O que realmente e
+    // exclusivo do Administrativo e criar/editar/arquivar um cadastro,
+    // entao testamos isso em vez da listagem.
+    await expect(
+      callerFor(approver!).catalogs.units.create({ code: "TESTE-BLOQ", name: "Unidade Teste Bloqueio", city: "Teste" }),
+    ).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
   });
