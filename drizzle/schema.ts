@@ -348,6 +348,10 @@ export const tripExpenses = pgTable(
     receiptUri: text("receipt_uri"),
     notes: text("notes"),
     reviewNote: text("review_note"),
+    // Quando o Administrativo considera o comprovante inválido durante a
+    // conferência do reembolso — o gasto passa a não contar mais no total
+    // a reembolsar, e aparece como "Rejeitado" para o viajante.
+    reimbursementRejectedAt: timestamp("reimbursement_rejected_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({

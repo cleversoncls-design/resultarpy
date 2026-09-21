@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { getDb } from './db';
-import { clients, clientBillingProfileItems, clientBillingProfiles, currencyRates, expenseTypes, fleetEvents, fleetReservations, fleetWorkOrders, reimbursementLimitProfileItems, reimbursementLimitProfiles, travelers, tripApprovals, tripExpenses, trips, users, vehicles } from '../drizzle/schema';
+import { clients, clientBillingProfileItems, clientBillingProfiles, currencyRates, expenseTypes, fleetEventPhotos, fleetEvents, fleetReservations, fleetWorkOrders, reimbursementLimitProfileItems, reimbursementLimitProfiles, travelers, tripApprovals, tripExpenses, trips, users, vehicles } from '../drizzle/schema';
 
 export type PageInput = { page: number; pageSize: number; search?: string; direction?: 'asc' | 'desc' };
 type Scope = { userId?: number; admin?: boolean };
@@ -392,11 +392,25 @@ export async function listReimbursementReport(input: ReimbursementReportInput) {
     const spentInLimitCurrency = sourceRate && targetRate ? Number(expense.amount) * sourceRate.value / targetRate.value : Number(expense.amount);
     const limitAmount = configuredLimit?.limitAmount ?? null;
     const reimbursableAmount = limitAmount === null ? spentInLimitCurrency : Math.min(spentInLimitCurrency, limitAmount);
-    return { id: expense.id, tripId: expense.tripId, tripCode, clientName: clientName ?? 'Sem cliente', date: expense.occurredOn, city: expense.city, expenseTypeId: expense.expenseTypeId, expenseTypeName: expenseTypeName ?? 'Tipo de gasto', quantity: expense.quantity, unitValue: expense.unitValue, sourceAmount: expense.amount, sourceCurrency, currency: limitCurrency, spent: spentInLimitCurrency, limit: limitAmount, reimbursable: reimbursableAmount, excess: Math.max(0, spentInLimitCurrency - reimbursableAmount), profileCity: profile?.city || null, rateDate: sourceRate && targetRate ? (sourceRate.rateDate < targetRate.rateDate ? sourceRate.rateDate : targetRate.rateDate) : null, conversionAvailable: Boolean(sourceRate && targetRate) };
+    const excessInLimitCurrency = Math.max(0, spentInLimitCurrency - reimbursableAmount); const isRejected = Boolean(expense.reimbursementRejectedAt);
+    // Além dos valores na moeda do perfil de reembolso (usados para
+    // comparar com o limite corretamente), guardamos também a mesma
+    // informação sempre convertida para Guaraní, para exibição no
+    // relatório de reembolso (que deve mostrar tudo em PYG).
+    const spentPyg = sourceRate ? Number(expense.amount) * sourceRate.value : Number(expense.amount);
+    const reimbursablePyg = isRejected ? 0 : (targetRate ? reimbursableAmount * targetRate.value : reimbursableAmount);
+    const excessPyg = isRejected ? 0 : (targetRate ? excessInLimitCurrency * targetRate.value : excessInLimitCurrency);
+    return { id: expense.id, tripId: expense.tripId, tripCode, clientName: clientName ?? 'Sem cliente', date: expense.occurredOn, city: expense.city, expenseTypeId: expense.expenseTypeId, expenseTypeName: expenseTypeName ?? 'Tipo de gasto', quantity: expense.quantity, unitValue: expense.unitValue, sourceAmount: expense.amount, sourceCurrency, currency: limitCurrency, rate: sourceRate?.value ?? null, spent: spentInLimitCurrency, limit: limitAmount, reimbursable: isRejected ? 0 : reimbursableAmount, excess: isRejected ? 0 : excessInLimitCurrency, spentPyg, reimbursablePyg, excessPyg, receiptUri: expense.receiptUri, reviewNote: expense.reviewNote, reimbursementRejectedAt: expense.reimbursementRejectedAt, profileCity: profile?.city || null, rateDate: sourceRate && targetRate ? (sourceRate.rateDate < targetRate.rateDate ? sourceRate.rateDate : targetRate.rateDate) : null, conversionAvailable: Boolean(sourceRate && targetRate) };
   });
   const pageSize = Math.min(Math.max(input.pageSize, 1), 100);
   const offset = Math.max(input.page - 1, 0) * pageSize;
   return { items: items.slice(offset, offset + pageSize), page: input.page, pageSize, total: items.length, totalPages: Math.max(1, Math.ceil(items.length / pageSize)) };
+}
+
+export async function setExpenseReimbursementRejection(id: number, rejected: boolean, reviewNote: string | null) {
+  const db = await requireDb();
+  const [updated] = await db.update(tripExpenses).set({ reimbursementRejectedAt: rejected ? new Date() : null, reviewNote }).where(eq(tripExpenses.id, id)).returning();
+  return updated;
 }
 
 export async function getTripExpense(id: number, scope: Scope = {}) {
@@ -408,21 +422,36 @@ export async function getTripExpense(id: number, scope: Scope = {}) {
 
 export async function createTripExpense(input: typeof tripExpenses.$inferInsert, scope: Scope = {}) {
   const db = await requireDb();
-  if (!(await getTrip(input.tripId, scope))) return undefined;
+  const trip = await getTrip(input.tripId, scope);
+  if (!trip) return undefined;
+  // Depois que o Administrativo valida os comprovantes, a prestação fica
+  // travada para o viajante — ele não pode mais incluir, editar ou
+  // apagar despesas dessa viagem (o Administrativo continua podendo).
+  if (!scope.admin && trip.receiptsValidatedAt) throw new Error('Esta viagem já teve os comprovantes validados e não pode mais receber novas despesas.');
   const [created] = await db.insert(tripExpenses).values(input).returning();
   return created;
 }
 
 export async function updateTripExpense(id: number, input: Partial<typeof tripExpenses.$inferInsert>, scope: Scope = {}) {
   const db = await requireDb();
-  if (!(await getTripExpense(id, scope))) return undefined;
+  const expense = await getTripExpense(id, scope);
+  if (!expense) return undefined;
+  if (!scope.admin) {
+    const trip = await getTrip(expense.tripId, scope);
+    if (trip?.receiptsValidatedAt) throw new Error('Esta viagem já teve os comprovantes validados e não pode mais ser alterada.');
+  }
   const [updated] = await db.update(tripExpenses).set(input).where(eq(tripExpenses.id, id)).returning();
   return updated;
 }
 
 export async function deleteTripExpense(id: number, scope: Scope = {}) {
   const db = await requireDb();
-  if (!(await getTripExpense(id, scope))) return undefined;
+  const expense = await getTripExpense(id, scope);
+  if (!expense) return undefined;
+  if (!scope.admin) {
+    const trip = await getTrip(expense.tripId, scope);
+    if (trip?.receiptsValidatedAt) throw new Error('Esta viagem já teve os comprovantes validados e não pode mais ser alterada.');
+  }
   const [deleted] = await db.delete(tripExpenses).where(eq(tripExpenses.id, id)).returning({ id: tripExpenses.id });
   return deleted;
 }
@@ -454,11 +483,19 @@ export async function updateVehicle(id: number, input: Partial<typeof vehicles.$
   return updated;
 }
 
-export async function listFleetReservations(input: PageInput & { status?: string }) {
+export async function listFleetReservations(input: PageInput & { status?: string; vehicleId?: number }) {
   const db = await requireDb();
-  const filters = [input.status ? eq(fleetReservations.status, input.status as typeof fleetReservations.status.enumValues[number]) : undefined].filter(Boolean);
+  const filters = [
+    input.status ? eq(fleetReservations.status, input.status as typeof fleetReservations.status.enumValues[number]) : undefined,
+    input.vehicleId ? eq(fleetReservations.vehicleId, input.vehicleId) : undefined,
+  ].filter(Boolean);
   const paging = page(input);
-  const items = await db.select().from(fleetReservations).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(fleetReservations.plannedStartOn) : asc(fleetReservations.plannedStartOn)).limit(paging.limit).offset(paging.offset);
+  // Traz o codigo/destino da viagem e o nome de quem solicitou o
+  // veiculo junto -- util para listar o historico de alocacoes de um
+  // veiculo especifico (tela de gerenciar veiculo), sem precisar de
+  // consultas separadas.
+  const rows = await db.select({ reservation: fleetReservations, tripCode: trips.tripCode, destination: trips.destination, driverName: travelers.name }).from(fleetReservations).leftJoin(trips, eq(fleetReservations.tripId, trips.id)).leftJoin(travelers, eq(fleetReservations.driverId, travelers.id)).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(fleetReservations.plannedStartOn) : asc(fleetReservations.plannedStartOn)).limit(paging.limit).offset(paging.offset);
+  const items = rows.map(({ reservation, tripCode, destination, driverName }) => ({ ...reservation, tripCode, destination, driverName }));
   const [{ total }] = await db.select({ total: count() }).from(fleetReservations).where(filters.length ? and(...filters) : undefined);
   return { items, page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
@@ -483,7 +520,7 @@ export async function updateFleetReservation(id: number, input: Partial<typeof f
 // da sua reserva — diferente de updateFleetReservation (admin-only), aqui
 // verificamos que o usuário logado é de fato o viajante dono da viagem
 // associada a essa reserva antes de gravar qualquer coisa.
-export async function recordReservationKm(reservationId: number, input: { departureKm?: number; returnKm?: number }, userId: number) {
+export async function recordReservationKm(reservationId: number, input: { departureKm?: number; returnKm?: number }, userId: number, isAdmin = false) {
   const db = await requireDb();
   const [row] = await db
     .select({ reservation: fleetReservations, travelerUserId: travelers.userId })
@@ -492,7 +529,9 @@ export async function recordReservationKm(reservationId: number, input: { depart
     .innerJoin(travelers, eq(trips.travelerId, travelers.id))
     .where(eq(fleetReservations.id, reservationId))
     .limit(1);
-  if (!row || row.travelerUserId !== userId) return undefined;
+  // Antes, só o próprio viajante da reserva podia gravar o KM — o
+  // Administrativo também precisa poder fazer isso.
+  if (!row || (row.travelerUserId !== userId && !isAdmin)) return undefined;
   const changes: Partial<typeof fleetReservations.$inferInsert> = {};
   if (input.departureKm !== undefined) {
     changes.departureKm = input.departureKm;
@@ -511,6 +550,13 @@ export async function recordReservationKm(reservationId: number, input: { depart
   if (updated && input.departureKm !== undefined) {
     await db.update(trips).set({ status: 'Em prestação' }).where(and(eq(trips.id, updated.tripId), eq(trips.status, 'Liberada para viagem')));
   }
+  // O KM informado aqui também precisa refletir no cadastro do
+  // veículo — antes, essa atualização nunca acontecia, então o
+  // "KM atuais" do veículo ficava sempre desatualizado.
+  const latestKm = input.returnKm ?? input.departureKm;
+  if (updated && updated.vehicleId && latestKm !== undefined) {
+    await db.update(vehicles).set({ currentKm: latestKm }).where(eq(vehicles.id, updated.vehicleId));
+  }
   return updated;
 }
 
@@ -520,12 +566,29 @@ export async function listFleetEvents(reservationId: number | undefined, input: 
   const paging = page(input);
   const items = await db.select().from(fleetEvents).where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(fleetEvents.createdAt) : asc(fleetEvents.createdAt)).limit(paging.limit).offset(paging.offset);
   const [{ total }] = await db.select({ total: count() }).from(fleetEvents).where(filters.length ? and(...filters) : undefined);
-  return { items, page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+  // Cada evento pode ter varias fotos anexadas (tabela propria
+  // fleet_event_photos) -- antes so existia uma unica foto por evento.
+  const eventIds = items.map((item) => item.id);
+  const photosByEvent = new Map<number, string[]>();
+  if (eventIds.length) {
+    const photoRows = await db.select({ eventId: fleetEventPhotos.eventId, photoUri: fleetEventPhotos.photoUri }).from(fleetEventPhotos).where(inArray(fleetEventPhotos.eventId, eventIds));
+    for (const row of photoRows) {
+      const list = photosByEvent.get(row.eventId) ?? [];
+      list.push(row.photoUri);
+      photosByEvent.set(row.eventId, list);
+    }
+  }
+  const itemsWithPhotos = items.map((item) => ({ ...item, photos: photosByEvent.get(item.id) ?? (item.photoUri ? [item.photoUri] : []) }));
+  return { items: itemsWithPhotos, page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
 
-export async function createFleetEvent(input: typeof fleetEvents.$inferInsert) {
+export async function createFleetEvent(input: Omit<typeof fleetEvents.$inferInsert, 'photoUri'> & { photoUris?: string[] }) {
   const db = await requireDb();
-  const [created] = await db.insert(fleetEvents).values(input).returning();
+  const { photoUris, ...eventFields } = input;
+  const [created] = await db.insert(fleetEvents).values({ ...eventFields, photoUri: photoUris?.[0] ?? null }).returning();
+  if (created && photoUris && photoUris.length) {
+    await db.insert(fleetEventPhotos).values(photoUris.map((uri) => ({ eventId: created.id, photoUri: uri })));
+  }
   return created;
 }
 
@@ -622,7 +685,7 @@ export async function listBillingReport(input: BillingReportInput) {
     // vinculado ao cliente (na tela "Limites por cliente"). Antes, um tipo
     // de gasto sem vínculo caía no valor cheio por engano.
     const billing = configured ? calculateBillingAmounts(spent, limit) : { billable: 0, difference: spent };
-    return { id: expense.id, tripId: expense.tripId, tripCode, clientId, clientName: clientName ?? 'Sem cliente', date: expense.occurredOn, city: expense.city, expenseTypeId: expense.expenseTypeId, expenseTypeName: expenseTypeName ?? 'Tipo de gasto', quantity: expense.quantity, sourceAmount: expense.amount, sourceCurrency, currency: limitCurrency, spent, limit, difference: billing.difference, billable: billing.billable, rateDate: sourceRate && targetRate ? (sourceRate.rateDate < targetRate.rateDate ? sourceRate.rateDate : targetRate.rateDate) : null, conversionAvailable: Boolean(sourceRate && targetRate) };
+    return { id: expense.id, tripId: expense.tripId, tripCode, clientId, clientName: clientName ?? 'Sem cliente', date: expense.occurredOn, city: expense.city, expenseTypeId: expense.expenseTypeId, expenseTypeName: expenseTypeName ?? 'Tipo de gasto', quantity: expense.quantity, sourceAmount: expense.amount, sourceCurrency, currency: limitCurrency, rate: targetRate?.value ?? null, spent, limit, difference: billing.difference, billable: billing.billable, rateDate: sourceRate && targetRate ? (sourceRate.rateDate < targetRate.rateDate ? sourceRate.rateDate : targetRate.rateDate) : null, conversionAvailable: Boolean(sourceRate && targetRate) };
   });
   const paging = page(input);
   return { items: items.slice(paging.offset, paging.offset + paging.limit), page: input.page, pageSize: paging.limit, total: items.length, totalPages: Math.max(1, Math.ceil(items.length / paging.limit)) };

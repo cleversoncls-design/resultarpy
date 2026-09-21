@@ -1,5 +1,8 @@
 import {
   Alert,
+  Image,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -63,6 +66,64 @@ export default function TripDetailScreen() {
   const recordKmMutation = trpc.operations.fleet.reservations.recordKm.useMutation({
     onSuccess: () => { reservationQuery.refetch(); },
   });
+  // Registro de eventos (multa/avaria/outro) durante o uso do veículo —
+  // antes, o botão de anexar foto era só um texto de exemplo (nunca
+  // abria nada de verdade), e o evento em si nunca era enviado ao
+  // servidor mesmo quando o formulário era preenchido.
+  const createFleetEventMutation = trpc.operations.fleet.events.create.useMutation();
+  // Eventos ja registrados nesta viagem (multas, avarias etc.) — antes
+  // nao existia lugar nenhum para ve-los depois de criados, nem para o
+  // proprio viajante nem para o Administrativo.
+  const eventsQuery = trpc.operations.fleet.events.list.useQuery(
+    { reservationId: reservation?.id as number, page: 1, pageSize: 20, direction: 'desc' },
+    { enabled: isAuthenticated && Boolean(reservation?.id) },
+  );
+  const fleetEvents = eventsQuery.data?.items ?? [];
+  const [viewingEventPhoto, setViewingEventPhoto] = useState<string | null>(null);
+  const [eventType, setEventType] = useState<'Multa' | 'Avaria' | 'Outro'>('Outro');
+  // Permite anexar mais de uma foto por evento -- antes so aceitava uma
+  // (e nem tinha como remover uma foto escolhida por engano).
+  const [eventPhotos, setEventPhotos] = useState<{ uri: string; name: string }[]>([]);
+  const [eventPhotoError, setEventPhotoError] = useState<string | null>(null);
+  const [eventError, setEventError] = useState<string | null>(null);
+  const [eventSuccess, setEventSuccess] = useState<string | null>(null);
+  const [tripActionError, setTripActionError] = useState<string | null>(null);
+  const [tripActionSuccess, setTripActionSuccess] = useState<string | null>(null);
+  const MAX_EVENT_PHOTOS = 6;
+  const pickEventPhoto = () => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+      setEventPhotoError(t('Este recurso está disponível apenas na versão web por enquanto.'));
+      return;
+    }
+    if (eventPhotos.length >= MAX_EVENT_PHOTOS) {
+      setEventPhotoError(t('Máximo de 6 fotos por evento.'));
+      return;
+    }
+    setEventPhotoError(null);
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.onchange = () => {
+      const files = Array.from(input.files ?? []).slice(0, MAX_EVENT_PHOTOS - eventPhotos.length);
+      files.forEach((file) => {
+        if (file.size > 4 * 1024 * 1024) {
+          setEventPhotoError(t('Arquivo muito grande. Escolha uma foto de até 4MB.'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === 'string') {
+            setEventPhotos((current) => current.length >= MAX_EVENT_PHOTOS ? current : [...current, { uri: reader.result as string, name: file.name }]);
+          }
+        };
+        reader.onerror = () => setEventPhotoError(t('Não foi possível ler o arquivo selecionado.'));
+        reader.readAsDataURL(file);
+      });
+    };
+    input.click();
+  };
+  const removeEventPhoto = (uri: string) => setEventPhotos((current) => current.filter((photo) => photo.uri !== uri));
 
   // Marca a viagem como "Em prestação" — funciona mesmo sem veículo da
   // frota (Veículo Próprio/Ônibus), diferente do recordKm acima que só
@@ -266,14 +327,16 @@ export default function TripDetailScreen() {
     updateHotelNoteMutation.mutate({ id: trip.id, hotelNote: hotelNoteValue.trim() || null });
   };
 
+  // Alert.alert() não funciona na web — as confirmações abaixo eram
+  // silenciosamente ignoradas ali; agora usam o mesmo aviso inline que
+  // já usamos no resto da tela.
   const startTrip = () => {
+    setTripActionError(null);
+    setTripActionSuccess(null);
     const hasVehicle = Boolean(reservation?.id);
     const km = parseKm(departureKm);
     if (hasVehicle && !km) {
-      Alert.alert(
-        "Informe o KM de saída",
-        "Digite a quilometragem antes de iniciar a viagem.",
-      );
+      setTripActionError(t('Digite a quilometragem de saída antes de iniciar a viagem.'));
       return;
     }
     setStarted(true);
@@ -281,30 +344,48 @@ export default function TripDetailScreen() {
       recordKmMutation.mutate({ reservationId: reservation.id, departureKm: km });
     }
     startTripMutation.mutate({ id: trip.id });
-    Alert.alert(
-      "Viagem iniciada",
-      hasVehicle ? `Saída registrada em ${km.toLocaleString("pt-BR")} km.` : "A viagem foi marcada como em andamento.",
-    );
+    setTripActionSuccess(hasVehicle ? `${t('Saída registrada em')} ${km.toLocaleString("pt-BR")} km.` : t('A viagem foi marcada como em andamento.'));
   };
 
   const finishTrip = () => {
+    setTripActionError(null);
+    setTripActionSuccess(null);
     const km = parseKm(returnKm);
     if (!km || km < parseKm(departureKm)) {
-      Alert.alert(
-        "Confira o KM de retorno",
-        "O KM de retorno deve ser maior ou igual ao KM de saída.",
-      );
+      setTripActionError(t('O KM de retorno deve ser maior ou igual ao KM de saída.'));
       return;
     }
     setFinished(true);
     if (reservation?.id) {
       recordKmMutation.mutate({ reservationId: reservation.id, returnKm: km });
     }
-    Alert.alert(
-      hasEvent ? "Viagem finalizada com evento" : "Viagem finalizada",
-      hasEvent
-        ? "O veículo foi sinalizado para avaliação do Administrativo."
-        : `Percurso registrado: ${(km - parseKm(departureKm)).toLocaleString("pt-BR")} km.`,
+    setTripActionSuccess(`${t('Percurso registrado')}: ${(km - parseKm(departureKm)).toLocaleString("pt-BR")} km.`);
+  };
+
+  // Um evento (multa, avaria, outro) pode acontecer a qualquer momento
+  // durante o uso do veiculo, nao so na hora de finalizar a viagem --
+  // por isso salva na hora, independente de iniciar/finalizar, e o
+  // formulario limpa depois para permitir registrar mais de um evento.
+  const saveEvent = () => {
+    setEventError(null);
+    if (!eventNote.trim()) {
+      setEventError(t('Descreva o evento antes de salvar.'));
+      return;
+    }
+    if (!reservation?.id) return;
+    createFleetEventMutation.mutate(
+      { reservationId: reservation.id, eventType, description: eventNote.trim(), photoUris: eventPhotos.map((photo) => photo.uri) },
+      {
+        onSuccess: () => {
+          setEventNote('');
+          setEventPhotos([]);
+          setEventType('Outro');
+          setHasEvent(false);
+          setEventSuccess(t('Evento registrado para avaliação do Administrativo.'));
+          void eventsQuery.refetch();
+        },
+        onError: (error) => setEventError(error.message),
+      },
     );
   };
 
@@ -378,7 +459,7 @@ export default function TripDetailScreen() {
               </Text>
               {tripRecord.advanceConfirmedAt ? (
                 <Text className="mt-1 text-xs text-success">
-                  {formatCurrency(Number(tripRecord.advanceConfirmedAmount ?? advanceValue))} depositado em {new Date(tripRecord.advanceConfirmedAt as string).toLocaleDateString("pt-BR")}
+                  {formatCurrency(Number(tripRecord.advanceConfirmedAmount ?? advanceValue))} {t('depositado em')} {new Date(tripRecord.advanceConfirmedAt as string).toLocaleDateString("pt-BR")}
                 </Text>
               ) : null}
             </View>
@@ -397,7 +478,7 @@ export default function TripDetailScreen() {
                 {tripRecord.requiresFleetVehicle ? (
                   <View>
                     <View className="flex-row items-center justify-between">
-                      <Text className="font-bold text-foreground">🚗 Veículo da frota</Text>
+                      <Text className="font-bold text-foreground">🚗 {t('Veículo da frota')}</Text>
                       <Text className={vehiclePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
                         {vehiclePending ? "PENDENTE" : "CONFIRMADO"}
                       </Text>
@@ -409,7 +490,7 @@ export default function TripDetailScreen() {
                     ) : (
                       <View className="mt-3 gap-2">
                         <PrimaryButton
-                          label={showVehiclePicker ? "Ocultar veículos disponíveis" : "Alocar veículo"}
+                          label={showVehiclePicker ? t("Ocultar veículos disponíveis") : t("Alocar veículo")}
                           onPress={createReservationMutation.isPending || updateReservationMutation.isPending ? undefined : () => setShowVehiclePicker((current) => !current)}
                         />
                         <MutationFeedback
@@ -490,7 +571,7 @@ export default function TripDetailScreen() {
                 {tripRecord.hasAdvance ? (
                   <View className="border-t border-border pt-5">
                     <View className="flex-row items-center justify-between">
-                      <Text className="font-bold text-foreground">💰 Adiantamento</Text>
+                      <Text className="font-bold text-foreground">💰 {t('Adiantamento')}</Text>
                       <Text className={advancePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
                         {advancePending ? "PENDENTE" : "CONFIRMADO"}
                       </Text>
@@ -507,7 +588,7 @@ export default function TripDetailScreen() {
                           className="rounded-xl border border-border bg-background px-4 py-3 text-foreground"
                         />
                         <PrimaryButton
-                          label={confirmAdvanceMutation.isPending ? "Confirmando..." : "Confirmar depósito realizado"}
+                          label={confirmAdvanceMutation.isPending ? t("Confirmando...") : t("Confirmar depósito realizado")}
                           onPress={confirmAdvanceMutation.isPending ? undefined : confirmAdvance}
                         />
                         <MutationFeedback
@@ -521,7 +602,7 @@ export default function TripDetailScreen() {
                       </View>
                     ) : (
                       <Text className="mt-1 text-sm text-muted">
-                        {formatCurrency(Number(tripRecord.advanceConfirmedAmount ?? advanceValue))} depositado em {new Date(tripRecord.advanceConfirmedAt as string).toLocaleString("pt-BR")}.
+                        {formatCurrency(Number(tripRecord.advanceConfirmedAmount ?? advanceValue))} {t('depositado em')} {new Date(tripRecord.advanceConfirmedAt as string).toLocaleString("pt-BR")}.
                       </Text>
                     )}
                   </View>
@@ -546,7 +627,7 @@ export default function TripDetailScreen() {
                           className="min-h-[80px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
                         />
                         <PrimaryButton
-                          label={updateHotelNoteMutation.isPending ? "Salvando..." : "Salvar dados do hotel"}
+                          label={updateHotelNoteMutation.isPending ? t("Salvando...") : t("Salvar dados do hotel")}
                           onPress={updateHotelNoteMutation.isPending ? undefined : () => { saveHotelNote(); setEditingHotel(false); }}
                         />
                         <MutationFeedback
@@ -578,29 +659,29 @@ export default function TripDetailScreen() {
               <View className="rounded-2xl border border-border bg-surface p-5 gap-5">
                 <View>
                   <View className="flex-row items-center justify-between">
-                    <Text className="font-bold text-foreground">📥 Prestação enviada</Text>
+                    <Text className="font-bold text-foreground">📥 {t('Prestação enviada')}</Text>
                     <Text className="text-xs font-bold text-success">CONFIRMADO</Text>
                   </View>
                   <Text className="mt-1 text-sm text-muted">
-                    Enviada pelo viajante em {new Date(tripRecord.closureSubmittedAt as string).toLocaleString("pt-BR")}.
+                    {t('Enviada pelo viajante em')} {new Date(tripRecord.closureSubmittedAt as string).toLocaleString("pt-BR")}.
                   </Text>
                 </View>
 
                 <View className="border-t border-border pt-5">
                   <View className="flex-row items-center justify-between">
-                    <Text className="font-bold text-foreground">🧾 Validação dos comprovantes</Text>
+                    <Text className="font-bold text-foreground">🧾 {t('Validação dos comprovantes')}</Text>
                     <Text className={tripRecord.receiptsValidatedAt ? "text-xs font-bold text-success" : "text-xs font-bold text-warning"}>
                       {tripRecord.receiptsValidatedAt ? "CONFIRMADO" : "PENDENTE"}
                     </Text>
                   </View>
                   {tripRecord.receiptsValidatedAt ? (
                     <Text className="mt-1 text-sm text-muted">
-                      Validado em {new Date(tripRecord.receiptsValidatedAt as string).toLocaleString("pt-BR")}.
+                      {t('Validado em')} {new Date(tripRecord.receiptsValidatedAt as string).toLocaleString("pt-BR")}.
                     </Text>
                   ) : (
                     <View className="mt-3">
                       <PrimaryButton
-                        label={validateReceiptsMutation.isPending ? "Validando..." : "Validar comprovantes"}
+                        label={validateReceiptsMutation.isPending ? t("Validando...") : t("Validar comprovantes")}
                         onPress={validateReceiptsMutation.isPending ? undefined : () => validateReceiptsMutation.mutate({ id: trip.id })}
                       />
                       <MutationFeedback
@@ -617,21 +698,21 @@ export default function TripDetailScreen() {
 
                 <View className="border-t border-border pt-5">
                   <View className="flex-row items-center justify-between">
-                    <Text className="font-bold text-foreground">💳 Faturamento ao cliente</Text>
+                    <Text className="font-bold text-foreground">💳 {t('Faturamento ao cliente')}</Text>
                     <Text className={tripRecord.billedAt ? "text-xs font-bold text-success" : "text-xs font-bold text-warning"}>
                       {tripRecord.billedAt ? "CONFIRMADO" : "PENDENTE"}
                     </Text>
                   </View>
                   {tripRecord.billedAt ? (
                     <Text className="mt-1 text-sm text-muted">
-                      Faturado em {new Date(tripRecord.billedAt as string).toLocaleString("pt-BR")}. Viagem finalizada.
+                      {t('Faturado em')} {new Date(tripRecord.billedAt as string).toLocaleString("pt-BR")}. {t('Viagem finalizada.')}
                     </Text>
                   ) : !tripRecord.receiptsValidatedAt ? (
                     <Text className="mt-1 text-sm text-muted">{t('Valide os comprovantes antes de faturar.')}</Text>
                   ) : (
                     <View className="mt-3">
                       <PrimaryButton
-                        label={billTripMutation.isPending ? "Faturando..." : "Faturar gastos"}
+                        label={billTripMutation.isPending ? t("Faturando...") : t("Faturar gastos")}
                         onPress={billTripMutation.isPending ? undefined : () => billTripMutation.mutate({ id: trip.id })}
                       />
                       <MutationFeedback
@@ -662,18 +743,18 @@ export default function TripDetailScreen() {
                 <Text className="font-bold text-foreground">
                   {vehicleAllocated
                     ? `${reservation?.vehicleBrand} ${reservation?.vehicleModel}`
-                    : "Veículo não associado"}
+                    : t("Veículo não associado")}
                 </Text>
                 <Text className="mt-1 text-sm text-muted">
                   {vehicleAllocated
-                    ? `${reservation?.vehiclePlate} · Condutor: ${reservation?.driverName}`
-                    : "Solicitação enviada ao Administrativo"}
+                    ? `${reservation?.vehiclePlate} · ${t('Condutor')}: ${reservation?.driverName}`
+                    : t("Solicitação enviada ao Administrativo")}
                 </Text>
               </View>
             </View>
             <View className="mt-5 gap-3">
               <Text className="text-xs font-bold uppercase tracking-widest text-muted">
-                KM do veículo
+                {t('KM do veículo')}
               </Text>
               <View className="flex-row gap-3">
                 <View className="flex-1">
@@ -712,20 +793,22 @@ export default function TripDetailScreen() {
                     className="rounded-xl p-3"
                   >
                     <Text className="font-semibold text-success">
-                      Viagem finalizada e quilometragem registrada.
+                      {t('Viagem finalizada e quilometragem registrada.')}
                     </Text>
                   </View>
                 )
               ) : null}
+              {tripActionError ? <Text style={{ color: colors.error }} className="mt-3 text-sm font-semibold">{tripActionError}</Text> : null}
+              {tripActionSuccess ? <Text style={{ color: colors.success }} className="mt-3 text-sm font-semibold">{tripActionSuccess}</Text> : null}
             </View>
             <View className="mt-6 border-t border-border pt-5">
               <View className="flex-row items-center justify-between">
                 <View>
                   <Text className="font-bold text-foreground">
-                    Registro de eventos
+                    {t('Registro de eventos')}
                   </Text>
                   <Text className="mt-1 text-xs text-muted">
-                    Multas, avarias ou outros acontecimentos
+                    {t('Multas, avarias ou outros acontecimentos')}
                   </Text>
                 </View>
                 <Pressable
@@ -746,6 +829,23 @@ export default function TripDetailScreen() {
               </View>
               {hasEvent ? (
                 <View className="mt-4 gap-3">
+                  <View className="flex-row gap-2">
+                    {(['Multa', 'Avaria', 'Outro'] as const).map((option) => (
+                      <Pressable
+                        key={option}
+                        onPress={() => setEventType(option)}
+                        style={({ pressed }) => ({
+                          flex: 1,
+                          borderColor: eventType === option ? colors.warning : colors.border,
+                          backgroundColor: eventType === option ? `${colors.warning}14` : colors.surface,
+                          opacity: pressed ? 0.72 : 1,
+                        })}
+                        className="rounded-xl border p-2"
+                      >
+                        <Text style={{ color: eventType === option ? colors.warning : colors.foreground }} className="text-center text-xs font-bold">{t(option)}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
                   <TextInput
                     value={eventNote}
                     onChangeText={setEventNote}
@@ -755,12 +855,7 @@ export default function TripDetailScreen() {
                     className="min-h-[90px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
                   />
                   <Pressable
-                    onPress={() =>
-                      Alert.alert(
-                        "Anexo de fotos",
-                        "A seleção de fotos da avaria será aberta neste ponto.",
-                      )
-                    }
+                    onPress={pickEventPhoto}
                     style={({ pressed }) => [
                       {
                         borderColor: colors.border,
@@ -775,48 +870,110 @@ export default function TripDetailScreen() {
                     ]}
                   >
                     <IconSymbol
-                      name="camera.fill"
+                      name={eventPhotos.length ? "checkmark.circle.fill" : "camera.fill"}
                       size={18}
-                      color={colors.primary}
+                      color={eventPhotos.length ? colors.success : colors.primary}
                     />
                     <Text className="ml-2 font-bold text-primary">
-                      Anexar fotos da avaria
+                      {eventPhotos.length ? `${eventPhotos.length} ${t('foto(s) selecionada(s)')} — ${t('toque para adicionar mais')}` : t('Anexar fotos da avaria')}
                     </Text>
+                  </Pressable>
+                  {eventPhotos.length ? (
+                    <View className="flex-row flex-wrap gap-2">
+                      {eventPhotos.map((photo) => (
+                        <View key={photo.uri} style={{ width: 84, height: 84 }}>
+                          <Image source={{ uri: photo.uri }} style={{ width: 84, height: 84, borderRadius: 10 }} resizeMode="cover" />
+                          <Pressable
+                            onPress={() => removeEventPhoto(photo.uri)}
+                            style={{ position: 'absolute', top: -6, right: -6, backgroundColor: colors.error, borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>×</Text>
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+                  {eventPhotoError ? <Text style={{ color: colors.error }} className="text-xs font-semibold">{eventPhotoError}</Text> : null}
+                  {eventError ? <Text style={{ color: colors.error }} className="text-xs font-semibold">{eventError}</Text> : null}
+                  <Pressable
+                    onPress={saveEvent}
+                    disabled={createFleetEventMutation.isPending}
+                    style={({ pressed }) => ({
+                      backgroundColor: colors.warning,
+                      borderRadius: 12,
+                      minHeight: 46,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed || createFleetEventMutation.isPending ? 0.75 : 1,
+                    })}
+                  >
+                    <Text className="font-bold text-white">{createFleetEventMutation.isPending ? t('Salvando...') : t('Salvar evento')}</Text>
                   </Pressable>
                 </View>
               ) : null}
+              {eventSuccess ? <Text style={{ color: colors.success }} className="mt-3 text-sm font-semibold">{eventSuccess}</Text> : null}
             </View>
           </View>
+
+          {fleetEvents.length > 0 ? (
+            <>
+              <SectionHeader title={t('Eventos registrados')} />
+              <View className="mb-2 gap-3">
+                {fleetEvents.map((event) => (
+                  <View key={event.id} className="rounded-2xl border border-border bg-surface p-4">
+                    <View className="flex-row items-start justify-between">
+                      <View className="flex-1 pr-3">
+                        <View style={{ backgroundColor: `${colors.warning}18` }} className="mb-2 self-start rounded-full px-2 py-0.5">
+                          <Text style={{ color: colors.warning }} className="text-[10px] font-bold uppercase">{t(event.eventType)}</Text>
+                        </View>
+                        <Text className="text-sm text-foreground">{event.description}</Text>
+                        <Text className="mt-1 text-xs text-muted">{new Date(event.createdAt).toLocaleString('pt-BR')}</Text>
+                      </View>
+                    </View>
+                    {(event as any).photos && (event as any).photos.length ? (
+                      <View className="mt-3 flex-row flex-wrap gap-2">
+                        {(event as any).photos.map((photoUri: string, index: number) => (
+                          <Pressable key={`${event.id}-${index}`} onPress={() => setViewingEventPhoto(photoUri)}>
+                            <Image source={{ uri: photoUri }} style={{ width: 56, height: 56, borderRadius: 10 }} resizeMode="cover" />
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : null}
 
           <SectionHeader title={t('Linha do tempo')} />
           <View className="rounded-2xl border border-border bg-surface p-5">
             <TimelineItem
-              title={t('Solicitação criada')}
+              title="Solicitação criada"
               detail="Registrada pelo viajante"
               done
             />
             <TimelineItem
-              title={t('Aprovada')}
+              title="Aprovada"
               detail={isApprovedOrLater ? "Concluída" : "Aguardando aprovação"}
               done={isApprovedOrLater}
             />
             <TimelineItem
-              title={t('Liberada para viagem')}
+              title="Liberada para viagem"
               detail={isReleasedOrLater ? "Concluída" : "Aguardando pendências"}
               done={isReleasedOrLater}
             />
             <TimelineItem
-              title={t('Prestação de contas')}
+              title="Prestação de contas"
               detail={Boolean(tripRecord.closureSubmittedAt) ? "Concluída" : "Em andamento"}
               done={Boolean(tripRecord.closureSubmittedAt)}
             />
             <TimelineItem
-              title={t('Validação dos comprovantes')}
+              title="Validação dos comprovantes"
               detail={tripRecord.receiptsValidatedAt ? "Concluída" : "Aguardando envio/validação"}
               done={Boolean(tripRecord.receiptsValidatedAt)}
             />
             <TimelineItem
-              title={t('Viagem finalizada')}
+              title="Viagem finalizada"
               detail={tripRecord.billedAt ? "Faturada ao cliente" : "Aguardando faturamento"}
               done={Boolean(tripRecord.billedAt) || isFinishedStatus}
               last
@@ -824,14 +981,23 @@ export default function TripDetailScreen() {
           </View>
           <SectionHeader
             title={t('Despesas')}
-            action={`${tripExpenses.length} itens`}
+            action={`${tripExpenses.length} ${t('itens')}`}
           />
-          {!isAdmin ? (
+          {!isAdmin && !tripRecord.receiptsValidatedAt ? (
             <PrimaryButton
               label={t('Adicionar despesa')}
               onPress={() => router.push({ pathname: "/expenses", params: { tripId: String(trip.id) } })}
             />
-          ) : null}
+          ) : (
+            // O Administrativo não lança despesas, e o viajante perde a
+            // opção de editar assim que os comprovantes são validados —
+            // nos dois casos, usa a mesma tela de despesas em modo
+            // só-leitura (com "Apagar" liberado apenas pro Administrativo).
+            <PrimaryButton
+              label={t('Ver despesas')}
+              onPress={() => router.push({ pathname: "/expenses", params: { tripId: String(trip.id) } })}
+            />
+          )}
 
           {!isAdmin ? (
             <View className="mt-4">
@@ -844,7 +1010,7 @@ export default function TripDetailScreen() {
               ) : (
                 <>
                   <PrimaryButton
-                    label={submitClosureMutation.isPending ? "Enviando..." : "Enviar fechamento"}
+                    label={submitClosureMutation.isPending ? t("Enviando...") : t("Enviar fechamento")}
                     onPress={submitClosureMutation.isPending ? undefined : () => submitClosureMutation.mutate({ id: trip.id })}
                   />
                   <MutationFeedback
@@ -861,6 +1027,7 @@ export default function TripDetailScreen() {
           ) : null}
         </ScrollView>
       </View>
+      <EventPhotoModal uri={viewingEventPhoto} onClose={() => setViewingEventPhoto(null)} />
     </ScreenContainer>
   );
 }
@@ -881,10 +1048,30 @@ function MutationFeedback({
   successLabel: string;
 }) {
   const colors = useColors();
-  if (isPending) return <Text className="mt-2 text-xs font-semibold text-muted">{pendingLabel}</Text>;
-  if (isError) return <Text style={{ color: colors.error }} className="mt-2 text-xs font-semibold">{errorMessage ?? "Ocorreu um erro. Tente novamente."}</Text>;
-  if (isSuccess) return <Text style={{ color: colors.success }} className="mt-2 text-xs font-semibold">✓ {successLabel}</Text>;
+  const { t } = useLanguage();
+  if (isPending) return <Text className="mt-2 text-xs font-semibold text-muted">{t(pendingLabel)}</Text>;
+  if (isError) return <Text style={{ color: colors.error }} className="mt-2 text-xs font-semibold">{errorMessage ? errorMessage : t("Ocorreu um erro. Tente novamente.")}</Text>;
+  if (isSuccess) return <Text style={{ color: colors.success }} className="mt-2 text-xs font-semibold">✓ {t(successLabel)}</Text>;
   return null;
+}
+
+function EventPhotoModal({ uri, onClose }: { uri: string | null; onClose: () => void }) {
+  const colors = useColors();
+  const { t } = useLanguage();
+  if (!uri) return null;
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable onPress={onClose} className="flex-1 items-center justify-center bg-black/70 px-5">
+        <Pressable onPress={(event) => event.stopPropagation()} style={{ backgroundColor: colors.surface }} className="max-h-[85%] w-full max-w-2xl rounded-2xl p-4">
+          <View className="mb-3 flex-row items-center justify-between">
+            <Text className="text-base font-bold text-foreground">{t('Foto do evento')}</Text>
+            <Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}><Text className="text-2xl text-muted">×</Text></Pressable>
+          </View>
+          <Image source={{ uri }} style={{ width: '100%', height: 420, borderRadius: 12 }} resizeMode="contain" />
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 }
 
 function TimelineItem({
@@ -899,6 +1086,7 @@ function TimelineItem({
   last?: boolean;
 }) {
   const colors = useColors();
+  const { t } = useLanguage();
   return (
     <View className="flex-row">
       <View className="items-center">
@@ -921,8 +1109,8 @@ function TimelineItem({
         ) : null}
       </View>
       <View className="ml-3 pb-3">
-        <Text className="font-bold text-foreground">{title}</Text>
-        <Text className="mt-1 text-xs text-muted">{detail}</Text>
+        <Text className="font-bold text-foreground">{t(title)}</Text>
+        <Text className="mt-1 text-xs text-muted">{t(detail)}</Text>
       </View>
     </View>
   );

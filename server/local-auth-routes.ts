@@ -63,6 +63,41 @@ export function registerLocalAuthRoutes(app: Express) {
     res.json({ success: true });
   });
 
+  // Autoatendimento: o próprio usuário troca a senha, confirmando a atual
+  // — antes disso não existia, só o Administrativo podia redefinir senha
+  // de qualquer pessoa (sem pedir a senha atual, já que é uma ação de
+  // confiança elevada do admin, diferente desta aqui).
+  app.post("/api/auth/local/me/change-password", async (req: Request, res: Response) => {
+    try {
+      const user = await getLocalUserFromRequest(req);
+      if (!user) {
+        res.status(401).json({ error: "Sessão expirada. Entre novamente." });
+        return;
+      }
+      const currentPassword = stringValue(req.body?.currentPassword);
+      const newPassword = stringValue(req.body?.newPassword);
+      if (!currentPassword || !newPassword) {
+        respondValidation(res, "Informe a senha atual e a nova senha.");
+        return;
+      }
+      const verified = await authenticateLocalUser(user.email, currentPassword);
+      if (!verified) {
+        res.status(400).json({ error: "A senha atual informada está incorreta." });
+        return;
+      }
+      await resetLocalUserPassword(user.id, newPassword);
+      // resetLocalUserPassword encerra as sessões existentes por segurança
+      // (inclusive esta) — autenticamos de novo com a senha nova para que
+      // quem acabou de trocar a própria senha não seja deslogado na hora.
+      const relogged = await authenticateLocalUser(user.email, newPassword);
+      if (relogged) setLocalSessionCookie(req, res, relogged.sessionToken);
+      res.json({ success: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Não foi possível trocar a senha.";
+      res.status(message.startsWith("A senha") ? 400 : 500).json({ error: message });
+    }
+  });
+
   app.post("/api/auth/local/users", async (req: Request, res: Response) => {
     try {
       const admin = await getLocalUserFromRequest(req);

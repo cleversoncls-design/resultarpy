@@ -167,11 +167,16 @@ export default function NewTripScreen() {
     try {
       if (isEditing) {
         await updateTrip.mutateAsync({ id: editId, ...payload });
-        Alert.alert(t('Viagem atualizada'), t('As alterações foram salvas na solicitação.'), [{ text: t('Ver minhas viagens'), onPress: () => router.replace('/(tabs)/trips') }]);
       } else {
         await createTrip.mutateAsync(payload);
-        Alert.alert(t('Solicitação enviada'), t('A viagem foi encaminhada ao aprovador da área.'), [{ text: t('Ver minhas viagens'), onPress: () => router.replace('/(tabs)/trips') }]);
       }
+      // Alert.alert() não funciona na web — a viagem já era criada/
+      // atualizada com sucesso, mas nada aparecia na tela, levando a
+      // pessoa a clicar de novo (o que gerava um código de viagem
+      // duplicado no segundo envio). Agora navega direto, sem depender
+      // de um aviso que não aparece.
+      router.replace('/(tabs)/trips');
+      return;
     } catch (error) {
       const message = error instanceof Error ? error.message : t('Tente novamente.');
       setSubmitError(message);

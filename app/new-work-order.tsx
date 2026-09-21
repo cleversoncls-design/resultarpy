@@ -130,7 +130,7 @@ export default function NewWorkOrderScreen() {
       <Text className="mb-2 text-xs font-semibold text-muted">{t('Status')}</Text>
       <View className="mb-4 flex-row gap-2"><Choice label="Concluída" selected={status === 'Concluída'} onPress={() => setStatus('Concluída')} /><Choice label="Em andamento" selected={status === 'Em andamento'} onPress={() => setStatus('Em andamento')} /></View>
       <Text className="mb-2 text-xs font-semibold text-muted">{t('Observação')}</Text>
-      <TextInput value={observation} onChangeText={setObservation} multiline placeholder="Descreva os serviços executados, peças trocadas ou recomendações..." placeholderTextColor={colors.muted} className="min-h-[110px] rounded-xl border border-border bg-background px-4 py-3 text-foreground" />
+      <TextInput value={observation} onChangeText={setObservation} multiline placeholder={t("Descreva os serviços executados, peças trocadas ou recomendações...")} placeholderTextColor={colors.muted} className="min-h-[110px] rounded-xl border border-border bg-background px-4 py-3 text-foreground" />
     </View>
 
     {feedback ? (

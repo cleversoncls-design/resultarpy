@@ -47,7 +47,7 @@ const tripFields = z.object({
       ctx.addIssue({ code: 'custom', path: ['flightDetails'], message: 'Dados do passageiro são obrigatórios para passagem aérea.' });
     }
   });
-const expenseFields = z.object({ tripId: z.number().int().positive(), expenseTypeId: z.number().int().positive(), occurredOn: z.string().date(), city: z.string().min(1).max(120), quantity: z.string().default('1'), unitValue: z.string(), currency: currencyCode.default('BRL'), expenseGroup: z.string().max(120).nullable().optional(), prepaid: z.boolean().default(false), billable: z.boolean().default(true), receiptUri: z.string().url().nullable().optional(), notes: z.string().max(2000).nullable().optional(), reviewNote: z.string().max(2000).nullable().optional() });
+const expenseFields = z.object({ tripId: z.number().int().positive(), expenseTypeId: z.number().int().positive(), occurredOn: z.string().date(), city: z.string().min(1).max(120), quantity: z.string().default('1'), unitValue: z.string(), currency: currencyCode.default('BRL'), expenseGroup: z.string().max(120).nullable().optional(), prepaid: z.boolean().default(false), billable: z.boolean().default(true), receiptUri: z.string().max(6000000, 'O comprovante é grande demais. Tente uma foto mais leve.').nullable().optional(), notes: z.string().max(2000).nullable().optional(), reviewNote: z.string().max(2000).nullable().optional() });
 const reportPeriod = { tripId: z.number().int().positive().optional(), clientId: z.number().int().positive().optional(), from: z.string().date().optional(), to: z.string().date().optional() };
 const reimbursementReportInput = pageInput.extend(reportPeriod).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
 const billingReportInput = pageInput.extend(reportPeriod).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
@@ -133,7 +133,7 @@ export const operationsRouter = router({
   expenses: router({
     list: protectedProcedure.input(pageInput.extend({ tripId: z.number().int().positive().optional() })).query(({ ctx, input }) => operations.listTripExpenses(input.tripId, { ...input, userId: ctx.user.role === 'admin' ? undefined : ctx.user.id })),
     get: protectedProcedure.input(idInput).query(async ({ ctx, input }) => { const expense = await operations.getTripExpense(input.id, scopeFor(ctx.user)); if (!expense) throw notFound(); return expense; }),
-    create: protectedProcedure.input(expenseFields).mutation(async ({ ctx, input }) => { const amount = (Number(input.quantity) * Number(input.unitValue)).toFixed(2); const created = await operations.createTripExpense({ ...input, amount }, scopeFor(ctx.user)); if (!created) throw forbidden(); return created; }),
+    create: protectedProcedure.input(expenseFields).mutation(async ({ ctx, input }) => { const amount = (Number(input.quantity) * Number(input.unitValue)).toFixed(2); const created = await operations.createTripExpense({ ...input, amount }, scopeFor(ctx.user)); if (!created) throw forbidden(); return created; }), setReimbursementRejection: adminProcedure.input(z.object({ id: z.number().int().positive(), rejected: z.boolean(), reviewNote: z.string().max(2000).nullable().optional() })).mutation(({ input }) => operations.setExpenseReimbursementRejection(input.id, input.rejected, input.reviewNote ?? null)),
     update: protectedProcedure.input(expenseFields.partial().extend({ id: idInput.shape.id })).mutation(async ({ ctx, input }) => { const { id, quantity, unitValue, ...changes } = input; const amount = quantity !== undefined || unitValue !== undefined ? (Number(quantity ?? 1) * Number(unitValue ?? 0)).toFixed(2) : undefined; const updated = await operations.updateTripExpense(id, { ...changes, ...(amount !== undefined ? { amount } : {}) }, scopeFor(ctx.user)); if (!updated) throw notFound(); return updated; }),
     delete: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => { const deleted = await operations.deleteTripExpense(input.id, scopeFor(ctx.user)); if (!deleted) throw notFound(); return deleted; }),
   }),
@@ -151,7 +151,7 @@ export const operationsRouter = router({
       update: adminProcedure.input(z.object({ id: z.number().int().positive(), plate: z.string().min(3).max(16).optional(), brand: z.string().min(1).max(80).optional(), model: z.string().min(1).max(100).optional(), modelYear: z.number().int().min(1950).max(2200).optional(), color: z.string().max(60).nullable().optional(), unitId: z.number().int().positive().optional(), currentKm: z.number().int().min(0).optional(), lastMaintenanceKm: z.number().int().min(0).optional(), maintenanceIntervalKm: z.number().int().positive().optional(), fireExtinguisherExpiresOn: z.string().date().nullable().optional(), status: vehicleStatus.optional(), notes: z.string().max(2000).nullable().optional() })).mutation(({ input: { id, ...input } }) => operations.updateVehicle(id, input)),
     }),
     reservations: router({
-      list: adminProcedure.input(pageInput.extend({ status: reservationStatus.optional() })).query(({ input }) => operations.listFleetReservations(input)),
+      list: adminProcedure.input(pageInput.extend({ status: reservationStatus.optional(), vehicleId: z.number().int().positive().optional() })).query(({ input }) => operations.listFleetReservations(input)),
       // Retorna a reserva de frota vinculada a uma viagem específica (com
       // dados do veículo e do condutor), para exibição na tela de detalhes
       // da viagem. Respeita o mesmo escopo de acesso de trips.get.
@@ -165,14 +165,15 @@ export const operationsRouter = router({
       // O próprio viajante registra o KM de saída/retorno da sua reserva.
       recordKm: protectedProcedure.input(z.object({ reservationId: z.number().int().positive(), departureKm: z.number().int().min(0).optional(), returnKm: z.number().int().min(0).optional() })).mutation(async ({ ctx, input }) => {
         const { reservationId, ...changes } = input;
-        const updated = await operations.recordReservationKm(reservationId, changes, ctx.user.id);
+        const isAdmin = ctx.user.role === 'admin' || ctx.user.profile === 'admin';
+        const updated = await operations.recordReservationKm(reservationId, changes, ctx.user.id, isAdmin);
         if (!updated) throw forbidden();
         return updated;
       }),
     }),
     events: router({
-      list: adminProcedure.input(pageInput.extend({ reservationId: z.number().int().positive().optional() })).query(({ input }) => operations.listFleetEvents(input.reservationId, input)),
-      create: adminProcedure.input(z.object({ reservationId: z.number().int().positive(), eventType: z.enum(['Multa', 'Avaria', 'Outro']), description: z.string().min(1).max(4000), photoUri: z.string().url().nullable().optional() })).mutation(({ input }) => operations.createFleetEvent(input)),
+      list: protectedProcedure.input(pageInput.extend({ reservationId: z.number().int().positive().optional() })).query(({ ctx, input }) => { if (input.reservationId === undefined && ctx.user.role !== 'admin' && ctx.user.profile !== 'admin') throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso administrativo necessário para listar todos os eventos.' }); return operations.listFleetEvents(input.reservationId, input); }),
+      create: protectedProcedure.input(z.object({ reservationId: z.number().int().positive(), eventType: z.enum(['Multa', 'Avaria', 'Outro']), description: z.string().min(1).max(4000), photoUris: z.array(z.string().max(6000000, 'Uma das fotos é grande demais. Tente imagens mais leves.')).max(6, 'No máximo 6 fotos por evento.').optional() })).mutation(({ input }) => operations.createFleetEvent(input)),
     }),
     workOrders: router({
       list: adminProcedure.input(pageInput.extend({ vehicleId: z.number().int().positive().optional(), maintenanceType: maintenanceType.optional(), from: z.string().date().optional(), to: z.string().date().optional() })).query(({ input }) => operations.listWorkOrders(input)),

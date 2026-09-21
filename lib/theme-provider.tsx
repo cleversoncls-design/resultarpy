@@ -36,6 +36,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [preference, setPreferenceState] = useState<ThemePreference>(() => readStoredPreferenceSync() ?? 'system');
   const colorScheme: ColorScheme = preference === 'system' ? systemScheme : preference;
 
+  // O HTML estático (gerado no build) sempre "nasce" com as cores do
+  // tema claro, porque não existe usuário/preferência nesse momento. Às
+  // vezes o React, ao "hidratar" essa página no navegador, não força a
+  // troca desse estilo específico — ele mantém o que já veio pronto do
+  // servidor. Isso fazia a tela principal (a que envolve o app inteiro)
+  // ficar presa no claro até um evento que forçasse um novo render.
+  // `mounted` começa false (igual ao servidor) e vira true assim que o
+  // navegador termina de montar a página — usamos isso como "key" do
+  // elemento principal, forçando o React a descartar o nó antigo (com o
+  // estilo do build) e criar um novo, já com a cor certa, sem meio-termo.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const applyScheme = useCallback((scheme: ColorScheme) => {
     nativewindColorScheme.set(scheme);
     Appearance.setColorScheme?.(scheme);
@@ -79,7 +92,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const themeVariables = useMemo(() => vars(Object.fromEntries(Object.entries(SchemeColors[colorScheme]).map(([token, value]) => [`color-${token}`, value]))), [colorScheme]);
   const value = useMemo(() => ({ colorScheme, preference, setColorScheme, setPreference }), [colorScheme, preference, setColorScheme, setPreference]);
 
-  return <ThemeContext.Provider value={value}><View style={[{ flex: 1 }, themeVariables]}>{children}</View></ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>
+      <View key={mounted ? 'client' : 'server'} style={[{ flex: 1 }, themeVariables]}>
+        {children}
+      </View>
+    </ThemeContext.Provider>
+  );
 }
 
 export function useThemeContext(): ThemeContextValue {

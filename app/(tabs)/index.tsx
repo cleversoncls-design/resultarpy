@@ -40,6 +40,12 @@ export default function HomeScreen() {
   const { currency } = useCurrency();
   const isTraveler = role === 'Viajante';
   const isAdmin = role === 'Administrativo';
+  // "role" acima só distingue admin de todo o resto — não bastava para
+  // decidir quem vê o cartão de Aprovações, já que "Viajante + Aprovador"
+  // também precisa vê-lo. Usamos o perfil de verdade aqui, do mesmo jeito
+  // que o menu lateral já faz.
+  const profile = user?.profile ?? (user?.role === 'admin' ? 'admin' : 'traveler');
+  const canApprove = profile === 'admin' || profile === 'approver' || profile === 'traveler_approver';
   const { width } = useWindowDimensions();
   const isNarrow = width < 760;
   const tripsQuery = trpc.operations.trips.list.useQuery({ page: 1, pageSize: 50, direction: 'asc' }, { enabled: isAuthenticated });
@@ -54,12 +60,12 @@ export default function HomeScreen() {
   const maintenanceData = Array.from(liveVehicles.filter((vehicle) => ['Realizar Manutenção', 'Em manutenção', 'Avaria registrada', 'Extintor próximo do vencimento'].includes(vehicle.status)).reduce((counts, vehicle) => counts.set(vehicle.status, (counts.get(vehicle.status) ?? 0) + 1), new Map<string, number>())).map(([label, value]) => ({ label, value, color: colors.warning }));
   const activeTrip = liveTrips[0];
   const visibleActions = actionCards.filter((card) => {
-    if (['Aprovações'].includes(card.title)) return role !== 'Viajante';
+    if (['Aprovações'].includes(card.title)) return canApprove;
     if (['Relatório analítico', 'Resumo por cliente', 'Preparação', 'Cadastros', 'Usuários locais'].includes(card.title)) return isAdmin;
     return true;
   });
   return <ScreenContainer className="px-5 pt-5"><View className="w-full max-w-6xl flex-1 self-center"><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-    <View className="mb-6 flex-row items-start justify-between"><View><Text className="text-sm text-muted">{t('Bom dia,')}</Text><Text className="mt-1 text-3xl font-bold text-foreground">{user?.name || t('Usuário autenticado')}.</Text><Text className="mt-1 text-sm text-muted">{t(`Perfil: ${role}`)}</Text></View><View style={{ backgroundColor: colors.primary }} className="h-11 w-11 items-center justify-center rounded-xl"><IconSymbol name="airplane" size={22} color="white" /></View></View>
+    <View className="mb-6 flex-row items-start justify-between"><View className="flex-1 pr-3"><Text className="text-sm text-muted">{t('Bom dia,')}</Text><Text className="mt-1 text-3xl font-bold text-foreground">{user?.name || t('Usuário autenticado')}.</Text><Text className="mt-1 text-sm text-muted">{t(`Perfil: ${role}`)}</Text></View><View style={{ backgroundColor: colors.primary, flexShrink: 0 }} className="h-11 w-11 items-center justify-center rounded-xl"><IconSymbol name="airplane" size={22} color="white" /></View></View>
     <View className={isNarrow ? 'mb-6 flex-col gap-3' : 'mb-8 flex-row gap-3'}><MetricCard label={t('Total de viagens')} value={String(liveTrips.length).padStart(2, '0')} /><MetricCard label={t('Aguardando aprovação')} value={String(liveTrips.filter((trip) => trip.status === 'Aguardando aprovação').length).padStart(2, '0')} accent={colors.warning} /><MetricCard label={t('Em preparação')} value={String(liveTrips.filter((trip) => trip.status === 'Em preparação').length).padStart(2, '0')} accent={colors.primary} /><MetricCard label={t('Fechamento enviado')} value={isTraveler ? '00' : formatCurrency(0, currency)} accent={colors.success} /></View>
     <View className="mb-3 flex-row items-center justify-between"><Text className="text-lg font-bold text-foreground">{t('Próxima atividade')}</Text><Text className="text-sm font-semibold text-primary">{t('Ver tudo')}</Text></View>
     {activeTrip ? <Pressable onPress={() => router.push({ pathname: '/trip-detail', params: { tripId: String(activeTrip.id) } })} style={({ pressed }) => [{ borderColor: colors.border, borderWidth: 1, borderRadius: 16, backgroundColor: colors.surface, padding: 20, marginBottom: 32, opacity: pressed ? 0.75 : 1 }]}><View className="flex-row items-start justify-between"><View className="flex-1"><Text className="text-xs font-bold uppercase tracking-widest text-muted">{t(activeTrip.status)}</Text><Text className="mt-2 text-xl font-bold text-foreground">{activeTrip.destination}</Text><Text className="mt-1 text-sm text-muted">{activeTrip.startsOn} — {activeTrip.endsOn}</Text></View><StatusPill status={activeTrip.status} /></View><View className="mt-5 flex-row items-end justify-between"><View><Text className="text-xs text-muted">{t('Adiantamento')}</Text><Text className="mt-1 text-base font-bold text-foreground">{activeTrip.hasAdvance ? formatCurrency(Number(activeTrip.advanceAmount), currency) : t('Não solicitado')}</Text></View><Text className="text-sm font-bold text-primary">{t('Abrir detalhes ›')}</Text></View></Pressable> : <View className="mb-8 rounded-2xl border border-dashed border-border bg-surface p-5"><Text className="font-bold text-foreground">{t('Nenhuma viagem persistida')}</Text><Text className="mt-1 text-sm text-muted">{t('Crie uma solicitação para visualizar atividades reais neste painel.')}</Text></View>}

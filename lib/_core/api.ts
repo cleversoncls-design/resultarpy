@@ -130,6 +130,16 @@ export async function resetLocalUserPassword(userId: number, password: string): 
   });
 }
 
+// Autoatendimento: o próprio usuário troca a senha, informando a atual —
+// diferente de resetLocalUserPassword (só o Administrativo, sem pedir a
+// senha atual, redefinindo a de qualquer outra pessoa).
+export async function changeOwnPassword(currentPassword: string, newPassword: string): Promise<void> {
+  await apiCall<{ success: true }>('/api/auth/local/me/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
 export async function setLocalUserActive(userId: number, active: boolean): Promise<LocalUser> {
   const result = await apiCall<{ user: LocalUser }>(`/api/auth/local/users/${userId}/status`, {
     method: 'PATCH',

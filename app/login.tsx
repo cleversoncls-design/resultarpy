@@ -14,6 +14,9 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Antes não tinha como conferir a senha digitada antes de enviar —
+  // adicionado o ícone de olho para mostrar/ocultar.
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     setError(null);
@@ -79,19 +82,28 @@ export default function LoginScreen() {
           />
 
           <Text className="mt-4 text-sm font-semibold text-foreground">Senha</Text>
-          <TextInput
-            autoCapitalize="none"
-            autoComplete="current-password"
-            onChangeText={setPassword}
-            onSubmitEditing={handleLogin}
-            placeholder="Digite sua senha"
-            placeholderTextColor={colors.muted}
-            returnKeyType="done"
-            secureTextEntry
-            style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }}
-            className="mt-2 rounded-xl border px-4 py-3"
-            value={password}
-          />
+          <View style={{ borderColor: colors.border, backgroundColor: colors.background }} className="mt-2 flex-row items-center rounded-xl border pr-2">
+            <TextInput
+              autoCapitalize="none"
+              autoComplete="current-password"
+              onChangeText={setPassword}
+              onSubmitEditing={handleLogin}
+              placeholder="Digite sua senha"
+              placeholderTextColor={colors.muted}
+              returnKeyType="done"
+              secureTextEntry={!showPassword}
+              style={{ color: colors.foreground }}
+              className="flex-1 px-4 py-3"
+              value={password}
+            />
+            <Pressable
+              accessibilityLabel={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              onPress={() => setShowPassword((current) => !current)}
+              style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.6 : 1 })}
+            >
+              <Text style={{ color: colors.primary }} className="text-xs font-bold">{showPassword ? "Ocultar" : "Mostrar"}</Text>
+            </Pressable>
+          </View>
 
           {error ? <Text className="mt-4 text-sm leading-5 text-error">{error}</Text> : null}
           <View className="mt-5">
