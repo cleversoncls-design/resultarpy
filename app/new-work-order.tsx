@@ -1,10 +1,10 @@
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ScreenContainer } from '@/components/screen-container';
 import { PrimaryButton, SectionHeader } from '@/components/app-ui';
+import { CalendarField } from '@/components/calendar-field';
 import type { MaintenanceKind } from '@/lib/demo-data';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/hooks/use-auth';
 import { trpc } from '@/lib/trpc';
@@ -193,51 +193,5 @@ function CatalogSearch({ value, options, placeholder, emptyLabel, onChange }: { 
         </View>
       ) : null}
     </View>
-  );
-}
-
-// Calendário visual — substitui o campo de texto livre AAAA-MM-DD.
-function CalendarField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const colors = useColors();
-  const { t } = useLanguage();
-  const [open, setOpen] = useState(false);
-  const parse = (input: string) => /^\d{4}-\d{2}-\d{2}$/.test(input) ? new Date(`${input}T12:00:00`) : new Date();
-  const [month, setMonth] = useState(() => { const d = parse(value); return new Date(d.getFullYear(), d.getMonth(), 1); });
-  const year = month.getFullYear();
-  const monthIndex = month.getMonth();
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-  const firstDay = new Date(year, monthIndex, 1).getDay();
-  const days = Array.from({ length: firstDay + daysInMonth }, (_, index) => index < firstDay ? null : index - firstDay + 1);
-  const iso = (day: number) => `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  return (
-    <>
-      <Pressable onPress={() => setOpen(true)} style={({ pressed }) => ({ borderColor: colors.border, backgroundColor: colors.background, opacity: pressed ? 0.7 : 1 })} className="mb-4 flex-row items-center justify-between rounded-xl border px-4 py-3">
-        <Text className={value ? 'text-foreground' : 'text-muted'}>{value || t('Selecionar data')}</Text>
-        <IconSymbol name="calendar" size={20} color={colors.primary} />
-      </Pressable>
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <View className="flex-1 items-center justify-center bg-black/40 px-5">
-          <View className="w-full max-w-md rounded-2xl bg-background p-5">
-            <View className="flex-row items-center justify-between">
-              <Pressable onPress={() => setMonth(new Date(year, monthIndex - 1, 1))} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}><Text className="px-3 py-2 text-2xl text-primary">‹</Text></Pressable>
-              <Text className="text-base font-bold text-foreground">{year}-{String(monthIndex + 1).padStart(2, '0')}</Text>
-              <Pressable onPress={() => setMonth(new Date(year, monthIndex + 1, 1))} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}><Text className="px-3 py-2 text-2xl text-primary">›</Text></Pressable>
-            </View>
-            <View className="mt-4 flex-row flex-wrap">
-              {days.map((day, index) => day === null ? (
-                <View key={`blank-${index}`} style={{ width: '14.2857%' }} className="p-1" />
-              ) : (
-                <Pressable key={day} onPress={() => { onChange(iso(day)); setOpen(false); }} style={({ pressed }) => ({ width: '14.2857%', backgroundColor: value === iso(day) ? colors.primary : 'transparent', opacity: pressed ? 0.65 : 1 })} className="items-center rounded-lg p-2">
-                  <Text style={{ color: value === iso(day) ? 'white' : colors.foreground }} className="text-sm font-semibold">{day}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable onPress={() => setOpen(false)} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="mt-4 items-center rounded-xl border border-border p-3">
-              <Text className="font-bold text-primary">{t('Cancelar')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-    </>
   );
 }

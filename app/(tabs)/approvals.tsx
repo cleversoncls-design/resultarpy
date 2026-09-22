@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { formatDateDisplay, normalizeDateValue } from '@/lib/date-utils';
-import { Alert, FlatList, Modal, Pressable, Text, TextInput, View, type ViewStyle } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { StatusPill } from '@/components/app-ui';
+import { CalendarModal } from '@/components/calendar-field';
 import { formatCurrency } from '@/lib/currency';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
@@ -225,24 +226,8 @@ export default function ApprovalsScreen() {
           </View>
         </View>
       </Modal>
-      <DateCalendarModal visible={showFromCalendar} onClose={() => setShowFromCalendar(false)} onSelect={(date) => { setHistoryFrom(date); setHistoryPage(1); setShowFromCalendar(false); }} title={t('Data inicial')} />
-      <DateCalendarModal visible={showToCalendar} onClose={() => setShowToCalendar(false)} onSelect={(date) => { setHistoryTo(date); setHistoryPage(1); setShowToCalendar(false); }} title={t('Data final')} />
+      <CalendarModal visible={showFromCalendar} onClose={() => setShowFromCalendar(false)} onSelect={(date) => { setHistoryFrom(date); setHistoryPage(1); setShowFromCalendar(false); }} title={t('Data inicial')} value={historyFrom} />
+      <CalendarModal visible={showToCalendar} onClose={() => setShowToCalendar(false)} onSelect={(date) => { setHistoryTo(date); setHistoryPage(1); setShowToCalendar(false); }} title={t('Data final')} value={historyTo} />
     </ScreenContainer>
   );
-}
-
-function DateCalendarModal({ visible, onClose, onSelect, title }: { visible: boolean; onClose: () => void; onSelect: (date: string) => void; title: string }) {
-  const colors = useColors();
-  const { t, language } = useLanguage();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
-  const days = Array.from({ length: daysInMonth }, (_, index) => index + 1);
-  const blanks = Array.from({ length: firstDayOfMonth }, (_, index) => index);
-  const monthNames = language === 'es-ES'
-    ? ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-    : ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  const weekdayNames = language === 'es-ES' ? ['D', 'L', 'M', 'X', 'J', 'V', 'S'] : ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
-  const cellStyle: ViewStyle = { width: '14.2857%', height: 42, alignItems: 'center', justifyContent: 'center' };
-  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}><View className="flex-1 items-center justify-center bg-black/40 px-5"><View className="w-full max-w-sm rounded-3xl bg-background p-6"><View className="mb-4 flex-row items-center justify-between"><Text className="text-lg font-bold text-foreground">{title}</Text><Pressable onPress={onClose} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}><IconSymbol name="xmark" size={20} color={colors.muted} /></Pressable></View><View className="mb-4 flex-row items-center justify-between"><Pressable onPress={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}><Text style={{ color: colors.primary }} className="p-2 text-xl font-bold">‹</Text></Pressable><Text className="font-bold text-foreground">{monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}</Text><Pressable onPress={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}><Text style={{ color: colors.primary }} className="p-2 text-xl font-bold">›</Text></Pressable></View><View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{weekdayNames.map((day, index) => <View key={`weekday-${index}`} style={cellStyle}><Text className="text-xs font-bold text-muted">{day}</Text></View>)}{blanks.map((blank) => <View key={`blank-${blank}`} style={cellStyle} />)}{days.map((day) => <Pressable key={day} onPress={() => onSelect(`${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`)} style={({ pressed }) => [cellStyle, { opacity: pressed ? 0.55 : 1 }]}><Text className="text-sm font-medium text-foreground">{day}</Text></Pressable>)}</View></View></View></Modal>;
 }
