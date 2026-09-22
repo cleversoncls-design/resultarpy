@@ -37,6 +37,8 @@ const MAPPING = {
   'camera.fill': 'photo-camera',
   'gauge.medium': 'speed',
   'calendar': 'calendar-today',
+  'rectangle.portrait.and.arrow.right': 'logout',
+  'sidebar.left': 'view-sidebar',
 } as IconMapping;
 
 export function IconSymbol({ name, size = 24, color, style }: { name: IconSymbolName; size?: number; color: string | OpaqueColorValue; style?: StyleProp<TextStyle>; weight?: SymbolWeight }) {
