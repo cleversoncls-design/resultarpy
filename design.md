@@ -92,3 +92,13 @@ Os principais agregados serão `User`, `Area`, `ServiceUnit`, `City`, `Client`, 
 ## Integração planejada
 
 A camada de dados será isolada por serviços, permitindo começar com estado local demonstrativo e substituir os adaptadores por Supabase Auth, PostgreSQL e Storage. Uploads deverão passar por seleção, compressão e validação de extensão/MIME; a aplicação não deve tratar o URI local como permanente. Regras de permissão serão aplicadas tanto na interface quanto na camada de dados, especialmente para impedir que um viajante acesse cadastros administrativos.
+
+## Autenticação local confirmada
+
+A entrada web de produção será `http://192.168.22.20:8080/login`, sem redirecionamento para Manus ou qualquer provedor OAuth externo. O usuário informará e-mail e senha; o servidor validará o hash da senha no PostgreSQL e emitirá uma sessão HTTP-only para o domínio da aplicação.
+
+A criação, bloqueio, desbloqueio e alteração de perfil serão operações administrativas. O primeiro usuário Administrativo será criado por um processo controlado de bootstrap, sem credencial embutida no código ou no repositório. A aplicação manterá os perfis Viajante, Aprovador e Administrativo, e o servidor continuará sendo a fonte definitiva de autorização.
+
+As sessões terão expiração, rotação de identificador e revogação no logout. Senhas serão armazenadas somente como hashes derivados com função resistente a ataques de força bruta; mensagens de login não revelarão se o e-mail existe. O fluxo de recuperação de senha será inicialmente administrativo, sem depender de SMTP, podendo receber e-mail transacional em etapa posterior.
+
+O PostgreSQL será preservado. A tabela `users` receberá os campos de autenticação local e uma tabela independente de sessões evitará armazenar tokens em texto puro. A migração será aditiva e não apagará os dados de viagens, despesas, frota ou manutenção.

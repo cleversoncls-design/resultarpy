@@ -65,6 +65,53 @@ jobs:
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Build API image for vulnerability scan
+        run: docker build --file docker/api.Dockerfile --target runtime --tag local/controle-viagens-api:${GITHUB_SHA} .
+
+      - name: Build frontend image for vulnerability scan
+        run: docker build --file docker/frontend.Dockerfile --tag local/controle-viagens-frontend:${GITHUB_SHA} --build-arg EXPO_PUBLIC_API_BASE_URL= .
+
+      - name: Scan API image with Trivy
+        id: scan-api-image
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: local/controle-viagens-api:${{ github.sha }}
+          format: sarif
+          output: trivy-api.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          vuln-type: os,library
+          exit-code: "1"
+
+      - name: Scan frontend image with Trivy
+        id: scan-frontend-image
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: local/controle-viagens-frontend:${{ github.sha }}
+          format: sarif
+          output: trivy-frontend.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          vuln-type: os,library
+          exit-code: "1"
+
+      - name: Upload Trivy reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: trivy-reports-${{ github.sha }}
+          path: trivy-*.sarif
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Enforce vulnerability threshold
+        if: steps.scan-api-image.outcome == 'failure' || steps.scan-frontend-image.outcome == 'failure'
+        run: |
+          echo "High or critical vulnerabilities were found in one or more application images."
+          exit 1
+
       - name: Compose bridge smoke environment
         env:
           JWT_SECRET: ci-only-ephemeral-secret-change-per-run

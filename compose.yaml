@@ -46,12 +46,13 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-controle}:${POSTGRES_PASSWORD:-controle_dev_only}@postgres:5432/${POSTGRES_DB:-controle_viagens}
       DATABASE_SSL: "false"
-      VITE_APP_ID: ${VITE_APP_ID:-controle-viagens-local}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set before starting the API}
-      OAUTH_SERVER_URL: ${OAUTH_SERVER_URL:-}
-      OWNER_OPEN_ID: ${OWNER_OPEN_ID:-}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:-Administrador}
       BUILT_IN_FORGE_API_URL: ${BUILT_IN_FORGE_API_URL:-}
       BUILT_IN_FORGE_API_KEY: ${BUILT_IN_FORGE_API_KEY:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -72,6 +73,7 @@ services:
       network: host
       args:
         EXPO_PUBLIC_API_BASE_URL: ${EXPO_PUBLIC_API_BASE_URL:-}
+        EXPO_PUBLIC_DEMO_MODE: ${EXPO_PUBLIC_DEMO_MODE:-false}
     depends_on:
       api:
         condition: service_healthy

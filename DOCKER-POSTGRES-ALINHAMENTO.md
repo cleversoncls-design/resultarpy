@@ -161,3 +161,26 @@ Também não há VM Docker anexada nem Docker context remoto. O Compose bridge f
 O histórico de aprovações passou a retornar metadados de paginação (`page`, `pageSize`, `total` e `totalPages`) e a interface apresenta navegação anterior/próxima. A consulta `historyExport` reutiliza os filtros de decisão e período, busca todos os registros filtrados com autorização no servidor e alimenta a camada existente de exportação em CSV, XLSX e PDF.
 
 A validação local foi repetida após a alteração: Compose host reconstruído e saudável, TypeScript sem erros, lint sem erros com dois avisos preexistentes de `useEffect`, 19 testes Vitest passando e 5 testes Playwright passando. A exportação para GitHub e o disparo remoto do workflow continuam aguardando a vinculação da conta pelo usuário; o origin atual é interno do projeto. Não há VM Docker externa nem context remoto disponível, e o bridge continua limitado pela ausência de `iptables/raw` no sandbox.
+
+
+## Proteção da branch, publicação de imagens e CI remoto
+
+O workflow CI recebeu o job `publish-images`, condicionado ao sucesso do job `validate` em pushes na branch `main`. A publicação usa `GITHUB_TOKEN` com permissão `packages: write` e envia as imagens `ghcr.io/cleversoncls-design/resultarpy-api` e `ghcr.io/cleversoncls-design/resultarpy-frontend`, com tags `latest`, `sha` e branch.
+
+O commit `5ceaa61` foi publicado no repositório privado `cleversoncls-design/resultarpy`. O workflow remoto `32777461899` terminou com sucesso: TypeScript, lint, Vitest, PostgreSQL 16, Compose bridge no runner GitHub, healthcheck, Playwright e publicação das duas imagens foram concluídos. Os dois avisos de `useEffect` foram corrigidos com memoização da lista de módulos e dependências explícitas; a validação local não apresenta mais avisos de hooks.
+
+A proteção nativa da branch `main` foi tentada via API e Rulesets, mas o GitHub retornou HTTP 403 informando que essa funcionalidade exige GitHub Pro ou que o repositório seja público. Nenhuma regra parcial foi aplicada. O job de publicação continua condicionado ao CI verde como proteção operacional imediata.
+
+
+## Atualização: proteção da branch main ativada
+
+Após o repositório `cleversoncls-design/resultarpy` ser tornado público, foi criada com sucesso a regra de proteção da branch `main` pela interface do GitHub. A regra exige o check `validate`, exige resolução de conversas antes do merge, aplica-se também aos administradores e mantém force-push e exclusão da branch desabilitados. O check selecionado pertence ao GitHub Actions e corresponde ao job de validação do workflow CI.
+
+
+## Validação adicional de branch, imagens e deploy VM — 24/08/2026
+
+Foi criado o Pull Request de teste [#1](https://github.com/cleversoncls-design/resultarpy/pull/1) a partir da branch temporária `test/branch-protection-validate-web`, sem alteração direta da `main`. A interface do GitHub confirmou o comportamento esperado: o PR ficou bloqueado enquanto o check obrigatório `validate` estava pendente e deixou de estar bloqueado depois da conclusão bem-sucedida; o PR foi fechado sem merge.
+
+O Pull Request [#2](https://github.com/cleversoncls-design/resultarpy/pull/2) adicionou análise de vulnerabilidades das imagens API e frontend com Trivy, geração de relatórios SARIF e gate para achados `HIGH` ou `CRITICAL` antes da publicação no GHCR. O primeiro scan encontrou pacotes de build e pacotes Alpine vulneráveis. O hardening reduziu o runtime da API removendo npm, npx e corepack da imagem final, atualizou a base do frontend para `nginx:1.29-alpine3.22` e executou `apk upgrade --no-cache`. O run remoto `32784271520` terminou com sucesso: TypeScript, lint, Vitest, build das duas imagens, scans Trivy, gate de segurança, Compose bridge no runner GitHub e Playwright passaram.
+
+A verificação de computação persistente confirmou que esta sessão não possui VM Cloud Computer anexada e que há apenas o Docker context `default` do sandbox. O sandbox continua sem a tabela `iptables/raw`, portanto a execução final do Compose com bridge nativa não pode ser feita aqui. O procedimento reproduzível para uma VM Ubuntu/Docker, incluindo variáveis, firewall UFW, volume PostgreSQL, systemd para auto-início, backup/restore e critérios de aceite, está em [`docker/VM-DEPLOY.md`](docker/VM-DEPLOY.md).

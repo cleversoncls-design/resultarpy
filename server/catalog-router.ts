@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { adminProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, router } from "./_core/trpc";
 import * as catalog from "./catalog-repository";
+import { syncOfficialCurrencyRates } from "./currency-rates";
 
 const idSchema = z.coerce.number().int().positive();
 const listInput = z.object({
@@ -45,6 +46,14 @@ const unitUpdate = unitCreate.partial().extend({ id: idSchema }).refine(
   "Informe ao menos um campo para atualizar",
 );
 
+const cityCreate = z.object({
+  name: z.string().trim().min(1).max(120),
+});
+const cityUpdate = cityCreate.partial().extend({ id: idSchema, active: z.boolean().optional() }).refine(
+  ({ id: _id, ...data }) => Object.values(data).some((value) => value !== undefined),
+  "Informe ao menos um campo para atualizar",
+);
+
 const clientCreate = z.object({
   name: z.string().trim().min(1).max(180),
   billingCurrency: z.string().trim().length(3).default("BRL"),
@@ -70,6 +79,15 @@ const expenseTypeCreate = z.object({
   name: z.string().trim().min(1).max(120),
   description: z.string().trim().max(1000).nullable().optional(),
 });
+const currencyCode = z.enum(['BRL', 'USD', 'PYG']);
+const reimbursementProfileItem = z.object({ expenseTypeId: idSchema, limitAmount: z.string().trim().min(1) });
+const reimbursementProfileCreate = z.object({ city: z.string().trim().max(120).default(''), currency: currencyCode.default('BRL'), items: z.array(reimbursementProfileItem).min(1).max(100) }).superRefine((input, context) => { if (new Set(input.items.map((item) => item.expenseTypeId)).size !== input.items.length) context.addIssue({ code: 'custom', path: ['items'], message: 'Cada tipo de gasto pode aparecer somente uma vez por cidade e moeda.' }); });
+const reimbursementProfileUpdate = reimbursementProfileCreate.safeExtend({ id: idSchema });
+const currencyRateInput = z.object({ rateDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), fromCurrency: currencyCode, toCurrency: z.literal('PYG'), rate: z.string().trim().min(1), rateType: z.enum(['venda', 'referencial']), source: z.enum(['DNIT', 'BCP', 'Manual']), sourceUrl: z.string().url().nullable().optional() });
+const clientBillingProfileItem = z.object({ expenseTypeId: idSchema, limitAmount: z.string().trim().min(1) });
+const clientBillingProfileCreate = z.object({ clientId: idSchema, currency: z.string().trim().length(3), items: z.array(clientBillingProfileItem).min(1).max(100) }).superRefine((input, context) => { if (new Set(input.items.map((item) => item.expenseTypeId)).size !== input.items.length) context.addIssue({ code: 'custom', path: ['items'], message: 'Cada tipo de gasto pode aparecer somente uma vez por cliente.' }); });
+const clientBillingProfileUpdate = clientBillingProfileCreate.safeExtend({ id: idSchema });
+
 const expenseTypeUpdate = expenseTypeCreate.partial().extend({ id: idSchema, active: z.boolean().optional() }).refine(
   ({ id: _id, ...data }) => Object.values(data).some((value) => value !== undefined),
   "Informe ao menos um campo para atualizar",
@@ -77,7 +95,7 @@ const expenseTypeUpdate = expenseTypeCreate.partial().extend({ id: idSchema, act
 
 export const catalogRouter = router({
   units: router({
-    list: adminProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listUnits(input))),
+    list: protectedProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listUnits(input))),
     get: adminProcedure.input(z.object({ id: idSchema })).query(({ input }) =>
       withCatalogErrors(async () => requireFound(await catalog.getUnit(input.id), "Unidade")),
     ),
@@ -90,8 +108,25 @@ export const catalogRouter = router({
       withCatalogErrors(async () => requireFound(await catalog.archiveUnit(input.id), "Unidade")),
     ),
   }),
+  cities: router({
+    // protectedProcedure no list: qualquer usuário autenticado precisa
+    // conseguir ler a lista de cidades para escolher no formulário de
+    // despesa, não só o Administrativo.
+    list: protectedProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listCities(input))),
+    get: adminProcedure.input(z.object({ id: idSchema })).query(({ input }) =>
+      withCatalogErrors(async () => requireFound(await catalog.getCity(input.id), "Cidade")),
+    ),
+    create: adminProcedure.input(cityCreate).mutation(({ input }) => withCatalogErrors(() => catalog.createCity(input))),
+    update: adminProcedure.input(cityUpdate).mutation(({ input }) => {
+      const { id, ...data } = input;
+      return withCatalogErrors(() => catalog.updateCity(id, data));
+    }),
+    archive: adminProcedure.input(z.object({ id: idSchema })).mutation(({ input }) =>
+      withCatalogErrors(async () => requireFound(await catalog.archiveCity(input.id), "Cidade")),
+    ),
+  }),
   clients: router({
-    list: adminProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listClients(input))),
+    list: protectedProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listClients(input))),
     get: adminProcedure.input(z.object({ id: idSchema })).query(({ input }) =>
       withCatalogErrors(async () => requireFound(await catalog.getClient(input.id), "Cliente")),
     ),
@@ -118,8 +153,36 @@ export const catalogRouter = router({
       withCatalogErrors(async () => requireFound(await catalog.archiveTraveler(input.id), "Viajante")),
     ),
   }),
+  maintenanceReasons: router({
+    list: adminProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listMaintenanceReasons(input))),
+    create: adminProcedure.input(z.object({ name: z.string().trim().min(1).max(160), description: z.string().trim().max(2000).nullable().optional(), category: z.enum(['Preventiva', 'Corretiva']) })).mutation(({ input }) => withCatalogErrors(() => catalog.createMaintenanceReason(input))),
+    update: adminProcedure.input(z.object({ id: idSchema, name: z.string().trim().min(1).max(160).optional(), description: z.string().trim().max(2000).nullable().optional(), category: z.enum(['Preventiva', 'Corretiva']).optional(), active: z.boolean().optional() })).mutation(({ input: { id, ...data } }) => withCatalogErrors(() => catalog.updateMaintenanceReason(id, data))),
+    archive: adminProcedure.input(z.object({ id: idSchema })).mutation(({ input }) => withCatalogErrors(async () => requireFound(await catalog.archiveMaintenanceReason(input.id), 'Motivo de manutenção'))),
+  }),
+  reimbursementLimits: router({
+    list: adminProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listReimbursementLimitProfiles(input))),
+    create: adminProcedure.input(reimbursementProfileCreate).mutation(({ input }) => withCatalogErrors(async () => { for (const item of input.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new Error('Um dos tipos de gasto não foi encontrado ou está inativo.'); return catalog.createReimbursementLimitProfile(input); })),
+    update: adminProcedure.input(reimbursementProfileUpdate).mutation(({ input }) => withCatalogErrors(async () => { const { id, ...data } = input; for (const item of data.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new Error('Um dos tipos de gasto não foi encontrado ou está inativo.'); return requireFound(await catalog.updateReimbursementLimitProfile(id, data), 'Perfil de reembolso'); })),
+    delete: adminProcedure.input(z.object({ id: idSchema })).mutation(({ input }) => withCatalogErrors(async () => requireFound(await catalog.deleteReimbursementLimitProfile(input.id), 'Perfil de reembolso'))),
+  }),
+  currencyRates: router({
+    list: adminProcedure.input(z.object({ rateDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(100).default(20) })).query(({ input }) => withCatalogErrors(() => catalog.listCurrencyRates(input))),
+    latest: adminProcedure.query(() => withCatalogErrors(() => catalog.listLatestCurrencyRates())),
+    save: adminProcedure.input(z.object({ items: z.array(currencyRateInput).min(1).max(10) })).mutation(({ input }) => withCatalogErrors(() => catalog.upsertCurrencyRates(input.items))),
+    sync: adminProcedure.mutation(() => withCatalogErrors(() => syncOfficialCurrencyRates())),
+  }),
+  clientBillingLimits: router({
+    list: adminProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listClientBillingProfiles(input))),
+    create: adminProcedure.input(clientBillingProfileCreate).mutation(({ input }) => withCatalogErrors(async () => { if (!(await catalog.getClient(input.clientId))) throw new Error('Cliente não encontrado ou inativo.'); for (const item of input.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new Error('Um dos tipos de gasto não foi encontrado ou está inativo.'); return catalog.createClientBillingProfile(input); })),
+    update: adminProcedure.input(clientBillingProfileUpdate).mutation(({ input }) => withCatalogErrors(async () => { const { id, ...data } = input; if (!(await catalog.getClient(data.clientId))) throw new Error('Cliente não encontrado ou inativo.'); for (const item of data.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new Error('Um dos tipos de gasto não foi encontrado ou está inativo.'); return requireFound(await catalog.updateClientBillingProfile(id, data), 'Limite de faturamento'); })),
+    delete: adminProcedure.input(z.object({ id: idSchema })).mutation(({ input }) => withCatalogErrors(async () => requireFound(await catalog.deleteClientBillingProfile(input.id), 'Limite de faturamento'))),
+  }),
+  translations: router({
+    list: adminProcedure.input(z.object({ search: z.string().trim().max(120).optional() }).default({})).query(({ input }) => withCatalogErrors(() => catalog.listTranslationEntries(input))),
+    save: adminProcedure.input(z.object({ items: z.array(z.object({ key: z.string().trim().min(1).max(240), spanish: z.string().trim().min(1).max(4000) })).min(1).max(500) })).mutation(({ ctx, input }) => withCatalogErrors(() => catalog.upsertTranslationEntries(input.items, ctx.user.id))),
+  }),
   expenseTypes: router({
-    list: adminProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listExpenseTypes(input))),
+    list: protectedProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listExpenseTypes(input))),
     get: adminProcedure.input(z.object({ id: idSchema })).query(({ input }) =>
       withCatalogErrors(async () => requireFound(await catalog.getExpenseType(input.id), "Tipo de gasto")),
     ),

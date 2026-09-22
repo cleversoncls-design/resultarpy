@@ -1,0 +1,1 @@
+ALTER TABLE "trip_expenses" ADD COLUMN "reimbursement_rejected_at" timestamp with time zone;

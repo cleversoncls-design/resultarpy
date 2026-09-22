@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { languageOptions, type AppLanguage } from '@/lib/language-provider';
+import { languageOptions, type AppLanguage, useLanguage } from '@/lib/language-provider';
 import type { ThemePreference } from '@/lib/theme-provider';
 
 type Props = {
@@ -10,6 +10,7 @@ type Props = {
   setLanguage: (value: AppLanguage) => void;
   theme: ThemePreference;
   setTheme: (value: ThemePreference) => void;
+  onLogout?: () => void;
 };
 
 const themeOptions: { key: ThemePreference; label: string; icon: 'gearshape.fill' | 'sun.max.fill' | 'moon.fill' }[] = [
@@ -18,15 +19,17 @@ const themeOptions: { key: ThemePreference; label: string; icon: 'gearshape.fill
   { key: 'dark', label: 'Escuro', icon: 'moon.fill' },
 ];
 
-export function PreferenceDropdowns({ language, setLanguage, theme, setTheme }: Props) {
+export function PreferenceDropdowns({ language, setLanguage, theme, setTheme, onLogout }: Props) {
   const colors = useColors();
+  const { t } = useLanguage();
   return <View style={{ gap: 8 }}>
-    <Dropdown label="Idioma" trigger={<><Text style={{ fontSize: 15 }}>{languageOptions.find((option) => option.key === language)?.flag}</Text><Text style={{ color: colors.foreground, marginLeft: 9, fontSize: 13, fontWeight: '700' }}>{languageOptions.find((option) => option.key === language)?.label}</Text></>}>
-      {languageOptions.map((option) => <Pressable key={option.key} onPress={() => setLanguage(option.key)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, backgroundColor: pressed ? `${colors.primary}12` : 'transparent' }]}><Text style={{ fontSize: 18 }}>{option.flag}</Text><Text style={{ flex: 1, marginLeft: 12, color: colors.foreground, fontSize: 14 }}>{option.label}</Text>{language === option.key ? <IconSymbol name="checkmark" size={17} color={colors.primary} /> : null}</Pressable>)}
+    <Dropdown label={t('Idioma')} trigger={<><Text style={{ fontSize: 15 }}>{languageOptions.find((option) => option.key === language)?.flag}</Text><Text style={{ color: colors.foreground, marginLeft: 9, fontSize: 13, fontWeight: '700' }}>{t(languageOptions.find((option) => option.key === language)?.label ?? '')}</Text></>}>
+      {languageOptions.map((option) => <Pressable key={option.key} onPress={() => setLanguage(option.key)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9, backgroundColor: pressed ? `${colors.primary}12` : 'transparent' }]}><Text style={{ fontSize: 18 }}>{option.flag}</Text><Text style={{ flex: 1, marginLeft: 12, color: colors.foreground, fontSize: 14 }}>{t(option.label)}</Text>{language === option.key ? <IconSymbol name="checkmark" size={17} color={colors.primary} /> : null}</Pressable>)}
     </Dropdown>
-    <Dropdown label="Aparência" trigger={<><IconSymbol name={themeOptions.find((option) => option.key === theme)?.icon ?? 'gearshape.fill'} size={17} color={colors.primary} /><Text style={{ color: colors.foreground, marginLeft: 9, fontSize: 13, fontWeight: '700' }}>{themeOptions.find((option) => option.key === theme)?.label}</Text></>}>
-      {themeOptions.map((option) => <Pressable key={option.key} onPress={() => setTheme(option.key)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: pressed ? `${colors.primary}12` : 'transparent' }]}><IconSymbol name={option.icon} size={19} color={theme === option.key ? colors.primary : colors.muted} /><Text style={{ flex: 1, marginLeft: 12, color: colors.foreground, fontSize: 15 }}>{option.label}</Text>{theme === option.key ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary }} /> : null}</Pressable>)}
+    <Dropdown label={t('Aparência')} trigger={<><IconSymbol name={themeOptions.find((option) => option.key === theme)?.icon ?? 'gearshape.fill'} size={17} color={colors.primary} /><Text style={{ color: colors.foreground, marginLeft: 9, fontSize: 13, fontWeight: '700' }}>{t(themeOptions.find((option) => option.key === theme)?.label ?? '')}</Text></>}>
+      {themeOptions.map((option) => <Pressable key={option.key} onPress={() => setTheme(option.key)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, backgroundColor: pressed ? `${colors.primary}12` : 'transparent' }]}><IconSymbol name={option.icon} size={20} color={theme === option.key ? colors.primary : colors.foreground} /><Text style={{ flex: 1, marginLeft: 12, color: colors.foreground, fontSize: 15 }}>{t(option.label)}</Text>{theme === option.key ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary }} /> : null}</Pressable>)}
     </Dropdown>
+    {onLogout ? <Pressable accessibilityLabel={t('Encerrar sessão')} onPress={onLogout} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 9, opacity: pressed ? 0.7 : 1 }]}><IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color={colors.foreground} /><Text style={{ color: colors.foreground, marginLeft: 9, fontSize: 13, fontWeight: '700' }}>{t('Encerrar sessão')}</Text></Pressable> : null}
   </View>;
 }
 

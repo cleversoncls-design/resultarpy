@@ -31,7 +31,7 @@ describePostgres('Operações persistentes autenticadas no PostgreSQL', () => {
     const vehicle = await caller.operations.fleet.vehicles.create({ plate: `IT${Date.now()}`.slice(0, 10), brand: 'Toyota', model: 'Integration Test', modelYear: 2024, color: 'Prata', unitId: unit!.id, currentKm: 10000, lastMaintenanceKm: 9000, maintenanceIntervalKm: 10000, fireExtinguisherExpiresOn: null, notes: 'Registro temporário do teste' });
 
     const tripCode = `IT-${Date.now()}`;
-    const trip = await caller.operations.trips.create({ tripCode, travelerId: traveler!.id, clientId: client!.id, unitId: unit!.id, origin: 'São Paulo', destination: 'Asunción', country: 'Paraguai', area: 'Comercial', transport: 'Passagem aérea', startsOn: '2026-09-02', endsOn: '2026-09-05', status: 'Rascunho', requiresFleetVehicle: false, hasAdvance: true, needsHotel: true, advanceAmount: '920.00' });
+    const trip = await caller.operations.trips.create({ tripCode, travelerId: traveler!.id, clientId: client!.id, unitId: unit!.id, origin: 'São Paulo', destination: 'Asunción', country: 'Paraguai', area: 'Comercial', transport: 'Veículo da frota', startsOn: '2026-09-02', endsOn: '2026-09-05', status: 'Rascunho', requiresFleetVehicle: false, hasAdvance: true, needsHotel: true, advanceAmount: '920.00' });
     expect(trip.tripCode).toBe(tripCode);
     expect((await caller.operations.trips.get({ id: trip.id })).id).toBe(trip.id);
 

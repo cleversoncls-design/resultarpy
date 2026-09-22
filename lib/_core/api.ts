@@ -1,6 +1,9 @@
 import { Platform } from "react-native";
-import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "./auth";
+
+function getLocalApiBaseUrl(): string {
+  return process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ?? "";
+}
 
 type ApiResponse<T> = {
   data?: T;
@@ -32,7 +35,7 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
     console.log("[API] apiCall:", { endpoint, platform: "web", method: options.method || "GET" });
   }
 
-  const baseUrl = getApiBaseUrl();
+  const baseUrl = getLocalApiBaseUrl();
   // Ensure no double slashes between baseUrl and endpoint
   const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
@@ -89,7 +92,64 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
   }
 }
 
-// OAuth callback handler - exchange code for session token
+// Local authentication: login creates an HTTP-only session cookie on the web.
+export async function loginLocal(email: string, password: string): Promise<{ user: any }> {
+  return apiCall<{ user: any }>("/api/auth/local/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export type LocalProfile = 'traveler' | 'traveler_approver' | 'approver' | 'admin';
+export type LocalUser = { id: number; name: string | null; email: string | null; role: 'user' | 'admin'; profile: LocalProfile; birthDate: string | null; active: boolean; createdAt?: string; lastSignedIn?: string };
+
+export async function createLocalUser(input: { name: string; email: string; password: string; role: "user" | "admin"; profile: LocalProfile; birthDate?: string | null }) {
+  return apiCall<{ user: LocalUser }>("/api/auth/local/users", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listLocalUsers(): Promise<LocalUser[]> {
+  const result = await apiCall<{ users: LocalUser[] }>("/api/auth/local/users");
+  return result.users;
+}
+
+export async function updateLocalUser(userId: number, input: { name: string; profile: LocalProfile; birthDate?: string | null }): Promise<LocalUser> {
+  const result = await apiCall<{ user: LocalUser }>(`/api/auth/local/users/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+  return result.user;
+}
+
+export async function resetLocalUserPassword(userId: number, password: string): Promise<void> {
+  await apiCall<{ success: true }>(`/api/auth/local/users/${userId}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+}
+
+// Autoatendimento: o próprio usuário troca a senha, informando a atual —
+// diferente de resetLocalUserPassword (só o Administrativo, sem pedir a
+// senha atual, redefinindo a de qualquer outra pessoa).
+export async function changeOwnPassword(currentPassword: string, newPassword: string): Promise<void> {
+  await apiCall<{ success: true }>('/api/auth/local/me/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+}
+
+export async function setLocalUserActive(userId: number, active: boolean): Promise<LocalUser> {
+  const result = await apiCall<{ user: LocalUser }>(`/api/auth/local/users/${userId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ active }),
+  });
+  return result.user;
+}
+
+// Legacy OAuth callback handler retained only for native compatibility during migration.
+// Production web authentication uses loginLocal above.
 // Calls /api/oauth/mobile endpoint which returns JSON with app_session_id and user
 export async function exchangeOAuthCode(
   code: string,
@@ -118,7 +178,7 @@ export async function exchangeOAuthCode(
 
 // Logout
 export async function logout(): Promise<void> {
-  await apiCall<void>("/api/auth/logout", {
+  await apiCall<void>("/api/auth/local/logout", {
     method: "POST",
   });
 }
@@ -131,9 +191,13 @@ export async function getMe(): Promise<{
   email: string | null;
   loginMethod: string | null;
   lastSignedIn: string;
+  role: "user" | "admin";
+  profile?: LocalProfile;
+  birthDate?: string | null;
+  active?: boolean;
 } | null> {
   try {
-    const result = await apiCall<{ user: any }>("/api/auth/me");
+    const result = await apiCall<{ user: any }>("/api/auth/local/me");
     return result.user || null;
   } catch (error) {
     console.error("[API] getMe failed:", error);
@@ -146,7 +210,7 @@ export async function getMe(): Promise<{
 export async function establishSession(token: string): Promise<boolean> {
   try {
     console.log("[API] establishSession: setting cookie on backend...");
-    const baseUrl = getApiBaseUrl();
+    const baseUrl = getLocalApiBaseUrl();
     const url = `${baseUrl}/api/auth/session`;
 
     const response = await fetch(url, {

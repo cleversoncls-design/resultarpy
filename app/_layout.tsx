@@ -2,13 +2,16 @@ import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { Platform } from "react-native";
+import { ActivityIndicator, Platform, Text, View } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { DemoRoleProvider } from "@/lib/demo-role";
+import { useAuth } from "@/hooks/use-auth";
+import { useColors } from "@/hooks/use-colors";
+import LoginScreen from "./login";
 import { CurrencyProvider } from "@/lib/currency-provider";
 import { LanguageProvider } from "@/lib/language-provider";
 import { DesktopRouteShell } from "@/components/desktop-route-shell";
@@ -21,7 +24,7 @@ import {
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
-import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
+import { subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -31,20 +34,34 @@ export const unstable_settings = {
   anchor: "(tabs)",
 };
 
+function AppSessionBoundary({ children }: { children: ReactNode }) {
+  const colors = useColors();
+  const { user, loading } = useAuth();
+  const pathname = usePathname();
+  const requireRealAuth = true;
+  const isOAuthCallback = pathname.startsWith("/oauth/callback");
+
+  if (requireRealAuth && !isOAuthCallback) {
+    if (loading) {
+      return <View style={{ backgroundColor: colors.background }} className="flex-1 items-center justify-center"><ActivityIndicator color={colors.primary} /><Text className="mt-3 text-sm text-muted">Verificando sessão…</Text></View>;
+    }
+    if (!user) return <LoginScreen />;
+    const role = user.role === "admin" ? "Administrativo" : "Viajante";
+    return <DemoRoleProvider lockedRole={role}>{children}</DemoRoleProvider>;
+  }
+
+  return <DemoRoleProvider lockedRole="Viajante">{children}</DemoRoleProvider>;
+}
+
 export default function RootLayout() {
   const pathname = usePathname();
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
-  const standaloneRoutes = ['/new-trip', '/expenses', '/fleet-reservation', '/maintenance-report', '/new-vehicle', '/new-work-order', '/fleet-cadastros', '/general-cadastros', '/trip-detail', '/administrativo', '/aprovador', '/viajante'];
+  const standaloneRoutes = ['/new-trip', '/expenses', '/fleet-reservation', '/maintenance-report', '/new-vehicle', '/new-work-order', '/fleet-cadastros', '/general-cadastros', '/cadastro-detalhe', '/closure-queue', '/admin-users', '/currency-settings', '/vehicle-detail', '/trip-detail', '/administrativo', '/aprovador', '/viajante'];
   const useStandaloneShell = Platform.OS === 'web' && standaloneRoutes.some((route) => pathname.startsWith(route));
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
-
-  // Initialize Manus runtime for cookie injection from parent container
-  useEffect(() => {
-    initManusRuntime();
-  }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);
@@ -88,18 +105,18 @@ export default function RootLayout() {
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <DemoRoleProvider>
-        <CurrencyProvider>
-          <LanguageProvider>
-            <TrpcProvider client={trpcClient} queryClient={queryClient}>
-            <QueryClientProvider client={queryClient}>
-              {useStandaloneShell ? <DesktopRouteShell><Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack></DesktopRouteShell> : <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack>}
+      <AppSessionBoundary>
+        <TrpcProvider client={trpcClient} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            <CurrencyProvider>
+              <LanguageProvider>
+                {useStandaloneShell ? <DesktopRouteShell><Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack></DesktopRouteShell> : <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack>}
+              </LanguageProvider>
               <StatusBar style="auto" />
-            </QueryClientProvider>
-            </TrpcProvider>
-          </LanguageProvider>
-        </CurrencyProvider>
-      </DemoRoleProvider>
+            </CurrencyProvider>
+          </QueryClientProvider>
+        </TrpcProvider>
+      </AppSessionBoundary>
     </GestureHandlerRootView>
   );
 

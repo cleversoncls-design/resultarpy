@@ -1,6 +1,6 @@
 import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 type UseAuthOptions = {
@@ -12,8 +12,10 @@ export function useAuth(options?: UseAuthOptions) {
   const [user, setUser] = useState<Auth.User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const requestSequence = useRef(0);
 
   const fetchUser = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     console.log("[useAuth] fetchUser called");
     try {
       setLoading(true);
@@ -25,6 +27,7 @@ export function useAuth(options?: UseAuthOptions) {
         const apiUser = await Api.getMe();
         console.log("[useAuth] API user response:", apiUser);
 
+        if (requestId !== requestSequence.current) return;
         if (apiUser) {
           const userInfo: Auth.User = {
             id: apiUser.id,
@@ -33,12 +36,17 @@ export function useAuth(options?: UseAuthOptions) {
             email: apiUser.email,
             loginMethod: apiUser.loginMethod,
             lastSignedIn: new Date(apiUser.lastSignedIn),
+            role: apiUser.role,
+            profile: apiUser.profile,
+            birthDate: apiUser.birthDate ?? null,
+            active: apiUser.active,
           };
           setUser(userInfo);
           // Cache user info in localStorage for faster subsequent loads
           await Auth.setUserInfo(userInfo);
           console.log("[useAuth] Web user set from API:", userInfo);
         } else {
+          if (requestId !== requestSequence.current) return;
           console.log("[useAuth] Web: No authenticated user from API");
           setUser(null);
           await Auth.clearUserInfo();
@@ -72,8 +80,10 @@ export function useAuth(options?: UseAuthOptions) {
     } catch (err) {
       const error = err instanceof Error ? err : new Error("Failed to fetch user");
       console.error("[useAuth] fetchUser error:", error);
-      setError(error);
-      setUser(null);
+      if (requestId === requestSequence.current) {
+        setError(error);
+        setUser(null);
+      }
     } finally {
       setLoading(false);
       console.log("[useAuth] fetchUser completed, loading:", false);
@@ -100,9 +110,15 @@ export function useAuth(options?: UseAuthOptions) {
     console.log("[useAuth] useEffect triggered, autoFetch:", autoFetch, "platform:", Platform.OS);
     if (autoFetch) {
       if (Platform.OS === "web") {
-        // Web: fetch user from API directly (user will login manually if needed)
+        // Web: fetch user from API directly and refresh when LoginScreen establishes a cookie.
         console.log("[useAuth] Web: fetching user from API...");
-        fetchUser();
+        void fetchUser();
+        const handleAuthChanged = () => {
+          console.log("[useAuth] Web: auth-changed event received");
+          void fetchUser();
+        };
+        window.addEventListener("local-auth-changed", handleAuthChanged);
+        return () => window.removeEventListener("local-auth-changed", handleAuthChanged);
       } else {
         // Native: check for cached user info first for faster initial load
         Auth.getUserInfo().then((cachedUser) => {

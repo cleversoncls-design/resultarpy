@@ -1,0 +1,3 @@
+-- Esvaziado: a tabela "cities" já existia (criada na migração 0018).
+-- Esta migração foi gerada por engano devido a uma dessincronia no
+-- histórico do Drizzle após uma correção manual anterior.
