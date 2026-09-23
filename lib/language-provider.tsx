@@ -94,6 +94,10 @@ const translations: Record<TranslationKey, string> = {
 
   'Total pendentes': 'Total pendientes', 'Aguardando validação': 'Esperando validación',
 
+  'Adiantamento pendente': 'Anticipo pendiente', 'Hotel pendente': 'Hotel pendiente', 'Veículo pendente': 'Vehículo pendiente', 'Viagens aprovadas que ainda aguardam alguma pendência antes de serem liberadas para viagem. A liberação acontece automaticamente ao resolver cada pendência.': 'Viajes aprobados que todavía esperan alguna pendiente antes de ser liberados para viaje. La liberación ocurre automáticamente al resolver cada pendiente.', 'Não há viagens aprovadas aguardando preparação no momento.': 'No hay viajes aprobados esperando preparación en este momento.',
+
+  'Administrativo · Reserva de frota': 'Administrativo · Reserva de flota', 'Associar veículo': 'Asociar vehículo', 'Use os dados da viagem aberta para reservar um veículo disponível e confirmar o condutor.': 'Use los datos del viaje abierto para reservar un vehículo disponible y confirmar el conductor.', 'Viagem solicitante': 'Viaje solicitante', 'Veículos disponíveis': 'Vehículos disponibles', 'opções': 'opciones', 'Confirmar reserva': 'Confirmar reserva', 'Não há reservas aguardando veículo no momento.': 'No hay reservas esperando vehículo en este momento.', 'Reserva confirmada': 'Reserva confirmada', 'foi reservado para': 'fue reservado para', 'Não foi possível confirmar a reserva.': 'No fue posible confirmar la reserva.', 'Escolha um veículo disponível para vincular à viagem.': 'Elija un vehículo disponible para vincular al viaje.',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';
