@@ -2,7 +2,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { router, useLocalSearchParams } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { StatusPill } from '@/components/app-ui';
+import { StatusPill, statusTone } from '@/components/app-ui';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/hooks/use-auth';
 import { useLanguage } from '@/lib/language-provider';
@@ -50,7 +50,7 @@ export default function VehicleDetailScreen() {
             <StatusPill status={vehicle.status} />
           </View>
 
-          <View className="mt-6 rounded-2xl border border-border bg-surface p-5">
+          <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="mt-6 rounded-2xl border border-border bg-surface p-5">
             <Text className="mb-3 text-xs font-bold uppercase tracking-widest text-muted">{t('Dados do veículo')}</Text>
             <View className="gap-3">
               <InfoRow label={t('KM atuais')} value={`${vehicle.currentKm.toLocaleString('pt-BR')} km`} />
@@ -89,7 +89,7 @@ export default function VehicleDetailScreen() {
           ) : (
             <View className="gap-3">
               {reservations.map((item: any) => (
-                <View key={item.id} className="rounded-2xl border border-border bg-surface p-4">
+                <View key={item.id} style={{ borderLeftWidth: 3, borderLeftColor: statusTone(item.status, colors).color }} className="rounded-2xl border border-border bg-surface p-4">
                   <View className="flex-row items-start justify-between">
                     <View className="flex-1 pr-3">
                       <Text className="text-xs font-bold tracking-wider text-muted">{item.tripCode ?? `#${item.tripId}`}{item.destination ? ` · ${item.destination}` : ''}</Text>
