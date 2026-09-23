@@ -29,6 +29,21 @@ export function MetricCard({ label, value, accent }: { label: string; value: str
   return <View className="flex-1 rounded-xl border border-border bg-surface p-4"><Text className="text-xs font-medium text-muted">{label}</Text><Text style={{ color: accent ?? colors.foreground }} className="mt-2 text-2xl font-bold">{value}</Text></View>;
 }
 
+// Cartão de indicador no padrão do protótipo de layout: faixa colorida no
+// topo, valor grande e rótulo pequeno em maiúsculas embaixo (ao contrário
+// do MetricCard, que mostra o rótulo em cima). Usado nos painéis com KPIs
+// (ex.: Visão geral).
+export function KpiCard({ label, value, color }: { label: string; value: string; color?: string }) {
+  const colors = useColors();
+  const barColor = color ?? colors.foreground;
+  return (
+    <View style={{ flex: 1, minWidth: 148, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderTopWidth: 3, borderTopColor: barColor, borderRadius: 12, padding: 16 }}>
+      <Text style={{ fontSize: 25, fontWeight: '800', color: colors.foreground, lineHeight: 28 }} numberOfLines={1}>{value}</Text>
+      <Text style={{ marginTop: 7, fontSize: 11, fontWeight: '700', color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</Text>
+    </View>
+  );
+}
+
 export function EmptyState({ title, detail }: { title: string; detail: string }) {
   return <View className="items-center rounded-2xl border border-dashed border-border bg-surface px-6 py-8"><Text className="text-base font-bold text-foreground">{title}</Text><Text className="mt-2 text-center text-sm leading-5 text-muted">{detail}</Text></View>;
 }
