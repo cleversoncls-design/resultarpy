@@ -59,8 +59,8 @@ export default function CurrencySettingsScreen() {
                   className="flex-row items-center rounded-2xl border p-5"
                 >
                   <View className="flex-1">
-                    <Text className="text-base font-bold text-foreground">{option.label}</Text>
-                    <Text className="mt-1 text-sm text-muted">{option.description}</Text>
+                    <Text className="text-base font-bold text-foreground">{t(option.label)}</Text>
+                    <Text className="mt-1 text-sm text-muted">{t(option.description)}</Text>
                     {selected ? <Text style={{ color: colors.primary }} className="mt-2 text-xs font-bold uppercase tracking-wider">{t('Moeda atual do sistema')}</Text> : null}
                   </View>
                   {selected ? <IconSymbol name="checkmark.circle.fill" size={24} color={colors.primary} /> : null}
