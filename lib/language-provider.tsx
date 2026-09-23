@@ -108,6 +108,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Informe marca, modelo, ano, placa, unidade, KM atual e intervalo.': 'Indique marca, modelo, año, placa, unidad, KM actual e intervalo.', 'Sua sessão expirou. Entre novamente para cadastrar um veículo.': 'Su sesión expiró. Ingrese nuevamente para registrar un vehículo.', 'Veículo atualizado com sucesso.': 'Vehículo actualizado con éxito.', 'Veículo cadastrado com sucesso.': 'Vehículo registrado con éxito.', 'Não foi possível salvar o veículo. Tente novamente.': 'No fue posible guardar el vehículo. Intente nuevamente.',
 
+  'Conta e preferências': 'Cuenta y preferencias',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';
