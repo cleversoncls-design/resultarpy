@@ -88,6 +88,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Rascunho': 'Borrador', 'Rejeitadas / Devolvidas': 'Rechazadas / Devueltas', 'Buscar por código, destino, cliente ou responsável...': 'Buscar por código, destino, cliente o responsable...', 'Todos os status': 'Todos los estados', 'Nenhum cliente encontrado nas viagens listadas': 'Ningún cliente encontrado en los viajes listados', 'Início (AAAA-MM-DD)': 'Inicio (AAAA-MM-DD)', 'Fim (AAAA-MM-DD)': 'Fin (AAAA-MM-DD)', 'Destino': 'Destino', 'Responsável': 'Responsable', 'até': 'hasta', 'Abrir': 'Abrir', 'Nenhuma viagem para os filtros selecionados.': 'Ningún viaje para los filtros seleccionados.',
 
+  'Pendentes': 'Pendientes', 'Devolvidas': 'Devueltas', 'Valor em adiantamentos': 'Valor en anticipos',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';
