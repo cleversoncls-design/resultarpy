@@ -86,6 +86,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Senha': 'Contraseña', 'Entrar': 'Ingresar', 'Mostrar': 'Mostrar', 'Ocultar': 'Ocultar', 'Mostrar senha': 'Mostrar contraseña', 'Ocultar senha': 'Ocultar contraseña', 'Preciso recuperar meu acesso': 'Necesito recuperar mi acceso', 'Acesso privado da organização': 'Acceso privado de la organización', 'Usuários e permissões são gerenciados pelo Administrador.': 'Los usuarios y permisos son administrados por el Administrador.', 'Controle de Viagens e Frota': 'Control de Viajes y Flota',
 
+  'Rascunho': 'Borrador', 'Rejeitadas / Devolvidas': 'Rechazadas / Devueltas', 'Buscar por código, destino, cliente ou responsável...': 'Buscar por código, destino, cliente o responsable...', 'Todos os status': 'Todos los estados', 'Nenhum cliente encontrado nas viagens listadas': 'Ningún cliente encontrado en los viajes listados', 'Início (AAAA-MM-DD)': 'Inicio (AAAA-MM-DD)', 'Fim (AAAA-MM-DD)': 'Fin (AAAA-MM-DD)', 'Destino': 'Destino', 'Responsável': 'Responsable', 'até': 'hasta', 'Abrir': 'Abrir', 'Nenhuma viagem para os filtros selecionados.': 'Ningún viaje para los filtros seleccionados.',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';

@@ -3,10 +3,19 @@ import { useColors } from '@/hooks/use-colors';
 import type { TripStatus } from '@/lib/demo-data';
 import { useLanguage } from '@/lib/language-provider';
 
+// Extraído do StatusPill para poder ser reaproveitado onde só a cor (sem o
+// componente inteiro do "pill") é necessária — ex.: a faixa colorida na
+// borda esquerda das linhas da tabela de viagens.
+export function statusTone(status: TripStatus | string, colors: ReturnType<typeof useColors>) {
+  if (status.includes('Final') || status.includes('Liber') || status.includes('Aprov')) return { backgroundColor: `${colors.success}22`, color: colors.success };
+  if (status.includes('Reje')) return { backgroundColor: `${colors.error}22`, color: colors.error };
+  return { backgroundColor: `${colors.warning}25`, color: colors.warning };
+}
+
 export function StatusPill({ status }: { status: TripStatus | string }) {
   const colors = useColors();
   const { t } = useLanguage();
-  const tone = status.includes('Final') || status.includes('Liber') || status.includes('Aprov') ? { backgroundColor: `${colors.success}22`, color: colors.success } : status.includes('Reje') ? { backgroundColor: `${colors.error}22`, color: colors.error } : { backgroundColor: `${colors.warning}25`, color: colors.warning };
+  const tone = statusTone(status, colors);
   return <View style={{ backgroundColor: tone.backgroundColor, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' }}><Text style={{ color: tone.color }} className="text-xs font-semibold">{t(status)}</Text></View>;
 }
 
