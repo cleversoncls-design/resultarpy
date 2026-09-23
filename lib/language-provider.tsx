@@ -90,6 +90,10 @@ const translations: Record<TranslationKey, string> = {
 
   'Pendentes': 'Pendientes', 'Devolvidas': 'Devueltas', 'Valor em adiantamentos': 'Valor en anticipos',
 
+  'registros cadastrados': 'registros', 'Buscar por nome...': 'Buscar por nombre...', 'Nenhum registro encontrado para a busca.': 'Ningún registro encontrado para la búsqueda.',
+
+  'Total pendentes': 'Total pendientes', 'Aguardando validação': 'Esperando validación',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';
