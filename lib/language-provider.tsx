@@ -98,6 +98,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Administrativo · Reserva de frota': 'Administrativo · Reserva de flota', 'Associar veículo': 'Asociar vehículo', 'Use os dados da viagem aberta para reservar um veículo disponível e confirmar o condutor.': 'Use los datos del viaje abierto para reservar un vehículo disponible y confirmar el conductor.', 'Viagem solicitante': 'Viaje solicitante', 'Veículos disponíveis': 'Vehículos disponibles', 'opções': 'opciones', 'Confirmar reserva': 'Confirmar reserva', 'Não há reservas aguardando veículo no momento.': 'No hay reservas esperando vehículo en este momento.', 'Reserva confirmada': 'Reserva confirmada', 'foi reservado para': 'fue reservado para', 'Não foi possível confirmar a reserva.': 'No fue posible confirmar la reserva.', 'Escolha um veículo disponível para vincular à viagem.': 'Elija un vehículo disponible para vincular al viaje.',
 
+  'Data Início Viagem': 'Fecha Inicio Viaje', 'Data Fim Viagem': 'Fecha Fin Viaje',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';
