@@ -106,6 +106,8 @@ const translations: Record<TranslationKey, string> = {
 
   'PENDENTE': 'PENDIENTE', 'CONFIRMADO': 'CONFIRMADO', 'Não foi possível carregar os detalhes desta viagem.': 'No fue posible cargar los detalles de este viaje.', 'Fechamento enviado em': 'Cierre enviado el', 'Aguardando validação do Administrativo.': 'Esperando validación del Administrativo.', 'Anexar fotos da avaria': 'Adjuntar fotos de la avería', 'Eventos registrados': 'Eventos registrados',
 
+  'Informe marca, modelo, ano, placa, unidade, KM atual e intervalo.': 'Indique marca, modelo, año, placa, unidad, KM actual e intervalo.', 'Sua sessão expirou. Entre novamente para cadastrar um veículo.': 'Su sesión expiró. Ingrese nuevamente para registrar un vehículo.', 'Veículo atualizado com sucesso.': 'Vehículo actualizado con éxito.', 'Veículo cadastrado com sucesso.': 'Vehículo registrado con éxito.', 'Não foi possível salvar o veículo. Tente novamente.': 'No fue posible guardar el vehículo. Intente nuevamente.',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';
