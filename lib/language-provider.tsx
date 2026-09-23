@@ -110,6 +110,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Conta e preferências': 'Cuenta y preferencias',
 
+  'Informe seu e-mail e sua senha.': 'Indique su correo electrónico y contraseña.', 'Não foi possível realizar o login.': 'No fue posible iniciar sesión.', 'A redefinição de senha deve ser solicitada ao Administrador.': 'El restablecimiento de contraseña debe solicitarse al Administrador.',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';

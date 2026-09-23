@@ -24,7 +24,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     setError(null);
     if (!email.trim() || !password) {
-      setError("Informe seu e-mail e sua senha.");
+      setError(t("Informe seu e-mail e sua senha."));
       return;
     }
     try {
@@ -47,7 +47,7 @@ export default function LoginScreen() {
       }
       router.replace("/(tabs)");
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "Não foi possível realizar o login.");
+      setError(loginError instanceof Error ? loginError.message : t("Não foi possível realizar o login."));
     } finally {
       setBusy(false);
     }
@@ -143,7 +143,7 @@ export default function LoginScreen() {
             </View>
 
             <Pressable
-              onPress={() => setError("A redefinição de senha deve ser solicitada ao Administrador.")}
+              onPress={() => setError(t("A redefinição de senha deve ser solicitada ao Administrador."))}
               style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
             >
               <Text style={{ color: NAV_COLORS.fg, fontSize: 12.5, textAlign: "center", marginTop: 16 }}>{t("Preciso recuperar meu acesso")}</Text>
