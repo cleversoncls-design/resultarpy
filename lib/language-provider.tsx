@@ -84,6 +84,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Solicitado por': 'Solicitado por',
 
+  'Senha': 'Contraseña', 'Entrar': 'Ingresar', 'Mostrar': 'Mostrar', 'Ocultar': 'Ocultar', 'Mostrar senha': 'Mostrar contraseña', 'Ocultar senha': 'Ocultar contraseña', 'Preciso recuperar meu acesso': 'Necesito recuperar mi acceso', 'Acesso privado da organização': 'Acceso privado de la organización', 'Usuários e permissões são gerenciados pelo Administrador.': 'Los usuarios y permisos son administrados por el Administrador.', 'Controle de Viagens e Frota': 'Control de Viajes y Flota',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';

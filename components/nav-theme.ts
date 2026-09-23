@@ -15,6 +15,10 @@ export const NAV_COLORS = {
   topAccent: '#EF6C2E',
   activeBg: 'rgba(255,255,255,0.09)',
   hoverBg: 'rgba(255,255,255,0.06)',
+  // Usados na tela de login (campos e placeholder sobre o card escuro).
+  fieldBg: '#101C22',
+  placeholder: '#5C7377',
+  error: '#FF9B9B',
 };
 
 export const NAV_WIDTH_EXPANDED = 252;
