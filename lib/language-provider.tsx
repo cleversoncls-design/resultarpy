@@ -100,6 +100,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Data Início Viagem': 'Fecha Inicio Viaje', 'Data Fim Viagem': 'Fecha Fin Viaje',
 
+  'Ano atual': 'Año actual', 'Nenhuma manutenção encontrada para os filtros selecionados.': 'Ningún mantenimiento encontrado para los filtros seleccionados.', 'O.S.': 'O.S.', 'Sem motivo cadastrado': 'Sin motivo registrado', 'Total': 'Total', 'Veículo': 'Vehículo',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';
