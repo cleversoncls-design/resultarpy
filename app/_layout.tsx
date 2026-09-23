@@ -105,18 +105,23 @@ export default function RootLayout() {
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppSessionBoundary>
-        <TrpcProvider client={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}>
-            <CurrencyProvider>
-              <LanguageProvider>
+      {/* LanguageProvider precisa envolver o AppSessionBoundary (e não só os
+          "children" dele): quando não há usuário autenticado, o boundary
+          retorna a LoginScreen diretamente, sem renderizar children — e a
+          tela de login também usa useLanguage() (seletor de idioma e
+          traduções do card de login). */}
+      <LanguageProvider>
+        <AppSessionBoundary>
+          <TrpcProvider client={trpcClient} queryClient={queryClient}>
+            <QueryClientProvider client={queryClient}>
+              <CurrencyProvider>
                 {useStandaloneShell ? <DesktopRouteShell><Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack></DesktopRouteShell> : <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack>}
-              </LanguageProvider>
-              <StatusBar style="auto" />
-            </CurrencyProvider>
-          </QueryClientProvider>
-        </TrpcProvider>
-      </AppSessionBoundary>
+                <StatusBar style="auto" />
+              </CurrencyProvider>
+            </QueryClientProvider>
+          </TrpcProvider>
+        </AppSessionBoundary>
+      </LanguageProvider>
     </GestureHandlerRootView>
   );
 

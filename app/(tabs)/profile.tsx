@@ -75,7 +75,7 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <Text className="text-sm font-medium text-muted">{t('Conta e preferências')}</Text>
         <Text className="mt-1 text-3xl font-bold text-foreground">{t('Perfil')}</Text>
-        <View className="mt-6 flex-row items-center rounded-3xl border border-border bg-surface p-5">
+        <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="mt-6 flex-row items-center rounded-3xl border border-border bg-surface p-5">
           <View style={{ backgroundColor: `${colors.primary}18` }} className="h-14 w-14 items-center justify-center rounded-2xl"><Text className="text-xl font-bold text-primary">{initials}</Text></View>
           <View className="ml-4 flex-1"><Text className="text-lg font-bold text-foreground">{currentName}</Text><Text className="mt-1 text-sm text-muted">{currentEmail}</Text><Text className="mt-1 text-xs font-semibold text-primary">{t('Perfil autenticado')}: {t(role)}</Text></View>
         </View>
@@ -122,7 +122,7 @@ export default function ProfileScreen() {
         <View className="mt-3 flex-row items-center rounded-xl px-3 py-2"><IconSymbol name="bell.fill" size={19} color={colors.primary} /><Text className="ml-3 flex-1 font-semibold text-foreground">{t('Notificações')}</Text><Text className="text-sm text-muted">{t('Ativadas')}</Text></View>
 
         <Text className="mb-2 mt-8 text-xs font-bold uppercase tracking-widest text-muted">{t('Segurança')}</Text>
-        <View className="rounded-2xl border border-border bg-surface p-4">
+        <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="rounded-2xl border border-border bg-surface p-4">
           <Text className="text-base font-bold text-foreground">{t('Trocar minha senha')}</Text>
           <Text className="mt-1 text-sm leading-5 text-muted">{t('Confirme a senha atual para definir uma nova.')}</Text>
 

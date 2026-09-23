@@ -92,6 +92,7 @@ export default function CatalogDetailScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<CatalogDraft>(emptyDraft);
   const [formError, setFormError] = useState('');
+  const [listSearch, setListSearch] = useState('');
 
   // Só a consulta do tipo de cadastro atual é habilitada — diferente da
   // tela antiga, que buscava os 8 cadastros de uma vez na mesma página.
@@ -165,6 +166,14 @@ export default function CatalogDetailScreen() {
     maintenanceReasons: maintenanceReasonRows,
   };
   const currentRows = kind ? rowsByKind[kind] : [];
+  // Busca local por nome, no mesmo padrão de filtro em memória já usado em
+  // Minhas viagens — não substitui a busca de vínculo (CatalogSearch), que
+  // é usada só dentro do modal de criar/editar.
+  const filteredRows = useMemo(() => {
+    const query = listSearch.trim().toLocaleLowerCase();
+    if (!query) return currentRows;
+    return currentRows.filter((row) => ('name' in row ? row.name : '').toLocaleLowerCase().includes(query));
+  }, [currentRows, listSearch]);
 
   const activeQuery = kind === 'units' ? unitsQuery
     : kind === 'cities' ? citiesQuery
@@ -327,6 +336,7 @@ export default function CatalogDetailScreen() {
               <Text className="text-sm font-medium text-muted">{t('Administrativo · Cadastros')}</Text>
               <Text className="mt-1 text-3xl font-bold text-foreground">{t(meta.title)}</Text>
               <Text className="mt-2 text-sm leading-5 text-muted">{t(meta.description)}</Text>
+              <Text className="mt-2 text-xs font-bold text-muted">{currentRows.length} {t('registros cadastrados')}</Text>
             </View>
             <Pressable onPress={openCreate} style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 10, minHeight: 40, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.75 : 1 })}><Text className="font-bold text-white">+ {t('Novo')}</Text></Pressable>
           </View>
@@ -335,11 +345,18 @@ export default function CatalogDetailScreen() {
           {hasError && <View className="mt-4 rounded-xl border border-error bg-surface p-4"><Text className="font-semibold text-error">{t('Não foi possível carregar este cadastro.')}</Text><Pressable onPress={refresh} style={({ pressed }) => ({ alignSelf: 'flex-start', marginTop: 10, opacity: pressed ? 0.65 : 1 })}><Text className="font-bold text-primary">{t('Tentar novamente')}</Text></Pressable></View>}
           {isLoading && <View className="mt-6 flex-row items-center rounded-xl border border-border bg-surface p-4"><ActivityIndicator color={colors.primary} /><Text className="ml-3 text-sm text-muted">{t('Carregando cadastros...')}</Text></View>}
 
-          <View className="mt-6 rounded-2xl border border-border bg-surface p-2">
-            {!isLoading && currentRows.length === 0 ? (
-              <Text className="p-4 text-sm text-muted">{t('Nenhum registro cadastrado ainda.')}</Text>
+          {currentRows.length > 6 ? (
+            <View className="mt-5 flex-row items-center rounded-2xl border border-border bg-surface px-4">
+              <TextInput value={listSearch} onChangeText={setListSearch} placeholder={t('Buscar por nome...')} placeholderTextColor={colors.muted} className="flex-1 py-3 text-foreground" />
+              <Text className="text-lg text-muted">⌕</Text>
+            </View>
+          ) : null}
+
+          <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="mt-6 rounded-2xl border border-border bg-surface p-2">
+            {!isLoading && filteredRows.length === 0 ? (
+              <Text className="p-4 text-sm text-muted">{listSearch.trim() ? t('Nenhum registro encontrado para a busca.') : t('Nenhum registro cadastrado ainda.')}</Text>
             ) : (
-              currentRows.map((row, index) => {
+              filteredRows.map((row, index) => {
                 const name = 'name' in row ? row.name : '';
                 const meta2 = 'meta' in row ? row.meta : 'city' in row ? `${row.city}${'code' in row && row.code ? ` · ${row.code}` : ''}` : undefined;
                 return (

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { formatDateDisplay, normalizeDateValue } from '@/lib/date-utils';
-import { Alert, FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Modal, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
-import { StatusPill } from '@/components/app-ui';
+import { KpiCard, StatusPill } from '@/components/app-ui';
 import { CalendarModal } from '@/components/calendar-field';
 import { formatCurrency } from '@/lib/currency';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -24,6 +24,7 @@ export default function ApprovalsScreen() {
   const { t } = useLanguage();
   const { currency } = useCurrency();
   const { isAuthenticated } = useAuth();
+  const { width } = useWindowDimensions();
   const [pendingDecision, setPendingDecision] = useState<{ id: string; action: DecisionAction } | null>(null);
   const [comment, setComment] = useState('');
   const [commentError, setCommentError] = useState<string | null>(null);
@@ -68,6 +69,13 @@ export default function ApprovalsScreen() {
     latestApproval: trip.latestApproval,
   }));
 
+  // Resumo em KPIs, no padrão do protótipo de layout — só para a aba
+  // Pendente, que já traz os dados necessários carregados (as abas de
+  // histórico já mostram o total de registros na paginação abaixo).
+  const pendingAwaitingCount = pendingItems.filter((item) => item.status === 'Aguardando aprovação').length;
+  const pendingReturnedCount = pendingItems.filter((item) => item.status === 'Devolvida').length;
+  const pendingAdvanceTotal = pendingItems.reduce((sum, item) => sum + item.amount, 0);
+
   const openDecision = (id: string, action: DecisionAction) => {
     setPendingDecision({ id, action });
     setComment('');
@@ -107,6 +115,15 @@ export default function ApprovalsScreen() {
         <Text className="text-sm font-medium text-muted">{t('Gestão da equipe')}</Text>
         <Text className="mt-1 text-3xl font-bold text-foreground">{t('Aprovações')}</Text>
         <Text className="mt-2 text-sm leading-5 text-muted">{t('Revise destino, cliente e adiantamento antes de liberar cada viagem.')}</Text>
+
+        {activeTab === 'Pendente' ? (
+          <View className={width < 640 ? 'mt-5 flex-col gap-3' : 'mt-5 flex-row gap-3'}>
+            <KpiCard label={t('Pendentes')} value={String(pendingItems.length)} color={colors.foreground} />
+            <KpiCard label={t('Aguardando aprovação')} value={String(pendingAwaitingCount)} color={colors.warning} />
+            <KpiCard label={t('Devolvidas')} value={String(pendingReturnedCount)} color={colors.error} />
+            <KpiCard label={t('Valor em adiantamentos')} value={formatCurrency(pendingAdvanceTotal, currency)} color={colors.primary} />
+          </View>
+        ) : null}
 
         <View className="mt-5 rounded-3xl border border-border bg-surface p-4">
           <Text className="text-sm font-bold text-foreground">{t('Filtros')}</Text>

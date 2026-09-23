@@ -86,12 +86,12 @@ export default function GeneralRegistrationsScreen() {
               <Pressable
                 key={card.kind}
                 onPress={() => router.push({ pathname: '/cadastro-detalhe', params: { tipo: card.kind } })}
-                style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1 })}
+                style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, borderTopWidth: 3, borderTopColor: colors.primary })}
                 className="min-w-[250px] flex-1 rounded-2xl border border-border bg-surface p-5"
               >
                 <View className="flex-row items-start justify-between">
                   <View style={{ backgroundColor: `${colors.primary}16` }} className="h-11 w-11 items-center justify-center rounded-xl"><IconSymbol name={card.icon} size={22} color={colors.primary} /></View>
-                  <Text className="text-2xl font-bold text-foreground">{card.count}</Text>
+                  <Text style={{ fontSize: 25, fontWeight: '800', lineHeight: 28 }} className="text-foreground">{card.count}</Text>
                 </View>
                 <Text className="mt-5 text-base font-bold text-foreground">{t(card.title)}</Text>
                 <Text className="mt-1 min-h-[42px] text-sm leading-5 text-muted">{t(card.description)}</Text>

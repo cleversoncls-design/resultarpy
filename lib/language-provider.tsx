@@ -84,6 +84,36 @@ const translations: Record<TranslationKey, string> = {
 
   'Solicitado por': 'Solicitado por',
 
+  'Senha': 'Contraseña', 'Entrar': 'Ingresar', 'Mostrar': 'Mostrar', 'Ocultar': 'Ocultar', 'Mostrar senha': 'Mostrar contraseña', 'Ocultar senha': 'Ocultar contraseña', 'Preciso recuperar meu acesso': 'Necesito recuperar mi acceso', 'Acesso privado da organização': 'Acceso privado de la organización', 'Usuários e permissões são gerenciados pelo Administrador.': 'Los usuarios y permisos son administrados por el Administrador.', 'Controle de Viagens e Frota': 'Control de Viajes y Flota',
+
+  'Rascunho': 'Borrador', 'Rejeitadas / Devolvidas': 'Rechazadas / Devueltas', 'Buscar por código, destino, cliente ou responsável...': 'Buscar por código, destino, cliente o responsable...', 'Todos os status': 'Todos los estados', 'Nenhum cliente encontrado nas viagens listadas': 'Ningún cliente encontrado en los viajes listados', 'Início (AAAA-MM-DD)': 'Inicio (AAAA-MM-DD)', 'Fim (AAAA-MM-DD)': 'Fin (AAAA-MM-DD)', 'Destino': 'Destino', 'Responsável': 'Responsable', 'até': 'hasta', 'Abrir': 'Abrir', 'Nenhuma viagem para os filtros selecionados.': 'Ningún viaje para los filtros seleccionados.',
+
+  'Pendentes': 'Pendientes', 'Devolvidas': 'Devueltas', 'Valor em adiantamentos': 'Valor en anticipos',
+
+  'registros cadastrados': 'registros', 'Buscar por nome...': 'Buscar por nombre...', 'Nenhum registro encontrado para a busca.': 'Ningún registro encontrado para la búsqueda.',
+
+  'Total pendentes': 'Total pendientes', 'Aguardando validação': 'Esperando validación',
+
+  'Adiantamento pendente': 'Anticipo pendiente', 'Hotel pendente': 'Hotel pendiente', 'Veículo pendente': 'Vehículo pendiente', 'Viagens aprovadas que ainda aguardam alguma pendência antes de serem liberadas para viagem. A liberação acontece automaticamente ao resolver cada pendência.': 'Viajes aprobados que todavía esperan alguna pendiente antes de ser liberados para viaje. La liberación ocurre automáticamente al resolver cada pendiente.', 'Não há viagens aprovadas aguardando preparação no momento.': 'No hay viajes aprobados esperando preparación en este momento.',
+
+  'Administrativo · Reserva de frota': 'Administrativo · Reserva de flota', 'Associar veículo': 'Asociar vehículo', 'Use os dados da viagem aberta para reservar um veículo disponível e confirmar o condutor.': 'Use los datos del viaje abierto para reservar un vehículo disponible y confirmar el conductor.', 'Viagem solicitante': 'Viaje solicitante', 'Veículos disponíveis': 'Vehículos disponibles', 'opções': 'opciones', 'Confirmar reserva': 'Confirmar reserva', 'Não há reservas aguardando veículo no momento.': 'No hay reservas esperando vehículo en este momento.', 'Reserva confirmada': 'Reserva confirmada', 'foi reservado para': 'fue reservado para', 'Não foi possível confirmar a reserva.': 'No fue posible confirmar la reserva.', 'Escolha um veículo disponível para vincular à viagem.': 'Elija un vehículo disponible para vincular al viaje.',
+
+  'Data Início Viagem': 'Fecha Inicio Viaje', 'Data Fim Viagem': 'Fecha Fin Viaje',
+
+  'Ano atual': 'Año actual', 'Nenhuma manutenção encontrada para os filtros selecionados.': 'Ningún mantenimiento encontrado para los filtros seleccionados.', 'O.S.': 'O.S.', 'Sem motivo cadastrado': 'Sin motivo registrado', 'Total': 'Total', 'Veículo': 'Vehículo',
+
+  'Usuário desbloqueado.': 'Usuario desbloqueado.', 'Não foi possível carregar os usuários.': 'No fue posible cargar los usuarios.', 'As sessões ativas serão encerradas.': 'Las sesiones activas serán cerradas.', 'nome@empresa.com': 'nombre@empresa.com', 'Não foi possível criar o usuário.': 'No fue posible crear el usuario.', 'Bloquear usuário': 'Bloquear usuario', 'Atualizando…': 'Actualizando…', 'Nova senha (mínimo de 10 caracteres)': 'Nueva contraseña (mínimo de 10 caracteres)', 'Somente o Administrador pode gerenciar usuários locais.': 'Solo el Administrador puede gestionar usuarios locales.', 'Usuário bloqueado.': 'Usuario bloqueado.', 'Informe o nome do usuário.': 'Indique el nombre del usuario.', 'Senha redefinida e sessões anteriores encerradas.': 'Contraseña redefinida y sesiones anteriores cerradas.', 'Bloquear': 'Bloquear', 'Desbloquear acesso': 'Desbloquear acceso', 'Bloquear acesso': 'Bloquear acceso', 'Informe nome, e-mail e senha.': 'Indique nombre, correo electrónico y contraseña.', 'Usuário atualizado com sucesso.': 'Usuario actualizado con éxito.', 'Informe a nova senha.': 'Indique la nueva contraseña.', 'Bloquear o acesso de': 'Bloquear el acceso de', 'Não foi possível editar o usuário.': 'No fue posible editar el usuario.', 'Informe uma data de nascimento válida no formato dd/mm/aaaa.': 'Indique una fecha de nacimiento válida en el formato dd/mm/aaaa.', 'Usuário criado com sucesso.': 'Usuario creado con éxito.', 'Não foi possível atualizar o usuário.': 'No fue posible actualizar el usuario.', 'Salvar senha': 'Guardar contraseña', 'Não foi possível redefinir a senha.': 'No fue posible redefinir la contraseña.', 'Viajante + Aprovador': 'Viajero + Aprobador', 'Acompanha as próprias viagens e presta contas.': 'Acompaña sus propios viajes y rinde cuentas.', 'Viaja, presta contas e aprova solicitações.': 'Viaja, rinde cuentas y aprueba solicitudes.', 'Analisa e aprova solicitações de viagem.': 'Analiza y aprueba solicitudes de viaje.', 'Acesso completo à gestão da organização.': 'Acceso completo a la gestión de la organización.', 'traduções': 'traducciones',
+
+  'PENDENTE': 'PENDIENTE', 'CONFIRMADO': 'CONFIRMADO', 'Não foi possível carregar os detalhes desta viagem.': 'No fue posible cargar los detalles de este viaje.', 'Fechamento enviado em': 'Cierre enviado el', 'Aguardando validação do Administrativo.': 'Esperando validación del Administrativo.', 'Anexar fotos da avaria': 'Adjuntar fotos de la avería', 'Eventos registrados': 'Eventos registrados',
+
+  'Informe marca, modelo, ano, placa, unidade, KM atual e intervalo.': 'Indique marca, modelo, año, placa, unidad, KM actual e intervalo.', 'Sua sessão expirou. Entre novamente para cadastrar um veículo.': 'Su sesión expiró. Ingrese nuevamente para registrar un vehículo.', 'Veículo atualizado com sucesso.': 'Vehículo actualizado con éxito.', 'Veículo cadastrado com sucesso.': 'Vehículo registrado con éxito.', 'Não foi possível salvar o veículo. Tente novamente.': 'No fue posible guardar el vehículo. Intente nuevamente.',
+
+  'Conta e preferências': 'Cuenta y preferencias',
+
+  'Informe seu e-mail e sua senha.': 'Indique su correo electrónico y contraseña.', 'Não foi possível realizar o login.': 'No fue posible iniciar sesión.', 'A redefinição de senha deve ser solicitada ao Administrador.': 'El restablecimiento de contraseña debe solicitarse al Administrador.',
+
+  'Informe um valor válido': 'Indique un valor válido', 'Digite o valor efetivamente depositado antes de confirmar.': 'Ingrese el valor efectivamente depositado antes de confirmar.',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';

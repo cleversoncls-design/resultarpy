@@ -51,10 +51,14 @@ export async function listTrips(input: PageInput & { status?: string; travelerId
     input.userId ? eq(travelers.userId, input.userId) : undefined,
   ].filter(Boolean);
   const paging = page(input);
-  const query = db.select({ trip: trips }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id));
+  // clientName/travelerName entram aqui (join extra, igual ao que getTrip já
+  // fazia para uma viagem só) para a tabela "Minhas viagens" no padrão do
+  // protótipo poder mostrar Cliente e Responsável reais, em vez de só
+  // "Cliente vinculado"/"Sem cliente".
+  const query = db.select({ trip: trips, clientName: clients.name, travelerName: travelers.name }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).leftJoin(clients, eq(trips.clientId, clients.id));
   const rows = await query.where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(trips.startsOn) : asc(trips.startsOn)).limit(paging.limit).offset(paging.offset);
   const [{ total }] = await db.select({ total: count() }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(filters.length ? and(...filters) : undefined);
-  return { items: rows.map(({ trip }) => trip), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+  return { items: rows.map(({ trip, clientName, travelerName }) => ({ ...trip, clientName, travelerName })), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
 
 export async function getTrip(id: number, scope: Scope = {}) {

@@ -272,9 +272,13 @@ export default function ReimbursementsScreen() {
                   <Text className="text-sm text-muted">{t('Nenhum gasto persistido para os filtros selecionados.')}</Text>
                 </View>
               ) : (
-                <View className="rounded-2xl border border-border bg-surface p-2">
+                <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="rounded-2xl border border-border bg-surface p-2">
                   {rows.map((row) => (
-                    <View key={row.id} className="border-b border-border p-4 last:border-b-0">
+                    <View
+                      key={row.id}
+                      style={{ borderLeftWidth: 3, borderLeftColor: row.reimbursementRejectedAt ? colors.error : row.reimbursablePyg > 0 ? colors.success : colors.warning }}
+                      className="border-b border-border p-4 last:border-b-0"
+                    >
                       <View className="flex-row items-start justify-between">
                         <View className="min-w-0 flex-1">
                           <View className="flex-row flex-wrap items-center gap-2">

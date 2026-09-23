@@ -1,7 +1,7 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
-import { PrimaryButton, StatusPill } from '@/components/app-ui';
+import { KpiCard, PrimaryButton, StatusPill, statusTone } from '@/components/app-ui';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/hooks/use-auth';
@@ -17,7 +17,10 @@ export default function ClosureQueueScreen() {
   const query = trpc.operations.trips.closureQueue.useQuery({ page: 1, pageSize: 50, direction: 'asc' }, { enabled });
   const validateReceipts = trpc.operations.trips.validateReceipts.useMutation({ onSuccess: () => void query.refetch() });
   const billTrip = trpc.operations.trips.billTrip.useMutation({ onSuccess: () => void query.refetch() });
+  const { width } = useWindowDimensions();
   const items = query.data?.items ?? [];
+  const pendingValidationCount = items.filter((item) => !item.receiptsValidatedAt).length;
+  const pendingBillingCount = items.filter((item) => Boolean(item.receiptsValidatedAt) && !item.billedAt).length;
 
   if (!isAdmin) {
     return (
@@ -41,6 +44,14 @@ export default function ClosureQueueScreen() {
           <Text className="mt-1 text-3xl font-bold text-foreground">{t('Prestações pendentes')}</Text>
           <Text className="mt-2 text-sm leading-5 text-muted">{t('Viagens com prestação de contas enviada, aguardando validação de comprovantes e faturamento ao cliente.')}</Text>
 
+          {!query.isLoading && items.length > 0 ? (
+            <View className={width < 640 ? 'mt-5 flex-col gap-3' : 'mt-5 flex-row gap-3'}>
+              <KpiCard label={t('Total pendentes')} value={String(items.length)} color={colors.foreground} />
+              <KpiCard label={t('Aguardando validação')} value={String(pendingValidationCount)} color={colors.warning} />
+              <KpiCard label={t('Aguardando faturamento')} value={String(pendingBillingCount)} color={colors.primary} />
+            </View>
+          ) : null}
+
           {query.isLoading ? <Text className="mt-6 text-sm text-muted">{t('Carregando...')}</Text> : null}
           {query.isError ? <Text className="mt-6 text-sm text-error">{t('Não foi possível carregar a fila.')}</Text> : null}
 
@@ -56,15 +67,16 @@ export default function ClosureQueueScreen() {
             {items.map((item) => {
               const needsValidation = !item.receiptsValidatedAt;
               const needsBilling = Boolean(item.receiptsValidatedAt) && !item.billedAt;
+              const rowStatus = needsValidation ? 'Aguardando validação' : 'Aguardando faturamento';
               return (
-                <View key={item.id} className="rounded-2xl border border-border bg-surface p-5">
+                <View key={item.id} style={{ borderLeftWidth: 3, borderLeftColor: statusTone(rowStatus, colors).color }} className="rounded-2xl border border-border bg-surface p-5">
                   <View className="flex-row items-start justify-between">
                     <Pressable onPress={() => router.push({ pathname: '/trip-detail', params: { tripId: String(item.id) } })} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })} className="flex-1">
                       <Text className="text-xs font-bold tracking-wider text-muted">{item.tripCode}</Text>
                       <Text className="mt-1 text-lg font-bold text-foreground">{item.destination}</Text>
                       <Text className="mt-1 text-xs text-muted">{item.travelerName ?? t('Viajante')} · {item.clientName ?? t('Sem cliente')}</Text>
                     </Pressable>
-                    <StatusPill status={needsValidation ? 'Aguardando validação' : 'Aguardando faturamento'} />
+                    <StatusPill status={rowStatus} />
                   </View>
                   <Text className="mt-3 text-xs text-muted">{t('Enviada em')} {item.closureSubmittedAt ? new Date(item.closureSubmittedAt as unknown as string).toLocaleString('pt-BR') : '—'}</Text>
                   {item.receiptsValidatedAt ? <Text className="mt-1 text-xs text-success">{t('Validada em')} {new Date(item.receiptsValidatedAt as unknown as string).toLocaleString('pt-BR')}</Text> : null}
