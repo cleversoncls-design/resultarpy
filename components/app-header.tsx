@@ -4,7 +4,15 @@ import { useColors } from '@/hooks/use-colors';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useLanguage } from '@/lib/language-provider';
 import { useAuth } from '@/hooks/use-auth';
+import { useThemeContext, type ThemePreference } from '@/lib/theme-provider';
 import { useVisibleModules, usePageHeading } from '@/hooks/use-app-navigation';
+
+const THEME_ORDER: ThemePreference[] = ['system', 'light', 'dark'];
+const THEME_ICON: Record<ThemePreference, 'gearshape.fill' | 'sun.max.fill' | 'moon.fill'> = {
+  system: 'gearshape.fill',
+  light: 'sun.max.fill',
+  dark: 'moon.fill',
+};
 
 function initialsOf(name?: string | null) {
   if (!name) return '?';
@@ -16,9 +24,11 @@ function initialsOf(name?: string | null) {
 
 export function AppHeader({ visibleModules }: { visibleModules: ReturnType<typeof useVisibleModules>['visibleModules'] }) {
   const colors = useColors();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { language, setLanguage, t } = useLanguage();
+  const { preference, setPreference } = useThemeContext();
   const { crumb, title } = usePageHeading(visibleModules);
+  const cycleTheme = () => setPreference(THEME_ORDER[(THEME_ORDER.indexOf(preference) + 1) % THEME_ORDER.length]);
 
   return <View style={{ height: 64, flexShrink: 0, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28 }}>
     <View>
@@ -32,6 +42,13 @@ export function AppHeader({ visibleModules }: { visibleModules: ReturnType<typeo
         style={({ pressed }) => [{ width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.background : colors.surface, alignItems: 'center', justifyContent: 'center' }]}
       >
         <IconSymbol name="globe" size={17} color={colors.muted} />
+      </Pressable>
+      <Pressable
+        accessibilityLabel={t('Aparência')}
+        onPress={cycleTheme}
+        style={({ pressed }) => [{ width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.background : colors.surface, alignItems: 'center', justifyContent: 'center' }]}
+      >
+        <IconSymbol name={THEME_ICON[preference]} size={17} color={colors.muted} />
       </Pressable>
       <Pressable
         accessibilityLabel={t('Notificações')}
@@ -48,6 +65,14 @@ export function AppHeader({ visibleModules }: { visibleModules: ReturnType<typeo
           <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.foreground }} numberOfLines={1}>{user?.name || t('Usuário autenticado')}</Text>
           <Text style={{ fontSize: 11, color: colors.muted, marginTop: 1 }} numberOfLines={1}>{user?.email || ''}</Text>
         </View>
+      </Pressable>
+      <View style={{ width: 1, height: 28, backgroundColor: colors.border }} />
+      <Pressable
+        accessibilityLabel={t('Encerrar sessão')}
+        onPress={() => void logout().then(() => router.replace('/login'))}
+        style={({ pressed }) => [{ width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.background : colors.surface, alignItems: 'center', justifyContent: 'center' }]}
+      >
+        <IconSymbol name="rectangle.portrait.and.arrow.right" size={17} color={colors.muted} />
       </Pressable>
     </View>
   </View>;

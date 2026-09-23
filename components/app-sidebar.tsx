@@ -3,8 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, usePathname } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { PreferenceDropdowns } from '@/components/preference-dropdown';
-import { useThemeContext } from '@/lib/theme-provider';
 import { useLanguage } from '@/lib/language-provider';
 import { useAuth } from '@/hooks/use-auth';
 import { NAV_COLORS, NAV_WIDTH_COLLAPSED, NAV_WIDTH_EXPANDED, APP_VERSION } from '@/components/nav-theme';
@@ -15,9 +13,8 @@ const logo = require('@/assets/images/resultar-logo.png');
 type VisibleModules = ReturnType<typeof useVisibleModules>['visibleModules'];
 
 export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules }) {
-  const { user, logout } = useAuth();
-  const { preference, setPreference } = useThemeContext();
-  const { language, setLanguage, t } = useLanguage();
+  const { user } = useAuth();
+  const { t } = useLanguage();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
@@ -122,11 +119,10 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
       </View>
 
       {showLabels ? <View style={{ borderTopWidth: 1, borderTopColor: NAV_COLORS.border, paddingTop: 12, marginTop: 4 }}>
-        <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => [{ paddingHorizontal: 2, marginBottom: 10, opacity: pressed ? 0.72 : 1 }]}>
+        <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => [{ paddingHorizontal: 2, opacity: pressed ? 0.72 : 1 }]}>
           <Text style={{ color: NAV_COLORS.fgStrong, fontSize: 12.5, fontWeight: '700' }} numberOfLines={1}>{user?.name || t('Usuário autenticado')}</Text>
           <Text style={{ color: NAV_COLORS.fgMuted, fontSize: 11, marginTop: 1 }} numberOfLines={1}>{user?.email || ''}</Text>
         </Pressable>
-        <PreferenceDropdowns language={language} setLanguage={setLanguage} theme={preference} setTheme={setPreference} colorScheme="dark" onLogout={() => void logout().then(() => router.replace('/login'))} />
         <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: NAV_COLORS.border }}>
           <Text style={{ color: NAV_COLORS.fgMuted, fontSize: 8.5, fontWeight: '700', letterSpacing: 0.5 }}>CONTROL DE VIAJES Y FLOTA</Text>
           <Text style={{ color: NAV_COLORS.fgMuted, fontSize: 8.5, fontWeight: '700', letterSpacing: 0.5, marginTop: 5 }}>{APP_VERSION}</Text>
