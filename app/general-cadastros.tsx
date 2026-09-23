@@ -15,7 +15,7 @@ const catalogQueryInput = {
   direction: 'asc' as const,
 };
 
-type CatalogKind = 'units' | 'cities' | 'clients' | 'travelers' | 'expenseTypes' | 'reimbursementLimits' | 'clientBillingLimits' | 'maintenanceReasons';
+type CatalogKind = 'units' | 'cities' | 'clients' | 'travelers' | 'expenseTypes' | 'reimbursementLimits' | 'clientBillingLimits';
 
 export default function GeneralRegistrationsScreen() {
   const colors = useColors();
@@ -37,14 +37,15 @@ export default function GeneralRegistrationsScreen() {
   const expenseTypesQuery = trpc.catalogs.expenseTypes.list.useQuery(catalogQueryInput, { enabled: liveEnabled });
   const reimbursementLimitsQuery = trpc.catalogs.reimbursementLimits.list.useQuery(catalogQueryInput, { enabled: liveEnabled });
   const clientBillingLimitsQuery = trpc.catalogs.clientBillingLimits.list.useQuery(catalogQueryInput, { enabled: liveEnabled });
-  const maintenanceReasonsQuery = trpc.catalogs.maintenanceReasons.list.useQuery(catalogQueryInput, { enabled: liveEnabled });
 
-  const queries = [unitsQuery, citiesQuery, clientsQuery, travelersQuery, expenseTypesQuery, reimbursementLimitsQuery, clientBillingLimitsQuery, maintenanceReasonsQuery];
+  const queries = [unitsQuery, citiesQuery, clientsQuery, travelersQuery, expenseTypesQuery, reimbursementLimitsQuery, clientBillingLimitsQuery];
   const isLoadingCatalogs = liveEnabled && queries.some((query) => query.isLoading);
   const hasCatalogError = liveEnabled && queries.some((query) => query.isError);
   const retryCatalogs = () => queries.forEach((query) => void query.refetch());
 
-  const cards: { title: string; description: string; count: number; icon: 'building.2.fill' | 'briefcase.fill' | 'person.crop.circle.fill' | 'wallet.pass.fill' | 'wrench.and.screwdriver.fill'; kind: CatalogKind }[] = [
+  // "Motivos de manutenção" saiu daqui — é um cadastro específico da
+  // Frota e já tem seu próprio cartão em app/fleet-cadastros.tsx.
+  const cards: { title: string; description: string; count: number; icon: 'building.2.fill' | 'briefcase.fill' | 'person.crop.circle.fill' | 'wallet.pass.fill'; kind: CatalogKind }[] = [
     { title: 'Unidades', description: 'Filiais ou escritórios da própria empresa, usados para vincular viagens, veículos e equipes.', count: unitsQuery.data?.total ?? 0, icon: 'building.2.fill', kind: 'units' },
     { title: 'Cidades', description: 'Qualquer cidade onde possa haver gasto de viagem — não precisa ter escritório da empresa lá.', count: citiesQuery.data?.total ?? 0, icon: 'building.2.fill', kind: 'cities' },
     { title: 'Viajantes e condutores', description: 'Pessoas que solicitam viagens ou conduzem veículos atribuídos.', count: travelersQuery.data?.total ?? 0, icon: 'person.crop.circle.fill', kind: 'travelers' },
@@ -52,7 +53,6 @@ export default function GeneralRegistrationsScreen() {
     { title: 'Tipos de gasto', description: 'Conceitos usados em reembolso e faturamento.', count: expenseTypesQuery.data?.total ?? 0, icon: 'wallet.pass.fill', kind: 'expenseTypes' },
     { title: 'Limites de reembolso', description: 'Limites por tipo de gasto, cidade ou regra genérica.', count: reimbursementLimitsQuery.data?.total ?? 0, icon: 'wallet.pass.fill', kind: 'reimbursementLimits' },
     { title: 'Limites por cliente', description: 'Vínculos de faturamento e teto por cliente.', count: clientBillingLimitsQuery.data?.total ?? 0, icon: 'briefcase.fill', kind: 'clientBillingLimits' },
-    { title: 'Motivos de manutenção', description: 'Tipos preventivos e corretivos para Ordens de Serviço.', count: maintenanceReasonsQuery.data?.total ?? 0, icon: 'wrench.and.screwdriver.fill', kind: 'maintenanceReasons' },
   ];
 
   if (!isAdmin) {
@@ -83,11 +83,10 @@ export default function GeneralRegistrationsScreen() {
 
           <View className="mt-7 flex-row flex-wrap gap-3">
             {cards.map((card) => (
-              <Pressable
+              <View
                 key={card.kind}
-                onPress={() => router.push({ pathname: '/cadastro-detalhe', params: { tipo: card.kind } })}
-                style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, borderTopWidth: 3, borderTopColor: colors.primary })}
-                className="min-w-[250px] flex-1 rounded-2xl border border-border bg-surface p-5"
+                style={{ borderTopWidth: 3, borderTopColor: colors.primary }}
+                className="min-w-[280px] flex-1 rounded-2xl border border-border bg-surface p-5"
               >
                 <View className="flex-row items-start justify-between">
                   <View style={{ backgroundColor: `${colors.primary}16` }} className="h-11 w-11 items-center justify-center rounded-xl"><IconSymbol name={card.icon} size={22} color={colors.primary} /></View>
@@ -95,19 +94,16 @@ export default function GeneralRegistrationsScreen() {
                 </View>
                 <Text className="mt-5 text-base font-bold text-foreground">{t(card.title)}</Text>
                 <Text className="mt-1 min-h-[42px] text-sm leading-5 text-muted">{t(card.description)}</Text>
-                <Text className="mt-3 text-xs font-bold text-primary">{t('Abrir cadastro')} ›</Text>
-              </Pressable>
+                <Pressable
+                  onPress={() => router.push({ pathname: '/cadastro-detalhe', params: { tipo: card.kind } })}
+                  style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 10, minHeight: 40, marginTop: 16, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.75 : 1 })}
+                >
+                  <Text className="font-bold text-white">{t('Abrir cadastro')} ›</Text>
+                </Pressable>
+              </View>
             ))}
           </View>
 
-          <View className="mt-6 rounded-2xl border border-border bg-surface p-5">
-            <Text className="text-lg font-bold text-foreground">{t('Cadastros específicos da Frota')}</Text>
-            <Text className="mt-1 text-sm leading-5 text-muted">{t('Veículos e motivos de manutenção continuam no cadastro da Frota, vinculados aos registros gerais acima.')}</Text>
-            <View className="mt-4 flex-row flex-wrap gap-3">
-              <Pressable onPress={() => router.push('/fleet-cadastros')} style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 10, minHeight: 40, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.75 : 1 })}><Text className="font-bold text-white">{t('Abrir Cadastros de Frota')}</Text></Pressable>
-              <Pressable onPress={() => router.push('/new-trip')} style={({ pressed }) => ({ borderColor: colors.border, borderWidth: 1, borderRadius: 10, minHeight: 40, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.75 : 1 })}><Text className="font-bold text-foreground">{t('Nova solicitação')}</Text></Pressable>
-            </View>
-          </View>
           <CurrencyRatesPanel enabled={liveEnabled} colors={colors} t={t} />
         </ScrollView>
       </View>
