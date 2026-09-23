@@ -112,6 +112,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Informe seu e-mail e sua senha.': 'Indique su correo electrónico y contraseña.', 'Não foi possível realizar o login.': 'No fue posible iniciar sesión.', 'A redefinição de senha deve ser solicitada ao Administrador.': 'El restablecimiento de contraseña debe solicitarse al Administrador.',
 
+  'Informe um valor válido': 'Indique un valor válido', 'Digite o valor efetivamente depositado antes de confirmar.': 'Ingrese el valor efectivamente depositado antes de confirmar.',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';

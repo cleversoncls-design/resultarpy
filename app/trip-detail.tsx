@@ -317,7 +317,7 @@ export default function TripDetailScreen() {
   const confirmAdvance = () => {
     const normalized = depositAmountValue.trim().replace(",", ".");
     if (!normalized || Number.isNaN(Number(normalized))) {
-      Alert.alert("Informe um valor válido", "Digite o valor efetivamente depositado antes de confirmar.");
+      Alert.alert(t("Informe um valor válido"), t("Digite o valor efetivamente depositado antes de confirmar."));
       return;
     }
     confirmAdvanceMutation.mutate({ id: trip.id, depositedAmount: normalized });
