@@ -5,6 +5,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useLanguage } from '@/lib/language-provider';
 import { useAuth } from '@/hooks/use-auth';
 import { useThemeContext, type ThemePreference } from '@/lib/theme-provider';
+import { useSidebarCollapse } from '@/lib/sidebar-provider';
 import { useVisibleModules, usePageHeading } from '@/hooks/use-app-navigation';
 
 const THEME_ORDER: ThemePreference[] = ['system', 'light', 'dark'];
@@ -28,12 +29,22 @@ export function AppHeader({ visibleModules }: { visibleModules: ReturnType<typeo
   const { language, setLanguage, t } = useLanguage();
   const { preference, setPreference } = useThemeContext();
   const { crumb, title } = usePageHeading(visibleModules);
+  const { collapsed, toggleCollapse } = useSidebarCollapse();
   const cycleTheme = () => setPreference(THEME_ORDER[(THEME_ORDER.indexOf(preference) + 1) % THEME_ORDER.length]);
 
   return <View style={{ height: 64, flexShrink: 0, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28 }}>
-    <View>
-      <Text style={{ fontSize: 11, color: colors.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t(crumb)}</Text>
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.foreground, marginTop: 2 }}>{t(title)}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <Pressable
+        accessibilityLabel={collapsed ? t('Expandir menu') : t('Recolher menu')}
+        onPress={toggleCollapse}
+        style={({ pressed }) => [{ width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.background : colors.surface, alignItems: 'center', justifyContent: 'center' }]}
+      >
+        <IconSymbol name="sidebar.left" size={17} color={colors.muted} />
+      </Pressable>
+      <View>
+        <Text style={{ fontSize: 11, color: colors.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t(crumb)}</Text>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: colors.foreground, marginTop: 2 }}>{t(title)}</Text>
+      </View>
     </View>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
       <Pressable

@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, usePathname } from 'expo-router';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useLanguage } from '@/lib/language-provider';
+import { useSidebarCollapse } from '@/lib/sidebar-provider';
 import { NAV_COLORS, NAV_WIDTH_COLLAPSED, NAV_WIDTH_EXPANDED, APP_VERSION } from '@/components/nav-theme';
 import { useVisibleModules } from '@/hooks/use-app-navigation';
 
@@ -14,7 +15,20 @@ type VisibleModules = ReturnType<typeof useVisibleModules>['visibleModules'];
 export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules }) {
   const { t } = useLanguage();
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  // O botão de recolher/expandir agora mora no AppHeader (components/app-header.tsx),
+  // então os dois compartilham o mesmo estado via SidebarProvider.
+  const { collapsed } = useSidebarCollapse();
+  // A largura anima suavemente entre recolhido e expandido (antes o menu
+  // simplesmente "pulava" de uma largura para a outra, sem transição).
+  const widthAnim = useRef(new Animated.Value(collapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED)).current;
+  const isFirstRender = useRef(true);
+  const showLabels = !collapsed;
+
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    Animated.timing(widthAnim, { toValue: collapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED, duration: 220, useNativeDriver: false }).start();
+  }, [collapsed, widthAnim]);
+
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [expandedModule, setExpandedModule] = useState('');
   const moduleKeys = useMemo(() => visibleModules.map((module) => module.key), [visibleModules]);
@@ -30,7 +44,6 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
         moduleAnimations[saved]?.setValue(1);
       }
     });
-    AsyncStorage.getItem('controle-viagens-sidebar-collapsed').then((saved) => { if (saved === '1') setCollapsed(true); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -54,15 +67,10 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
     else AsyncStorage.removeItem('controle-viagens-expanded-module');
   };
 
-  const toggleCollapse = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    AsyncStorage.setItem('controle-viagens-sidebar-collapsed', next ? '1' : '0');
-  };
+  // O botão de recolher/expandir agora fica no AppHeader (ver comentário no
+  // topo do componente) — aqui o cabeçalho do menu só mostra a logo.
 
-  const showLabels = !collapsed;
-
-  return <View style={{ width: collapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED, flexShrink: 0, backgroundColor: NAV_COLORS.bg, borderRightColor: NAV_COLORS.border, borderRightWidth: 1 }}>
+  return <Animated.View style={{ width: widthAnim, flexShrink: 0, overflow: 'hidden', backgroundColor: NAV_COLORS.bg, borderRightColor: NAV_COLORS.border, borderRightWidth: 1 }}>
     <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 18 }}>
       {showLabels ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingBottom: 18, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: NAV_COLORS.border }}>
@@ -70,16 +78,13 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
             <Image source={logo} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
           </View>
           <Text style={{ flex: 1, color: NAV_COLORS.fgStrong, fontSize: 11.5, fontWeight: '800' }} numberOfLines={1}>RESULTAR SERVICIOS</Text>
-          <Pressable accessibilityLabel={t('Recolher menu')} onPress={toggleCollapse} style={({ pressed }) => [{ width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: pressed ? NAV_COLORS.hoverBg : 'transparent' }]}>
-            <IconSymbol name="sidebar.left" size={17} color={NAV_COLORS.fg} />
-          </Pressable>
         </View>
       ) : (
-        <Pressable accessibilityLabel={t('Expandir menu')} onPress={toggleCollapse} style={({ pressed }) => [{ alignItems: 'center', paddingBottom: 18, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: NAV_COLORS.border, opacity: pressed ? 0.75 : 1 }]}>
+        <View style={{ alignItems: 'center', paddingBottom: 18, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: NAV_COLORS.border }}>
           <View style={{ width: 30, height: 30, borderRadius: 9, overflow: 'hidden' }}>
             <Image source={logo} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
           </View>
-        </Pressable>
+        </View>
       )}
 
       <View style={{ flex: 1 }}>
@@ -121,5 +126,5 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
         <Text style={{ color: NAV_COLORS.fgMuted, fontSize: 8.5, fontWeight: '700', letterSpacing: 0.5, marginTop: 5 }}>{APP_VERSION}</Text>
       </View> : null}
     </View>
-  </View>;
+  </Animated.View>;
 }

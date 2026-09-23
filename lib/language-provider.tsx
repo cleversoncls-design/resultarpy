@@ -114,6 +114,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Informe um valor válido': 'Indique un valor válido', 'Digite o valor efetivamente depositado antes de confirmar.': 'Ingrese el valor efectivamente depositado antes de confirmar.',
 
+  'Recolher menu': 'Contraer menú', 'Expandir menu': 'Expandir menú',
+
 };
 
 const LANGUAGE_KEY = 'controle-viagens-language';
