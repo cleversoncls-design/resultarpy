@@ -240,7 +240,7 @@ export default function TripDetailScreen() {
           <Text className="font-semibold text-primary">‹ Voltar</Text>
         </Pressable>
         <Text className="text-foreground">
-          Não foi possível carregar os detalhes desta viagem.
+          {t('Não foi possível carregar os detalhes desta viagem.')}
         </Text>
         {tripQuery.error ? (
           <Text className="mt-2 text-sm text-muted">{tripQuery.error.message}</Text>
@@ -452,7 +452,7 @@ export default function TripDetailScreen() {
             </View>
           ) : null}
           <View className="mt-6 flex-row gap-3">
-            <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
+            <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="flex-1 rounded-2xl border border-border bg-surface p-4">
               <Text className="text-xs text-muted">{t('Adiantamento')}</Text>
               <Text className="mt-2 text-lg font-bold text-foreground">
                 {formatCurrency(Number(advanceValue))}
@@ -463,7 +463,7 @@ export default function TripDetailScreen() {
                 </Text>
               ) : null}
             </View>
-            <View className="flex-1 rounded-2xl border border-border bg-surface p-4">
+            <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="flex-1 rounded-2xl border border-border bg-surface p-4">
               <Text className="text-xs text-muted">{t('Despesas lançadas')}</Text>
               <Text className="mt-2 text-lg font-bold text-primary">
                 {formatCurrency(spent)}
@@ -474,13 +474,13 @@ export default function TripDetailScreen() {
           {showPendenciesBlock ? (
             <>
               <SectionHeader title={t('Pendências para liberação')} />
-              <View className="rounded-2xl border border-border bg-surface p-5 gap-5">
+              <View style={{ borderTopWidth: 3, borderTopColor: colors.warning }} className="rounded-2xl border border-border bg-surface p-5 gap-5">
                 {tripRecord.requiresFleetVehicle ? (
                   <View>
                     <View className="flex-row items-center justify-between">
                       <Text className="font-bold text-foreground">🚗 {t('Veículo da frota')}</Text>
                       <Text className={vehiclePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
-                        {vehiclePending ? "PENDENTE" : "CONFIRMADO"}
+                        {vehiclePending ? t('PENDENTE') : t('CONFIRMADO')}
                       </Text>
                     </View>
                     {vehicleAllocated ? (
@@ -573,7 +573,7 @@ export default function TripDetailScreen() {
                     <View className="flex-row items-center justify-between">
                       <Text className="font-bold text-foreground">💰 {t('Adiantamento')}</Text>
                       <Text className={advancePending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
-                        {advancePending ? "PENDENTE" : "CONFIRMADO"}
+                        {advancePending ? t('PENDENTE') : t('CONFIRMADO')}
                       </Text>
                     </View>
                     {advancePending ? (
@@ -613,7 +613,7 @@ export default function TripDetailScreen() {
                     <View className="flex-row items-center justify-between">
                       <Text className="font-bold text-foreground">🏨 Hotel</Text>
                       <Text className={hotelPending ? "text-xs font-bold text-warning" : "text-xs font-bold text-success"}>
-                        {hotelPending ? "PENDENTE" : "CONFIRMADO"}
+                        {hotelPending ? t('PENDENTE') : t('CONFIRMADO')}
                       </Text>
                     </View>
                     {hotelPending || editingHotel ? (
@@ -656,11 +656,11 @@ export default function TripDetailScreen() {
           {isAdmin && tripRecord.closureSubmittedAt ? (
             <>
               <SectionHeader title={t('Fechamento da prestação de contas')} />
-              <View className="rounded-2xl border border-border bg-surface p-5 gap-5">
+              <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="rounded-2xl border border-border bg-surface p-5 gap-5">
                 <View>
                   <View className="flex-row items-center justify-between">
                     <Text className="font-bold text-foreground">📥 {t('Prestação enviada')}</Text>
-                    <Text className="text-xs font-bold text-success">CONFIRMADO</Text>
+                    <Text className="text-xs font-bold text-success">{t('CONFIRMADO')}</Text>
                   </View>
                   <Text className="mt-1 text-sm text-muted">
                     {t('Enviada pelo viajante em')} {new Date(tripRecord.closureSubmittedAt as string).toLocaleString("pt-BR")}.
@@ -671,7 +671,7 @@ export default function TripDetailScreen() {
                   <View className="flex-row items-center justify-between">
                     <Text className="font-bold text-foreground">🧾 {t('Validação dos comprovantes')}</Text>
                     <Text className={tripRecord.receiptsValidatedAt ? "text-xs font-bold text-success" : "text-xs font-bold text-warning"}>
-                      {tripRecord.receiptsValidatedAt ? "CONFIRMADO" : "PENDENTE"}
+                      {tripRecord.receiptsValidatedAt ? t('CONFIRMADO') : t('PENDENTE')}
                     </Text>
                   </View>
                   {tripRecord.receiptsValidatedAt ? (
@@ -700,7 +700,7 @@ export default function TripDetailScreen() {
                   <View className="flex-row items-center justify-between">
                     <Text className="font-bold text-foreground">💳 {t('Faturamento ao cliente')}</Text>
                     <Text className={tripRecord.billedAt ? "text-xs font-bold text-success" : "text-xs font-bold text-warning"}>
-                      {tripRecord.billedAt ? "CONFIRMADO" : "PENDENTE"}
+                      {tripRecord.billedAt ? t('CONFIRMADO') : t('PENDENTE')}
                     </Text>
                   </View>
                   {tripRecord.billedAt ? (
@@ -731,7 +731,7 @@ export default function TripDetailScreen() {
           ) : null}
 
           <SectionHeader title={t('Controle da viagem de frota')} />
-          <View className="rounded-2xl border border-border bg-surface p-5">
+          <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="rounded-2xl border border-border bg-surface p-5">
             <View className="flex-row items-center">
               <View
                 style={{ backgroundColor: `${colors.primary}18` }}
@@ -920,7 +920,7 @@ export default function TripDetailScreen() {
               <SectionHeader title={t('Eventos registrados')} />
               <View className="mb-2 gap-3">
                 {fleetEvents.map((event) => (
-                  <View key={event.id} className="rounded-2xl border border-border bg-surface p-4">
+                  <View key={event.id} style={{ borderLeftWidth: 3, borderLeftColor: colors.warning }} className="rounded-2xl border border-border bg-surface p-4">
                     <View className="flex-row items-start justify-between">
                       <View className="flex-1 pr-3">
                         <View style={{ backgroundColor: `${colors.warning}18` }} className="mb-2 self-start rounded-full px-2 py-0.5">
@@ -946,7 +946,7 @@ export default function TripDetailScreen() {
           ) : null}
 
           <SectionHeader title={t('Linha do tempo')} />
-          <View className="rounded-2xl border border-border bg-surface p-5">
+          <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="rounded-2xl border border-border bg-surface p-5">
             <TimelineItem
               title="Solicitação criada"
               detail="Registrada pelo viajante"
@@ -1004,7 +1004,7 @@ export default function TripDetailScreen() {
               {tripRecord.closureSubmittedAt ? (
                 <View style={{ backgroundColor: `${colors.success}18` }} className="rounded-xl p-3">
                   <Text style={{ color: colors.success }} className="text-sm font-semibold">
-                    ✓ Fechamento enviado em {new Date(tripRecord.closureSubmittedAt as string).toLocaleString("pt-BR")}. Aguardando validação do Administrativo.
+                    ✓ {t('Fechamento enviado em')} {new Date(tripRecord.closureSubmittedAt as string).toLocaleString("pt-BR")}. {t('Aguardando validação do Administrativo.')}
                   </Text>
                 </View>
               ) : (
