@@ -9,6 +9,10 @@ import { NAV_COLORS, NAV_WIDTH_COLLAPSED, NAV_WIDTH_EXPANDED, APP_VERSION } from
 import { useVisibleModules } from '@/hooks/use-app-navigation';
 
 const logo = require('@/assets/images/resultar-logo.png');
+// Componente animado com suporte a hover: o menu recolhido "espia" (expande
+// temporariamente) quando o mouse passa por cima, sem alterar a preferência
+// fixada pelo botão no cabeçalho — só a View animada não tem onHoverIn/Out.
+const AnimatedHoverView = Animated.createAnimatedComponent(Pressable);
 
 type VisibleModules = ReturnType<typeof useVisibleModules>['visibleModules'];
 
@@ -18,16 +22,22 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
   // O botão de recolher/expandir agora mora no AppHeader (components/app-header.tsx),
   // então os dois compartilham o mesmo estado via SidebarProvider.
   const { collapsed } = useSidebarCollapse();
+  // Quando o menu está recolhido, passar o mouse por cima expande
+  // temporariamente (mesmo comportamento do protótipo de referência); ao
+  // tirar o mouse, ele volta a recolher. O clique no botão do cabeçalho
+  // continua fixando o estado (collapsed), independente do hover.
+  const [hovering, setHovering] = useState(false);
+  const visuallyCollapsed = collapsed && !hovering;
   // A largura anima suavemente entre recolhido e expandido (antes o menu
   // simplesmente "pulava" de uma largura para a outra, sem transição).
-  const widthAnim = useRef(new Animated.Value(collapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED)).current;
+  const widthAnim = useRef(new Animated.Value(visuallyCollapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED)).current;
   const isFirstRender = useRef(true);
-  const showLabels = !collapsed;
+  const showLabels = !visuallyCollapsed;
 
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
-    Animated.timing(widthAnim, { toValue: collapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED, duration: 220, useNativeDriver: false }).start();
-  }, [collapsed, widthAnim]);
+    Animated.timing(widthAnim, { toValue: visuallyCollapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED, duration: 220, useNativeDriver: false }).start();
+  }, [visuallyCollapsed, widthAnim]);
 
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
   const [expandedModule, setExpandedModule] = useState('');
@@ -70,7 +80,11 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
   // O botão de recolher/expandir agora fica no AppHeader (ver comentário no
   // topo do componente) — aqui o cabeçalho do menu só mostra a logo.
 
-  return <Animated.View style={{ width: widthAnim, flexShrink: 0, overflow: 'hidden', backgroundColor: NAV_COLORS.bg, borderRightColor: NAV_COLORS.border, borderRightWidth: 1 }}>
+  return <AnimatedHoverView
+    onHoverIn={() => collapsed && setHovering(true)}
+    onHoverOut={() => setHovering(false)}
+    style={{ width: widthAnim, flexShrink: 0, overflow: 'hidden', backgroundColor: NAV_COLORS.bg, borderRightColor: NAV_COLORS.border, borderRightWidth: 1 }}
+  >
     <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 18 }}>
       {showLabels ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingBottom: 18, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: NAV_COLORS.border }}>
@@ -126,5 +140,5 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
         <Text style={{ color: NAV_COLORS.fgMuted, fontSize: 8.5, fontWeight: '700', letterSpacing: 0.5, marginTop: 5 }}>{APP_VERSION}</Text>
       </View> : null}
     </View>
-  </Animated.View>;
+  </AnimatedHoverView>;
 }
