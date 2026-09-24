@@ -95,11 +95,27 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
   // O botão de recolher/expandir agora fica no AppHeader (ver comentário no
   // topo do componente) — aqui o cabeçalho do menu só mostra a logo.
 
-  return <AnimatedHoverView
-    onHoverIn={() => collapsed && setHovering(true)}
-    onHoverOut={() => setHovering(false)}
-    style={{ width: widthAnim, flexShrink: 0, overflow: 'hidden', backgroundColor: NAV_COLORS.bg, borderRightColor: NAV_COLORS.border, borderRightWidth: 1 }}
-  >
+  // Enquanto o menu está fixado recolhido, o espaço reservado no layout
+  // (flex-row com o conteúdo ao lado) permanece sempre estreito — antes ele
+  // acompanhava a largura animada, então cada hover empurrava/reencolhia a
+  // tela inteira (cabeçalho e conteúdo pulando de lugar), o que aparecia
+  // como "falha" ao passar o mouse sobre o menu. Agora, quando recolhido, a
+  // caixa que cresce no hover fica sobreposta (position: absolute) por cima
+  // do conteúdo, sem alterar o espaço reservado — só quando fixado expandido
+  // (collapsed === false) ela participa do fluxo normal do layout.
+  const reservedWidth = collapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED;
+
+  return <View style={{ width: reservedWidth, flexShrink: 0, position: 'relative' }}>
+    <AnimatedHoverView
+      onHoverIn={() => collapsed && setHovering(true)}
+      onHoverOut={() => setHovering(false)}
+      style={[
+        collapsed
+          ? { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 20, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 4, height: 0 }, elevation: 12 }
+          : { position: 'relative' },
+        { width: widthAnim, overflow: 'hidden', backgroundColor: NAV_COLORS.bg, borderRightColor: NAV_COLORS.border, borderRightWidth: 1 },
+      ]}
+    >
     <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 18 }}>
       {showLabels ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 6, paddingBottom: 18, marginBottom: 14, borderBottomWidth: 1, borderBottomColor: NAV_COLORS.border }}>
@@ -155,5 +171,6 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
         <Text style={{ color: NAV_COLORS.fgMuted, fontSize: 8.5, fontWeight: '700', letterSpacing: 0.5, marginTop: 5 }}>{APP_VERSION}</Text>
       </View> : null}
     </View>
-  </AnimatedHoverView>;
+    </AnimatedHoverView>
+  </View>;
 }
