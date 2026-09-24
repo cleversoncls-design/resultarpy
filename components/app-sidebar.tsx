@@ -41,6 +41,24 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
   // depois que a animação de encolher termina; ao expandir, o texto aparece
   // já no início para acompanhar o crescimento da caixa.
   const [showLabels, setShowLabels] = useState(!visuallyCollapsed);
+  // Ao passar o mouse por cima de um item do menu (botão de módulo, link),
+  // o próprio elemento interno também reage ao hover (para o destaque dele) —
+  // e isso pode fazer o hover do container externo "piscar" entre dentro/fora
+  // por uma fração de segundo conforme o layout se reajusta durante a
+  // animação de largura, reiniciando a animação repetidamente e travando o
+  // menu numa largura intermediária, com o texto quebrando em várias linhas.
+  // Um pequeno atraso ao sair do hover absorve essas piscadas: se o mouse
+  // "volta" quase imediatamente (o caso do flicker), o recolhimento é
+  // cancelado antes de acontecer; se o mouse realmente saiu do menu, o
+  // recolhimento ocorre normalmente, só um pouco depois.
+  const hoverOutTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearHoverOutTimer = () => {
+    if (hoverOutTimer.current) {
+      clearTimeout(hoverOutTimer.current);
+      hoverOutTimer.current = null;
+    }
+  };
+  useEffect(() => () => clearHoverOutTimer(), []);
 
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
@@ -96,8 +114,8 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
   // topo do componente) — aqui o cabeçalho do menu só mostra a logo.
 
   return <AnimatedHoverView
-    onHoverIn={() => collapsed && setHovering(true)}
-    onHoverOut={() => setHovering(false)}
+    onHoverIn={() => { clearHoverOutTimer(); if (collapsed) setHovering(true); }}
+    onHoverOut={() => { clearHoverOutTimer(); hoverOutTimer.current = setTimeout(() => setHovering(false), 100); }}
     style={{ width: widthAnim, flexShrink: 0, overflow: 'hidden', backgroundColor: NAV_COLORS.bg, borderRightColor: NAV_COLORS.border, borderRightWidth: 1 }}
   >
     <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 18 }}>
@@ -117,7 +135,7 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
       )}
 
       <View style={{ flex: 1 }}>
-        {showLabels ? <Text style={{ color: NAV_COLORS.fgMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 10, paddingBottom: 6 }}>{t('Workspace')}</Text> : null}
+        {showLabels ? <Text numberOfLines={1} style={{ color: NAV_COLORS.fgMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 10, paddingBottom: 6 }}>{t('Workspace')}</Text> : null}
         {visibleModules.map((module) => {
           const moduleActive = module.items.some((item) => item.path === '/' ? pathname === '/' : pathname.startsWith(item.path.split('?')[0]));
           const open = expandedModule === module.key && showLabels;
@@ -133,7 +151,7 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
             >
               <IconSymbol name={module.icon} size={18} color={moduleActive || hoveredPath === `module-${module.key}` ? NAV_COLORS.fgStrong : NAV_COLORS.fg} />
               {showLabels ? <>
-                <Text style={{ color: NAV_COLORS.fg, marginLeft: 12, fontSize: 13, fontWeight: '700', flex: 1 }}>{t(module.label)}</Text>
+                <Text numberOfLines={1} style={{ color: NAV_COLORS.fg, marginLeft: 12, fontSize: 13, fontWeight: '700', flex: 1 }}>{t(module.label)}</Text>
                 <IconSymbol name="chevron.right" size={13} color={NAV_COLORS.fgMuted} style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }} />
               </> : null}
             </Pressable>
@@ -142,7 +160,7 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
                 const active = item.path === '/' ? pathname === '/' : pathname.startsWith(item.path.split('?')[0]);
                 return <Pressable key={item.path} onPress={() => router.push(item.path as never)} onHoverIn={() => setHoveredPath(item.path)} onHoverOut={() => setHoveredPath(null)} style={({ pressed }) => [{ backgroundColor: active ? NAV_COLORS.activeBg : hoveredPath === item.path ? NAV_COLORS.hoverBg : 'transparent', borderRadius: 8, flexDirection: 'row', alignItems: 'center', minHeight: 34, paddingHorizontal: 9, paddingVertical: 7, marginBottom: 2, opacity: pressed ? 0.72 : 1 }]}>
                   <IconSymbol name={item.icon} size={16} color={active ? NAV_COLORS.fgStrong : hoveredPath === item.path ? NAV_COLORS.fgStrong : NAV_COLORS.fg} />
-                  <Text style={{ color: active ? NAV_COLORS.fgStrong : NAV_COLORS.fg, marginLeft: 10, fontSize: 12.5, fontWeight: active ? '700' : '600', flex: 1 }}>{t(item.label)}</Text>
+                  <Text numberOfLines={1} style={{ color: active ? NAV_COLORS.fgStrong : NAV_COLORS.fg, marginLeft: 10, fontSize: 12.5, fontWeight: active ? '700' : '600', flex: 1 }}>{t(item.label)}</Text>
                 </Pressable>;
               })}
             </Animated.View> : null}
