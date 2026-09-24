@@ -32,11 +32,26 @@ export function AppSidebar({ visibleModules }: { visibleModules: VisibleModules 
   // simplesmente "pulava" de uma largura para a outra, sem transição).
   const widthAnim = useRef(new Animated.Value(visuallyCollapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED)).current;
   const isFirstRender = useRef(true);
-  const showLabels = !visuallyCollapsed;
+  // showLabels controla qual layout é renderizado (ícone só vs. ícone+texto).
+  // Antes ele era calculado direto de visuallyCollapsed, então trocava de
+  // conteúdo instantaneamente enquanto a largura ainda estava animando (220ms)
+  // — ao tirar o mouse, o conteúdo já virava "só ícone" mas a caixa continuava
+  // larga por mais um instante, dando a impressão de um bug visual (caixa
+  // larga com ícone solto e um vão vazio do lado). Agora o texto só some
+  // depois que a animação de encolher termina; ao expandir, o texto aparece
+  // já no início para acompanhar o crescimento da caixa.
+  const [showLabels, setShowLabels] = useState(!visuallyCollapsed);
 
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
-    Animated.timing(widthAnim, { toValue: visuallyCollapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED, duration: 220, useNativeDriver: false }).start();
+    if (visuallyCollapsed) {
+      Animated.timing(widthAnim, { toValue: NAV_WIDTH_COLLAPSED, duration: 220, useNativeDriver: false }).start(({ finished }) => {
+        if (finished) setShowLabels(false);
+      });
+    } else {
+      setShowLabels(true);
+      Animated.timing(widthAnim, { toValue: NAV_WIDTH_EXPANDED, duration: 220, useNativeDriver: false }).start();
+    }
   }, [visuallyCollapsed, widthAnim]);
 
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
