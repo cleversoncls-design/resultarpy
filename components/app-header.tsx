@@ -1,4 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/use-colors';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -31,15 +32,20 @@ export function AppHeader({ visibleModules }: { visibleModules: ReturnType<typeo
   const { crumb, title } = usePageHeading(visibleModules);
   const { collapsed, toggleCollapse } = useSidebarCollapse();
   const cycleTheme = () => setPreference(THEME_ORDER[(THEME_ORDER.indexOf(preference) + 1) % THEME_ORDER.length]);
+  // Só este botão precisa de destaque ao passar o mouse (sem precisar
+  // clicar) — os demais botões do cabeçalho seguem como já eram.
+  const [collapseHovered, setCollapseHovered] = useState(false);
 
   return <View style={{ height: 64, flexShrink: 0, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28 }}>
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
       <Pressable
         accessibilityLabel={collapsed ? t('Expandir menu') : t('Recolher menu')}
         onPress={toggleCollapse}
-        style={({ pressed }) => [{ width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed ? colors.background : colors.surface, alignItems: 'center', justifyContent: 'center' }]}
+        onHoverIn={() => setCollapseHovered(true)}
+        onHoverOut={() => setCollapseHovered(false)}
+        style={({ pressed }) => [{ width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: pressed || collapseHovered ? colors.background : colors.surface, alignItems: 'center', justifyContent: 'center' }]}
       >
-        <IconSymbol name="sidebar.left" size={17} color={colors.muted} />
+        <IconSymbol name="sidebar.left" size={17} color={collapseHovered ? colors.foreground : colors.muted} />
       </Pressable>
       <View>
         <Text style={{ fontSize: 11, color: colors.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>{t(crumb)}</Text>
