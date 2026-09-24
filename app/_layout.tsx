@@ -14,6 +14,7 @@ import { useColors } from "@/hooks/use-colors";
 import LoginScreen from "./login";
 import { CurrencyProvider } from "@/lib/currency-provider";
 import { LanguageProvider } from "@/lib/language-provider";
+import { SidebarProvider } from "@/lib/sidebar-provider";
 import { DesktopRouteShell } from "@/components/desktop-route-shell";
 import {
   SafeAreaFrameContext,
@@ -115,8 +116,10 @@ export default function RootLayout() {
           <TrpcProvider client={trpcClient} queryClient={queryClient}>
             <QueryClientProvider client={queryClient}>
               <CurrencyProvider>
-                {useStandaloneShell ? <DesktopRouteShell><Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack></DesktopRouteShell> : <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack>}
-                <StatusBar style="auto" />
+                <SidebarProvider>
+                  {useStandaloneShell ? <DesktopRouteShell><Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack></DesktopRouteShell> : <Stack screenOptions={{ headerShown: false }}><Stack.Screen name="(tabs)" /><Stack.Screen name="oauth/callback" /></Stack>}
+                  <StatusBar style="auto" />
+                </SidebarProvider>
               </CurrencyProvider>
             </QueryClientProvider>
           </TrpcProvider>
