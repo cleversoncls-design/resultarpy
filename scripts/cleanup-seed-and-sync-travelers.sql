@@ -121,6 +121,38 @@ BEGIN
   END LOOP;
 END $$;
 
+-- 4b) Mesclar motivos "duplicados por idioma" -----------------------------
+-- Casos que a dedup por normalização acima não pega porque o texto é
+-- literalmente diferente, não só o encoding: o cadastro original (mais
+-- antigo, sem acento/em espanhol) e a versão em português que o bug do
+-- seed reinseria. Mantém o cadastro original e remove a versão inserida
+-- pelo seed.
+DO $$
+DECLARE
+  pairs text[][] := ARRAY[
+    ARRAY['Avaria mecânica', 'Averia mecanica'],
+    ARRAY['Revisão periódica', 'Revision periódica'],
+    ARRAY['Troca de pneus', 'Cambio de Neumaticos']
+  ];
+  p text[];
+  seed_id bigint;
+  keep_id bigint;
+BEGIN
+  FOREACH p SLICE 1 IN ARRAY pairs LOOP
+    SELECT id INTO seed_id FROM maintenance_reasons WHERE name = p[1];
+    SELECT id INTO keep_id FROM maintenance_reasons WHERE name = p[2];
+    IF seed_id IS NULL THEN
+      RAISE NOTICE '[manutencao-idioma] "%" não encontrado, nada a fazer.', p[1];
+    ELSIF keep_id IS NULL THEN
+      RAISE NOTICE '[manutencao-idioma] "%" existe mas "%" não foi encontrado -- não mesclado, revise manualmente.', p[1], p[2];
+    ELSE
+      UPDATE fleet_work_orders SET reason_id = keep_id WHERE reason_id = seed_id;
+      DELETE FROM maintenance_reasons WHERE id = seed_id;
+      RAISE NOTICE '[manutencao-idioma] "%" (id %) removido, mantido "%" (id %).', p[1], seed_id, p[2], keep_id;
+    END IF;
+  END LOOP;
+END $$;
+
 -- 5) Deduplicar viajantes/condutores por nome ----------------------------
 -- Mesma pessoa cadastrada mais de uma vez (ex.: uma vez manualmente como
 -- "Condutor" e outra vez automaticamente como "Viajante" ao criar a
