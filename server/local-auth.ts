@@ -6,6 +6,7 @@ import { COOKIE_NAME } from "../shared/const";
 import { localAuthCredentials, localAuthSessions, users, type User } from "../drizzle/schema";
 import { getDb } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { ensureTravelerIdByUserId } from "./operations-repository";
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12;
 const MAX_FAILED_ATTEMPTS = 5;
@@ -18,6 +19,13 @@ export type LocalProfile = (typeof LOCAL_PROFILES)[number];
 
 export function normalizeProfile(profile: unknown): LocalProfile {
   return LOCAL_PROFILES.includes(profile as LocalProfile) ? profile as LocalProfile : 'traveler_approver';
+}
+
+// Perfis que viajam (e por isso precisam de um registro em "travelers" —
+// o cadastro de Viajeros y conductores). "approver" e "admin" puros não
+// viajam por si só.
+function isTravelerProfile(profile: LocalProfile): boolean {
+  return profile === 'traveler' || profile === 'traveler_approver';
 }
 
 type LocalUser = User;
@@ -191,6 +199,13 @@ export async function createLocalUser(input: {
   const user = inserted[0];
   if (!user) throw new Error("Não foi possível criar o usuário.");
   await db.insert(localAuthCredentials).values({ userId: user.id, normalizedEmail, passwordHash: await hashPassword(input.password) });
+  // Perfil viajante: já cria o cadastro de viajante/condutor correspondente,
+  // para não depender de alguém lembrar de cadastrá-lo à parte em "Viajeros
+  // y conductores" (mesma função usada para criar sob demanda na primeira
+  // viagem, ver operations-repository.ensureTravelerIdByUserId).
+  if (isTravelerProfile(profile)) {
+    await ensureTravelerIdByUserId(user.id);
+  }
   return user;
 }
 

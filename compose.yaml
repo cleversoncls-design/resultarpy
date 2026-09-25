@@ -28,7 +28,11 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-controle}:${POSTGRES_PASSWORD:-controle_dev_only}@postgres:5432/${POSTGRES_DB:-controle_viagens}
-    command: ["sh", "-c", "pnpm db:migrate && pnpm db:seed"]
+    # NÃO rodar "pnpm db:seed" aqui: esse script injeta dados fixos de
+    # teste automatizado (veículo/unidades/viajante fictícios usados pelo
+    # CI) e não deve tocar o banco de produção. Rodar só quando quiser
+    # popular um ambiente de teste, manualmente: pnpm db:seed.
+    command: ["sh", "-c", "pnpm db:migrate"]
     depends_on:
       postgres:
         condition: service_healthy
