@@ -61,6 +61,15 @@ export async function listTrips(input: PageInput & { status?: string; travelerId
   return { items: rows.map(({ trip, clientName, travelerName }) => ({ ...trip, clientName, travelerName })), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
 
+// Aprovador padrão do viajante -- usado em trips.create/update (router) pra
+// preencher trips.approverId no servidor, nunca a partir do que o cliente
+// mandar (ver ficha de segurança: auto-aprovação de viagem).
+export async function getTravelerApproverId(travelerId: number) {
+  const db = await requireDb();
+  const [row] = await db.select({ approverId: travelers.approverId }).from(travelers).where(eq(travelers.id, travelerId)).limit(1);
+  return row?.approverId ?? undefined;
+}
+
 export async function getTrip(id: number, scope: Scope = {}) {
   const db = await requireDb();
   const filters = [eq(trips.id, id), scope.admin ? undefined : scope.userId ? eq(travelers.userId, scope.userId) : undefined].filter(Boolean);
@@ -224,7 +233,7 @@ export async function getFleetReservationForTrip(tripId: number, scope: Scope = 
 
 export type ApprovalQueueStatus = 'Pendiente' | 'Aprovada' | 'Rejeitada';
 
-export async function listTripApprovals(input: PageInput & { userId?: number; admin?: boolean; approver?: boolean; status?: ApprovalQueueStatus; from?: string; to?: string }) {
+export async function listTripApprovals(input: PageInput & { userId?: number; admin?: boolean; status?: ApprovalQueueStatus; from?: string; to?: string }) {
   const db = await requireDb();
   const statusFilter = input.status === 'Aprovada'
     ? eq(trips.status, 'Aprovada')
@@ -233,7 +242,11 @@ export async function listTripApprovals(input: PageInput & { userId?: number; ad
       : or(eq(trips.status, 'Aguardando aprovação'), eq(trips.status, 'Devolvida'));
   const filters = [
     statusFilter,
-    input.admin || input.approver ? undefined : input.userId ? eq(trips.approverId, input.userId) : undefined,
+    // Admin vê a fila inteira; qualquer outra pessoa (mesmo com perfil
+    // aprovador/traveler_approver) só vê as viagens em que ela é o
+    // aprovador padrão designado -- antes, qualquer perfil aprovador via e
+    // decidia TODAS as viagens pendentes, inclusive as próprias.
+    input.admin ? undefined : input.userId ? eq(trips.approverId, input.userId) : undefined,
     input.search ? or(ilike(trips.tripCode, `%${input.search}%`), ilike(trips.destination, `%${input.search}%`)) : undefined,
     input.from ? gte(trips.createdAt, new Date(`${input.from}T00:00:00.000Z`)) : undefined,
     input.to ? lte(trips.createdAt, new Date(`${input.to}T23:59:59.999Z`)) : undefined,
@@ -307,10 +320,14 @@ export async function listTripApprovalHistory(tripId: number, scope: Scope = {},
   return { items, page: currentPage, pageSize, total: Number(total), totalPages: filters.exportAll ? 1 : Math.max(Math.ceil(Number(total) / pageSize), 1) };
 }
 
-export async function decideTripApproval(input: { tripId: number; approverId: number; decision: typeof tripApprovals.decision.enumValues[number]; comment?: string | null }, admin = false, approver = false) {
+export async function decideTripApproval(input: { tripId: number; approverId: number; decision: typeof tripApprovals.decision.enumValues[number]; comment?: string | null }, admin = false) {
   const db = await requireDb();
   const [trip] = await db.select().from(trips).where(eq(trips.id, input.tripId)).limit(1);
-  if (!trip || (!admin && !approver && trip.approverId !== input.approverId)) return undefined;
+  // Só admin decide qualquer viagem; qualquer outra pessoa só decide a
+  // viagem em que é exatamente o aprovador padrão designado (trips.approverId)
+  // -- antes, todo perfil aprovador/traveler_approver decidia qualquer
+  // viagem pendente, inclusive a própria (auto-aprovação).
+  if (!trip || (!admin && trip.approverId !== input.approverId)) return undefined;
   if (trip.status !== 'Aguardando aprovação') return undefined;
   return db.transaction(async (tx) => {
     const [approval] = await tx.insert(tripApprovals).values({ tripId: input.tripId, approverId: input.approverId, decision: input.decision, comment: input.comment ?? null }).onConflictDoUpdate({ target: [tripApprovals.tripId, tripApprovals.approverId], set: { decision: input.decision, comment: input.comment ?? null, decidedAt: new Date() } }).returning();

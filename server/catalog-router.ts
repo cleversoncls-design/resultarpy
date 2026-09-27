@@ -31,6 +31,9 @@ async function withCatalogErrors<T>(operation: () => Promise<T>) {
     if (code === "23503") {
       throw new TRPCError({ code: "CONFLICT", message: "O registro está vinculado a outros dados e não pode ser alterado dessa forma" });
     }
+    if (error instanceof catalog.ApproverCannotBeSelfError) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    }
     if (error instanceof TRPCError) throw error;
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível concluir a operação no cadastro" });
   }
@@ -69,6 +72,10 @@ const travelerCreate = z.object({
   unitId: idSchema.nullable().optional(),
   documentNumber: z.string().trim().max(40).nullable().optional(),
   canDrive: z.boolean().default(false),
+  // Quem decide as viagens desse viajante por padrão (além de qualquer
+  // admin). Sem isso definido, o viajante não consegue criar viagens --
+  // ver operations-router.ts (trips.create).
+  approverId: idSchema.nullable().optional(),
 });
 const travelerUpdate = travelerCreate.partial().extend({ id: idSchema, active: z.boolean().optional() }).refine(
   ({ id: _id, ...data }) => Object.values(data).some((value) => value !== undefined),

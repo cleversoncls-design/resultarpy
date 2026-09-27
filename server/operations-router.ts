@@ -38,8 +38,13 @@ const forbidden = () => new TRPCError({ code: 'FORBIDDEN', message: 'Você não 
 const notFound = () => new TRPCError({ code: 'NOT_FOUND', message: 'Registro não encontrado' });
 const scopeFor = (user: { id: number; role: string }) => ({ userId: user.role === 'admin' ? undefined : user.id, admin: user.role === 'admin' });
 
+// Sem "approverId" aqui de propósito: quem decide a viagem é sempre
+// calculado no servidor a partir do aprovador padrão do viajante (ver
+// trips.create/trips.update abaixo), nunca aceito do cliente -- era
+// possível, antes, criar/editar uma viagem informando o próprio usuário
+// como approverId e depois aprová-la (auto-aprovação).
 const tripFields = z.object({
-  tripCode: z.string().min(3).max(40), travelerId: z.number().int().positive().optional(), approverId: z.number().int().positive().nullable().optional(), clientId: z.number().int().positive().nullable().optional(), unitId: z.number().int().positive().nullable().optional(), origin: z.string().max(120).default(''), destination: z.string().min(1).max(120), country: z.string().max(80).nullable().optional(), area: z.string().max(120).nullable().optional(), transport: z.string().max(120).nullable().optional(), startsOn: z.string().date(), endsOn: z.string().date(), notes: z.string().max(4000).nullable().optional(), status: tripStatus.default('Aguardando aprovação'), requiresFleetVehicle: z.boolean().default(false), hasAdvance: z.boolean().default(false), needsHotel: z.boolean().default(false), advanceAmount: z.string().default('0'), flightDetails: z.object({ passengerName: z.string().max(180).optional(), passengerDocument: z.string().max(80).optional(), passengerBirthDate: z.preprocess(normalizeBirthDate, z.string().date().optional()), airline: z.string().max(120).optional(), flightNumber: z.string().max(40).optional(), departureAirport: z.string().max(12).optional(), arrivalAirport: z.string().max(12).optional() }).nullable().optional(),
+  tripCode: z.string().min(3).max(40), travelerId: z.number().int().positive().optional(), clientId: z.number().int().positive().nullable().optional(), unitId: z.number().int().positive().nullable().optional(), origin: z.string().max(120).default(''), destination: z.string().min(1).max(120), country: z.string().max(80).nullable().optional(), area: z.string().max(120).nullable().optional(), transport: z.string().max(120).nullable().optional(), startsOn: z.string().date(), endsOn: z.string().date(), notes: z.string().max(4000).nullable().optional(), status: tripStatus.default('Aguardando aprovação'), requiresFleetVehicle: z.boolean().default(false), hasAdvance: z.boolean().default(false), needsHotel: z.boolean().default(false), advanceAmount: z.string().default('0'), flightDetails: z.object({ passengerName: z.string().max(180).optional(), passengerDocument: z.string().max(80).optional(), passengerBirthDate: z.preprocess(normalizeBirthDate, z.string().date().optional()), airline: z.string().max(120).optional(), flightNumber: z.string().max(40).optional(), departureAirport: z.string().max(12).optional(), arrivalAirport: z.string().max(12).optional() }).nullable().optional(),
   }).superRefine((input, ctx) => {
     if (input.transport !== 'Passagem aérea') return;
     const flight = input.flightDetails;
@@ -59,8 +64,31 @@ export const operationsRouter = router({
     // viagens" (além de "Todas as viagens").
     hasOwnTrips: protectedProcedure.query(({ ctx }) => operations.hasOwnTrips(ctx.user.id)),
     get: protectedProcedure.input(idInput).query(async ({ ctx, input }) => { const trip = await operations.getTrip(input.id, scopeFor(ctx.user)); if (!trip) throw notFound(); return trip; }),
-    create: protectedProcedure.input(tripFields).mutation(async ({ ctx, input }) => { const isAdmin = ctx.user.role === 'admin' || ctx.user.profile === 'admin'; const travelerId = isAdmin ? input.travelerId : await operations.ensureTravelerIdByUserId(ctx.user.id); if (!travelerId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Não foi possível identificar o viajante da sessão.' }); return operations.createTrip({ ...input, travelerId }); }),
-    update: protectedProcedure.input(tripFields.partial().extend({ id: idInput.shape.id })).mutation(async ({ ctx, input }) => { const { id, ...changes } = input; const trip = await operations.updateTrip(id, changes, scopeFor(ctx.user)); if (!trip) throw notFound(); return trip; }),
+    create: protectedProcedure.input(tripFields).mutation(async ({ ctx, input }) => {
+      const isAdmin = ctx.user.role === 'admin' || ctx.user.profile === 'admin';
+      const travelerId = isAdmin ? input.travelerId : await operations.ensureTravelerIdByUserId(ctx.user.id);
+      if (!travelerId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Não foi possível identificar o viajante da sessão.' });
+      // approverId sempre vem do cadastro do viajante, nunca do cliente --
+      // ver comentário em tripFields.
+      const approverId = await operations.getTravelerApproverId(travelerId);
+      if (!approverId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Este viajante ainda não tem um aprovador padrão definido. Peça a um administrador para configurá-lo em Cadastros > Viajantes e condutores antes de criar a viagem.' });
+      return operations.createTrip({ ...input, travelerId, approverId });
+    }),
+    update: protectedProcedure.input(tripFields.partial().extend({ id: idInput.shape.id })).mutation(async ({ ctx, input }) => {
+      const { id, ...changes } = input;
+      // Se o viajante da viagem está sendo trocado (só admin faz isso hoje
+      // pela UI), o aprovador precisa ser recalculado a partir do novo
+      // viajante -- nunca aceito do cliente (ver tripFields).
+      const finalChanges: typeof changes & { approverId?: number } = { ...changes };
+      if (changes.travelerId) {
+        const approverId = await operations.getTravelerApproverId(changes.travelerId);
+        if (!approverId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Este viajante ainda não tem um aprovador padrão definido. Peça a um administrador para configurá-lo em Cadastros > Viajantes e condutores antes de reatribuir a viagem.' });
+        finalChanges.approverId = approverId;
+      }
+      const trip = await operations.updateTrip(id, finalChanges, scopeFor(ctx.user));
+      if (!trip) throw notFound();
+      return trip;
+    }),
     // Fluxo de fechamento: viajante envia -> admin valida comprovantes ->
     // admin fatura (o que finaliza a viagem).
     // O viajante marca que a viagem começou — funciona para qualquer
@@ -104,7 +132,7 @@ export const operationsRouter = router({
     }),
   }),
   approvals: router({
-    list: protectedProcedure.input(pageInput.extend({ status: z.enum(['Pendiente', 'Aprovada', 'Rejeitada']).default('Pendiente'), from: z.string().date().optional(), to: z.string().date().optional() })).query(({ ctx, input }) => operations.listTripApprovals({ ...input, userId: ctx.user.id, admin: ctx.user.role === 'admin' || ctx.user.profile === 'admin', approver: ctx.user.profile === 'approver' || ctx.user.profile === 'traveler_approver' })),
+    list: protectedProcedure.input(pageInput.extend({ status: z.enum(['Pendiente', 'Aprovada', 'Rejeitada']).default('Pendiente'), from: z.string().date().optional(), to: z.string().date().optional() })).query(({ ctx, input }) => operations.listTripApprovals({ ...input, userId: ctx.user.id, admin: ctx.user.role === 'admin' || ctx.user.profile === 'admin' })),
     history: protectedProcedure.input(approvalHistoryInput).query(async ({ ctx, input }) => {
       const { id, ...filters } = input;
       const history = await operations.listTripApprovalHistory(id, scopeFor(ctx.user), filters);
@@ -125,7 +153,7 @@ export const operationsRouter = router({
       return history.items;
     }),
     decide: protectedProcedure.input(z.object({ tripId: idInput.shape.id, decision: approvalDecision, comment: z.string().trim().min(3, 'Comentário obrigatório').max(2000) })).mutation(async ({ ctx, input }) => {
-      const result = await operations.decideTripApproval({ ...input, approverId: ctx.user.id }, ctx.user.role === 'admin' || ctx.user.profile === 'admin', ctx.user.profile === 'approver' || ctx.user.profile === 'traveler_approver');
+      const result = await operations.decideTripApproval({ ...input, approverId: ctx.user.id }, ctx.user.role === 'admin' || ctx.user.profile === 'admin');
       if (!result) throw forbidden();
       return result;
     }),

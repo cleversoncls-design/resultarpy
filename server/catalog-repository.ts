@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import {
   clients,
   clientBillingLimits,
@@ -201,6 +202,22 @@ export async function archiveClient(id: number) {
   return updateClient(id, { active: false });
 }
 
+// Alias necessário porque "users" já é referenciada uma vez nessa consulta
+// (para trazer a data de nascimento do próprio viajante, via travelers.userId)
+// -- essa segunda junção traz o nome do aprovador padrão (travelers.approverId).
+const approverUsers = alias(users, "approver_users");
+
+// Lançado quando o aprovador padrão informado é o próprio usuário vinculado
+// ao viajante -- ninguém pode ser aprovador de si mesmo (ver decideTripApproval
+// em operations-repository.ts, que hoje depende só disso pra barrar
+// auto-aprovação).
+export class ApproverCannotBeSelfError extends Error {
+  constructor() {
+    super("O aprovador padrão não pode ser o próprio viajante.");
+    this.name = "ApproverCannotBeSelfError";
+  }
+}
+
 export async function listTravelers(input: CatalogListInput) {
   const db = await requireDb();
   const search = normalizedSearch(input.search);
@@ -210,10 +227,22 @@ export async function listTravelers(input: CatalogListInput) {
   const where = filters.length ? and(...filters) : undefined;
   const order = input.direction === "desc" ? desc(travelers.name) : asc(travelers.name);
   const [rows, countRows] = await Promise.all([
-    db.select({ traveler: travelers, birthDate: users.birthDate }).from(travelers).leftJoin(users, eq(travelers.userId, users.id)).where(where).orderBy(order).limit(input.pageSize).offset(pageOffset(input)),
+    db
+      .select({ traveler: travelers, birthDate: users.birthDate, approverName: approverUsers.name, approverEmail: approverUsers.email })
+      .from(travelers)
+      .leftJoin(users, eq(travelers.userId, users.id))
+      .leftJoin(approverUsers, eq(travelers.approverId, approverUsers.id))
+      .where(where)
+      .orderBy(order)
+      .limit(input.pageSize)
+      .offset(pageOffset(input)),
     db.select({ count: sql<number>`count(*)` }).from(travelers).where(where),
   ]);
-  const items = rows.map(({ traveler, birthDate }) => ({ ...traveler, birthDate: birthDate ?? null }));
+  const items = rows.map(({ traveler, birthDate, approverName, approverEmail }) => ({
+    ...traveler,
+    birthDate: birthDate ?? null,
+    approverName: approverName ?? approverEmail ?? null,
+  }));
   return result(items, input, Number(countRows[0]?.count ?? 0));
 }
 
@@ -223,9 +252,16 @@ export async function getTraveler(id: number) {
   return rows[0] ?? null;
 }
 
+function assertApproverNotSelf(userId: number | null | undefined, approverId: number | null | undefined) {
+  if (userId != null && approverId != null && userId === approverId) {
+    throw new ApproverCannotBeSelfError();
+  }
+}
+
 export async function createTraveler(
-  input: Pick<InsertTraveler, "name" | "userId" | "unitId" | "documentNumber" | "canDrive">,
+  input: Pick<InsertTraveler, "name" | "userId" | "unitId" | "documentNumber" | "canDrive" | "approverId">,
 ) {
+  assertApproverNotSelf(input.userId, input.approverId);
   const db = await requireDb();
   const rows = await db.insert(travelers).values({ ...input, active: true }).returning();
   return rows[0];
@@ -233,9 +269,15 @@ export async function createTraveler(
 
 export async function updateTraveler(
   id: number,
-  input: Partial<Pick<InsertTraveler, "name" | "userId" | "unitId" | "documentNumber" | "canDrive" | "active">>,
+  input: Partial<Pick<InsertTraveler, "name" | "userId" | "unitId" | "documentNumber" | "canDrive" | "active" | "approverId">>,
 ) {
   const db = await requireDb();
+  if (input.approverId !== undefined) {
+    const effectiveUserId = input.userId !== undefined
+      ? input.userId
+      : (await db.select({ userId: travelers.userId }).from(travelers).where(eq(travelers.id, id)).limit(1))[0]?.userId;
+    assertApproverNotSelf(effectiveUserId, input.approverId);
+  }
   const rows = await db.update(travelers).set(input).where(eq(travelers.id, id)).returning();
   return rows[0] ?? null;
 }

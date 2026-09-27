@@ -14,10 +14,12 @@ import { useAuth } from '@/hooks/use-auth';
 import { trpc } from '@/lib/trpc';
 import { formatDateDisplay, isIsoDate, normalizeDateValue } from '@/lib/date-utils';
 
+// approverId não faz mais parte do rascunho: quem aprova a viagem é
+// calculado no servidor a partir do aprovador padrão cadastrado para o
+// viajante (Cadastros > Viajantes e condutores), nunca enviado pelo app.
 type TripDraft = {
   tripCode: string;
   travelerId: number;
-  approverId: number | null;
   clientId: number | null;
   unitId: number | null;
   origin: string;
@@ -39,7 +41,6 @@ type TripDraft = {
 const defaultDraft: TripDraft = {
   tripCode: `TR-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
   travelerId: 0,
-  approverId: null as number | null,
   clientId: null,
   unitId: null,
   origin: '',
@@ -90,7 +91,6 @@ export default function NewTripScreen() {
     setDraft({
       tripCode: trip.tripCode,
       travelerId: trip.travelerId,
-      approverId: trip.approverId,
       clientId: trip.clientId,
       unitId: trip.unitId,
       origin: trip.origin,

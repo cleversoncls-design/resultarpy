@@ -143,6 +143,11 @@ export const travelers = pgTable(
     name: varchar("name", { length: 160 }).notNull(),
     documentNumber: varchar("document_number", { length: 40 }),
     canDrive: boolean("can_drive").default(false).notNull(),
+    // Aprovador padrão desse viajante -- quem decide as viagens dele por
+    // padrão (além de qualquer usuário "admin", que sempre pode decidir).
+    // Viagem só pode ser criada depois que isso estiver preenchido (ver
+    // trips.create em operations-router.ts).
+    approverId: bigint("approver_id", { mode: "number" }).references(() => users.id),
     active: boolean("active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
