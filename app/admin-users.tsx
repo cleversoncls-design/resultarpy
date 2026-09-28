@@ -28,11 +28,6 @@ export default function AdminUsersScreen() {
   const { t } = useLanguage();
   const { user, isAuthenticated } = useAuth();
   const [users, setUsers] = useState<Api.LocalUser[]>([]);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [profile, setProfile] = useState<Profile>("traveler_approver");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,35 +65,6 @@ export default function AdminUsersScreen() {
   useEffect(() => {
     if (isAuthenticated && user?.role === "admin") refreshUsers();
   }, [isAuthenticated, user?.role, refreshUsers]);
-
-  const createUser = async () => {
-    setError(null);
-    setSuccess(null);
-    if (!name.trim() || !email.trim() || !password) {
-      setError(t("Informe nome, e-mail e senha."));
-      return;
-    }
-    const parsedBirthDate = birthDate.trim() ? parseBrazilianDate(birthDate) : null;
-    if (birthDate.trim() && !parsedBirthDate) {
-      setError(t("Informe uma data de nascimento válida no formato dd/mm/aaaa."));
-      return;
-    }
-    try {
-      setBusy(true);
-      await Api.createLocalUser({ name, email, password, role: profile === "admin" ? "admin" : "user", profile, birthDate: parsedBirthDate });
-      setName("");
-      setEmail("");
-      setPassword("");
-      setBirthDate("");
-      setProfile("traveler_approver");
-      setSuccess(t("Usuário criado com sucesso."));
-      await refreshUsers();
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : t("Não foi possível criar o usuário."));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const beginEdit = (target: Api.LocalUser) => {
     setEditingId(target.id);
@@ -189,7 +155,11 @@ export default function AdminUsersScreen() {
     <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="mt-6 rounded-2xl border border-border bg-surface p-5">
       <View className="flex-row items-center justify-between"><Text className="text-base font-bold text-foreground">{t('Usuários registrados')}</Text><Pressable onPress={refreshUsers} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}><Text className="font-semibold text-primary">{t('Atualizar')}</Text></Pressable></View>
       <TextInput value={search} onChangeText={setSearch} placeholder={t('Buscar por nome ou e-mail')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="mt-4 rounded-xl border px-4 py-3" />
-      <View className="mt-3 flex-row gap-2"><Text className="mr-1 self-center text-xs font-semibold text-muted">{t('Status')}:</Text>{(["all", "active", "blocked"] as const).map((option) => { const selected = statusFilter === option; return <Pressable key={option} onPress={() => setStatusFilter(option)} style={({ pressed }) => ({ backgroundColor: selected ? colors.primary : colors.background, borderColor: selected ? colors.primary : colors.border, borderWidth: 1, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7, opacity: pressed ? 0.75 : 1 })}><Text style={{ color: selected ? "#fff" : colors.foreground }} className="text-xs font-semibold">{option === "all" ? t("Todos") : option === "active" ? t("Ativos") : t("Bloqueados")}</Text></Pressable>; })}</View>
+      <View className="mt-3 flex-row flex-wrap items-center justify-between gap-2">
+        <View className="flex-row flex-wrap items-center gap-2"><Text className="mr-1 self-center text-xs font-semibold text-muted">{t('Status')}:</Text>{(["all", "active", "blocked"] as const).map((option) => { const selected = statusFilter === option; return <Pressable key={option} onPress={() => setStatusFilter(option)} style={({ pressed }) => ({ backgroundColor: selected ? colors.primary : colors.background, borderColor: selected ? colors.primary : colors.border, borderWidth: 1, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7, opacity: pressed ? 0.75 : 1 })}><Text style={{ color: selected ? "#fff" : colors.foreground }} className="text-xs font-semibold">{option === "all" ? t("Todos") : option === "active" ? t("Ativos") : t("Bloqueados")}</Text></Pressable>; })}</View>
+        <Pressable onPress={() => router.push('/new-user')} style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.8 : 1 })}><Text className="text-xs font-bold text-white">+ {t('Adicionar usuário')}</Text></Pressable>
+      </View>
+      {error ? <Text className="mt-3 text-sm text-error">{error}</Text> : null}{success ? <Text className="mt-3 text-sm text-success">{success}</Text> : null}
       {loadingUsers ? <View className="mt-5 items-center"><ActivityIndicator color={colors.primary} /></View> : users.length === 0 ? <Text className="mt-4 text-sm text-muted">{t('Nenhum usuário local registrado.')}</Text> : filteredUsers.length === 0 ? <Text className="mt-4 text-sm text-muted">{t('Nenhum usuário corresponde aos filtros.')}</Text> : <View className="mt-4">
         <View className="flex-row items-center border-b border-border px-1 pb-2"><Text className="flex-[2] text-xs font-semibold text-muted">{t('Nome')}</Text><Text className="hidden flex-[2] text-xs font-semibold text-muted sm:flex">{t('E-mail')}</Text><Text className="w-28 text-xs font-semibold text-muted">{t('Perfil')}</Text><Text className="w-20 text-xs font-semibold text-muted">{t('Situação')}</Text><Text className="w-24 text-right text-xs font-semibold text-muted">{t('Ações')}</Text></View>
         {filteredUsers.map((item) => { const isSelfAdmin = item.id === user.id && item.active && item.profile === "admin"; return <View key={item.id} className="border-b border-border">
@@ -204,21 +174,9 @@ export default function AdminUsersScreen() {
             <Pressable disabled={togglingId === item.id || isSelfAdmin} onPress={() => toggleUser(item)} hitSlop={6} style={({ pressed }) => ({ padding: 6, borderRadius: 8, opacity: togglingId === item.id ? 0.6 : isSelfAdmin ? 0.3 : pressed ? 0.6 : 1 })}>{togglingId === item.id ? <ActivityIndicator size="small" color={colors.primary} /> : <IconSymbol name={item.active ? "lock.fill" : "lock.open.fill"} size={16} color={item.active ? colors.error : colors.success} />}</Pressable>
           </View>
         </View>
-        {editingId === item.id ? <View className="mb-3 rounded-xl border border-border p-3"><TextInput value={editingName} onChangeText={setEditingName} placeholder={t('Nome completo')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="rounded-xl border px-3 py-2" /><TextInput value={editingBirthDate} onChangeText={(value) => setEditingBirthDate(formatDateInput(value))} keyboardType="numeric" placeholder="dd/mm/aaaa" placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="mt-3 rounded-xl border px-3 py-2" /><View className="mt-3">{profileOptions.map((option) => <Pressable key={option.key} onPress={() => setEditingProfile(option.key)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", paddingVertical: 6, opacity: pressed ? 0.7 : 1 })}><View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: editingProfile === option.key ? colors.primary : colors.muted, marginRight: 8, alignItems: "center", justifyContent: "center" }}>{editingProfile === option.key ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary }} /> : null}</View><Text className="text-sm text-foreground">{t(option.label)}</Text></Pressable>)}</View><View className="mt-3 flex-row gap-2"><Pressable onPress={() => setEditingId(null)} style={({ pressed }) => ({ borderColor: colors.border, borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}><Text className="text-sm font-semibold text-muted">{t('Cancelar')}</Text></Pressable><Pressable onPress={saveEdit} style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}><Text className="text-sm font-semibold text-white">{t('Salvar')}</Text></Pressable></View></View> : null}
-        {resetId === item.id ? <View className="mb-3 rounded-xl border border-border p-3"><TextInput value={resetPassword} onChangeText={setResetPassword} autoCapitalize="none" secureTextEntry placeholder={t('Nova senha (mínimo de 10 caracteres)')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="rounded-xl border px-3 py-2" /><View className="mt-3 flex-row gap-2"><Pressable onPress={() => setResetId(null)} style={({ pressed }) => ({ borderColor: colors.border, borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}><Text className="text-sm font-semibold text-muted">{t('Cancelar')}</Text></Pressable><Pressable onPress={savePassword} style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}><Text className="text-sm font-semibold text-white">{t('Salvar senha')}</Text></Pressable></View></View> : null}
+        {editingId === item.id ? <View className="mb-3 rounded-xl border border-border p-3"><TextInput value={editingName} onChangeText={setEditingName} placeholder={t('Nome completo')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="rounded-xl border px-3 py-2" /><TextInput value={editingBirthDate} onChangeText={(value) => setEditingBirthDate(formatDateInput(value))} keyboardType="numeric" placeholder="dd/mm/aaaa" placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="mt-3 rounded-xl border px-3 py-2" /><View className="mt-3">{profileOptions.map((option) => <Pressable key={option.key} onPress={() => setEditingProfile(option.key)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", paddingVertical: 6, opacity: pressed ? 0.7 : 1 })}><View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: editingProfile === option.key ? colors.primary : colors.muted, marginRight: 8, alignItems: "center", justifyContent: "center" }}>{editingProfile === option.key ? <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary }} /> : null}</View><Text className="text-sm text-foreground">{t(option.label)}</Text></Pressable>)}</View><View className="mt-3 flex-row gap-2"><Pressable onPress={() => setEditingId(null)} style={({ pressed }) => ({ borderColor: colors.border, borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}><Text className="text-sm font-semibold text-muted">{t('Cancelar')}</Text></Pressable><Pressable disabled={busy} onPress={saveEdit} style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, opacity: busy ? 0.6 : pressed ? 0.7 : 1 })}><Text className="text-sm font-semibold text-white">{busy ? t('Salvando...') : t('Salvar')}</Text></Pressable></View></View> : null}
+        {resetId === item.id ? <View className="mb-3 rounded-xl border border-border p-3"><TextInput value={resetPassword} onChangeText={setResetPassword} autoCapitalize="none" secureTextEntry placeholder={t('Nova senha (mínimo de 10 caracteres)')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="rounded-xl border px-3 py-2" /><View className="mt-3 flex-row gap-2"><Pressable onPress={() => setResetId(null)} style={({ pressed }) => ({ borderColor: colors.border, borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.7 : 1 })}><Text className="text-sm font-semibold text-muted">{t('Cancelar')}</Text></Pressable><Pressable disabled={busy} onPress={savePassword} style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 8, opacity: busy ? 0.6 : pressed ? 0.7 : 1 })}><Text className="text-sm font-semibold text-white">{busy ? t('Salvando...') : t('Salvar senha')}</Text></Pressable></View></View> : null}
       </View>; })}</View>}
-    </View>
-
-    <View className="mt-5 rounded-2xl border border-border bg-surface p-5">
-      <Text className="text-base font-bold text-foreground">{t('Novo usuário')}</Text>
-      <Text className="mt-4 text-sm font-semibold text-foreground">{t('Nome')}</Text><TextInput value={name} onChangeText={setName} placeholder={t('Nome completo')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="mt-2 rounded-xl border px-4 py-3" />
-      <Text className="mt-4 text-sm font-semibold text-foreground">{t('E-mail')}</Text><TextInput value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" placeholder={t('nome@empresa.com')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="mt-2 rounded-xl border px-4 py-3" />
-<Text className="mt-4 text-sm font-semibold text-foreground">{t('Senha inicial')}</Text><TextInput value={password} onChangeText={setPassword} autoCapitalize="none" secureTextEntry placeholder={t('Mínimo de 10 caracteres')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="mt-2 rounded-xl border px-4 py-3" />
-       <Text className="mt-4 text-sm font-semibold text-foreground">{t('Data de nascimento')}</Text><TextInput value={birthDate} onChangeText={(value) => setBirthDate(formatDateInput(value))} keyboardType="numeric" placeholder="dd/mm/aaaa" placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="mt-2 rounded-xl border px-4 py-3" />
-       <Text className="mt-4 text-sm font-semibold text-foreground">{t('Perfil de acesso')}</Text>
-      <View className="mt-2">{profileOptions.map((option) => { const selected = profile === option.key; return <Pressable key={option.key} onPress={() => setProfile(option.key)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", borderColor: selected ? colors.primary : colors.border, borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 8, backgroundColor: selected ? `${colors.primary}14` : colors.background, opacity: pressed ? 0.75 : 1 })}><View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: selected ? colors.primary : colors.muted, alignItems: "center", justifyContent: "center", marginRight: 10 }}>{selected ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} /> : null}</View><View className="flex-1"><Text className="font-semibold text-foreground">{t(option.label)}</Text><Text className="mt-1 text-xs text-muted">{t(option.description)}</Text></View></Pressable>; })}</View>
-      {error ? <Text className="mt-2 text-sm text-error">{error}</Text> : null}{success ? <Text className="mt-2 text-sm text-success">{success}</Text> : null}
-      <View className="mt-5">{busy ? <ActivityIndicator color={colors.primary} /> : <Pressable onPress={createUser} style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 10, minHeight: 50, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.8 : 1 })}><Text className="font-bold text-white">{t('Criar usuário')}</Text></Pressable>}</View>
     </View>
   </ScrollView></ScreenContainer>;
 }
