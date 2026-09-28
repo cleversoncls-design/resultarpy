@@ -39,6 +39,10 @@ const MAPPING = {
   'calendar': 'calendar-today',
   'rectangle.portrait.and.arrow.right': 'logout',
   'sidebar.left': 'view-sidebar',
+  'pencil': 'edit',
+  'key.fill': 'vpn-key',
+  'lock.fill': 'lock',
+  'lock.open.fill': 'lock-open',
 } as IconMapping;
 
 export function IconSymbol({ name, size = 24, color, style }: { name: IconSymbolName; size?: number; color: string | OpaqueColorValue; style?: StyleProp<TextStyle>; weight?: SymbolWeight }) {
