@@ -31,8 +31,14 @@ describePostgres('Fluxo persistente ponta a ponta', () => {
     expect(traveler && unit && client && expenseType && approver).toBeTruthy();
     const approverCaller = callerFor(approver!);
 
+    // approverId da viagem não é mais informado na criação -- vem do
+    // aprovador padrão cadastrado no viajante (ver server/operations-router.ts
+    // trips.create). Configura esse aprovador padrão diretamente no banco
+    // pra reproduzir o cadastro que o admin faria em Viajantes e condutores.
+    await db.update(travelers).set({ approverId: approver!.id }).where(eq(travelers.id, traveler!.id));
+
     const vehicle = await caller.operations.fleet.vehicles.create({ plate: `E2E${Date.now()}`.slice(0, 10), brand: 'Toyota', model: 'Corolla E2E', modelYear: 2024, color: 'Prata', unitId: unit!.id, currentKm: 10000, lastMaintenanceKm: 9000, maintenanceIntervalKm: 10000, fireExtinguisherExpiresOn: '2027-12-31', notes: 'Registro temporário do teste de fluxo' });
-    const trip = await caller.operations.trips.create({ tripCode: `E2E-${Date.now()}`, travelerId: traveler!.id, approverId: approver!.id, clientId: client!.id, unitId: unit!.id, origin: 'São Paulo', destination: 'Asunción', country: 'Paraguai', area: 'Comercial', transport: 'Veículo da frota', startsOn: '2026-09-10', endsOn: '2026-09-12', status: 'Aguardando aprovação', requiresFleetVehicle: true, hasAdvance: true, needsHotel: true, advanceAmount: '500.00' });
+    const trip = await caller.operations.trips.create({ tripCode: `E2E-${Date.now()}`, travelerId: traveler!.id, clientId: client!.id, unitId: unit!.id, origin: 'São Paulo', destination: 'Asunción', country: 'Paraguai', area: 'Comercial', transport: 'Veículo da frota', startsOn: '2026-09-10', endsOn: '2026-09-12', status: 'Aguardando aprovação', requiresFleetVehicle: true, hasAdvance: true, needsHotel: true, advanceAmount: '500.00' });
     expect((await approverCaller.operations.approvals.list({ page: 1, pageSize: 20, direction: 'asc' })).items.some((item) => item.id === trip.id)).toBe(true);
     await expect(approverCaller.operations.approvals.decide({ tripId: trip.id, decision: 'Aprovada', comment: '' })).rejects.toThrow('Comentário obrigatório');
     const approvedTrip = await approverCaller.operations.approvals.decide({ tripId: trip.id, decision: 'Aprovada', comment: 'Aprovado no fluxo E2E' });
