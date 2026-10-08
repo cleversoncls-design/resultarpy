@@ -27,7 +27,13 @@ describePostgres('Operações persistentes autenticadas no PostgreSQL', () => {
     const [unit] = await db.select().from(units).limit(1);
     const [client] = await db.select().from(clients).limit(1);
     const [expenseType] = await db.select().from(expenseTypes).limit(1);
-    expect(traveler && unit && client && expenseType).toBeTruthy();
+    const approver = await getUserByOpenId('seed-approver');
+    expect(traveler && unit && client && expenseType && approver).toBeTruthy();
+    // A viagem exige um aprovador padrão no cadastro do viajante (ver
+    // trips.create). Este teste pega "um" viajante sem ordem definida e roda em
+    // paralelo com operations-flow.e2e, então não pode depender de outro teste
+    // ter configurado isso antes: configura aqui, com o mesmo valor do outro.
+    await db.update(travelers).set({ approverId: approver!.id }).where(eq(travelers.id, traveler!.id));
     const vehicle = await caller.operations.fleet.vehicles.create({ plate: `IT${Date.now()}`.slice(0, 10), brand: 'Toyota', model: 'Integration Test', modelYear: 2024, color: 'Prata', unitId: unit!.id, currentKm: 10000, lastMaintenanceKm: 9000, maintenanceIntervalKm: 10000, fireExtinguisherExpiresOn: null, notes: 'Registro temporário do teste' });
 
     const tripCode = `IT-${Date.now()}`;
