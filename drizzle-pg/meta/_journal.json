@@ -169,6 +169,13 @@
       "when": 1790518707365,
       "tag": "0023_add_traveler_approver",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790605107365,
+      "tag": "0024_add_email_settings",
+      "breakpoints": true
     }
   ]
 }

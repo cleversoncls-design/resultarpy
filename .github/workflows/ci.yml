@@ -116,6 +116,11 @@ jobs:
         env:
           JWT_SECRET: ci-only-ephemeral-secret-change-per-run
           FRONTEND_PORT: 8080
+          # O compose.yaml usa "network: host" no build. Nas versões novas do Docker
+          # Compose (que delegam o build ao buildx bake) isso exige a permissão
+          # --allow=network.host e o passo falha. Com o bake desligado o build segue
+          # o caminho clássico, que aceita a rede do host como sempre aceitou.
+          COMPOSE_BAKE: "false"
         run: docker compose -f compose.yaml up -d --build
 
       - name: Wait for Compose frontend
