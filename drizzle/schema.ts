@@ -21,6 +21,49 @@ export const organizationSettings = pgTable("organization_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Configuração SMTP dos avisos automáticos por e-mail (linha única, id = 1).
+// A senha fica cifrada (AES-256-GCM, ver server/email-crypto.ts) e nunca é
+// devolvida às telas -- só se informa se já existe uma guardada.
+export const emailSettings = pgTable("email_settings", {
+  id: integer("id").primaryKey().default(1),
+  enabled: boolean("enabled").default(false).notNull(),
+  smtpHost: varchar("smtp_host", { length: 255 }).default("").notNull(),
+  smtpPort: integer("smtp_port").default(465).notNull(),
+  // "ssl" (SSL/TLS direto, ex.: 465), "starttls" (ex.: 587) ou "none".
+  smtpSecurity: varchar("smtp_security", { length: 16 }).default("ssl").notNull(),
+  smtpUser: varchar("smtp_user", { length: 255 }).default("").notNull(),
+  smtpPasswordEnc: text("smtp_password_enc"),
+  fromEmail: varchar("from_email", { length: 320 }).default("").notNull(),
+  fromName: varchar("from_name", { length: 160 }).default("").notNull(),
+  // E-mails do Administrativo que recebem "viagem aprovada" e "prestação de
+  // contas enviada" (um por linha ou separados por vírgula/ponto e vírgula).
+  adminRecipients: text("admin_recipients").default("").notNull(),
+  lastTestAt: timestamp("last_test_at", { withTimezone: true }),
+  lastTestOk: boolean("last_test_ok"),
+  lastTestMessage: text("last_test_message"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Registro de cada envio tentado (sucesso ou erro), para a tela "Registro
+// de e-mails enviados". Sem FK em trip_id: apagar a viagem não pode falhar
+// por causa do histórico.
+export const emailLog = pgTable(
+  "email_log",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    event: varchar("event", { length: 40 }).notNull(),
+    toEmail: varchar("to_email", { length: 1000 }).notNull(),
+    subject: varchar("subject", { length: 300 }).notNull(),
+    status: varchar("status", { length: 16 }).notNull(),
+    error: text("error"),
+    tripId: bigint("trip_id", { mode: "number" }),
+  },
+  (table) => ({
+    createdAtIdx: index("email_log_created_at_idx").on(table.createdAt),
+  }),
+);
+
 export const authRoleEnum = pgEnum("auth_role", ["user", "admin"]);
 export const tripStatusEnum = pgEnum("trip_status", [
   "Rascunho",

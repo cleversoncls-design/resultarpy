@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { getDb } from './db';
+import { notifyTripReleased } from './email-service';
 import { clients, clientBillingProfileItems, clientBillingProfiles, currencyRates, expenseTypes, fleetEventPhotos, fleetEvents, fleetReservations, fleetWorkOrders, reimbursementLimitProfileItems, reimbursementLimitProfiles, travelers, tripApprovals, tripExpenses, trips, users, vehicles } from '../drizzle/schema';
 
 export type PageInput = { page: number; pageSize: number; search?: string; direction?: 'asc' | 'desc' };
@@ -100,6 +101,8 @@ export async function maybeReleaseTrip(id: number) {
 
   if (vehicleOk && advanceOk && hotelOk) {
     const [updated] = await db.update(trips).set({ status: 'Liberada para viagem' }).where(eq(trips.id, id)).returning();
+    // Administrativo terminou de definir tudo: avisa o viajante.
+    if (updated) notifyTripReleased(id);
     return updated;
   }
   return trip;

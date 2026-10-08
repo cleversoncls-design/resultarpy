@@ -28,6 +28,7 @@ export const moduleGroups = [
   { key: 'settings', label: 'Configurações Gerais', icon: 'gearshape.fill' as const, items: [
     { label: 'Usuários', path: '/admin-users', icon: 'person.2.fill' as const },
     { label: 'Moedas', path: '/currency-settings', icon: 'wallet.pass.fill' as const },
+    { label: 'E-mail', path: '/email-settings', icon: 'paperplane.fill' as const },
   ] },
 ];
 
@@ -41,6 +42,8 @@ const EXTRA_TITLES: Record<string, { crumb: string; title: string }> = {
   '/fleet-reservation': { crumb: 'Frota', title: 'Reserva de veículo' },
   '/cadastro-detalhe': { crumb: 'Viagens', title: 'Detalhe do cadastro' },
   '/admin-translations': { crumb: 'Configurações Gerais', title: 'Traduções' },
+  '/email-log': { crumb: 'Configurações Gerais', title: 'Registro de e-mails' },
+  '/new-user': { crumb: 'Configurações Gerais', title: 'Adicionar usuário' },
   '/administrativo': { crumb: 'Conta', title: 'Perfil administrativo' },
   '/aprovador': { crumb: 'Conta', title: 'Perfil aprovador' },
   '/viajante': { crumb: 'Conta', title: 'Perfil viajante' },
@@ -58,7 +61,7 @@ export function useVisibleModules() {
     if ((module.key === 'fleet' || module.key === 'settings') && !canAdmin) return false;
     if (item.path === '/approvals') return canApprove;
     if (item.path === '/trips?mine=1') return canAdmin && Boolean(hasOwnTripsQuery.data);
-    if (['/operations', '/reports', '/general-cadastros', '/admin-users', '/closure-queue'].includes(item.path)) return canAdmin;
+    if (['/operations', '/reports', '/general-cadastros', '/admin-users', '/email-settings', '/closure-queue'].includes(item.path)) return canAdmin;
     return true;
   }).map((item) => item.path === '/trips' && canAdmin ? { ...item, label: 'Todas as viagens' } : item) })).filter((module) => module.items.length > 0), [canAdmin, canApprove, hasOwnTripsQuery.data]);
   return { visibleModules, role, canAdmin, canApprove };

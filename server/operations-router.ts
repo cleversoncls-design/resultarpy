@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { adminProcedure, protectedProcedure, router } from './_core/trpc';
 import * as operations from './operations-repository';
+import { notifyClosureSubmitted, notifyTripApproved, notifyTripRequested } from './email-service';
 
 const pageInput = z.object({
   page: z.number().int().min(1).default(1),
@@ -72,7 +73,9 @@ export const operationsRouter = router({
       // ver comentário em tripFields.
       const approverId = await operations.getTravelerApproverId(travelerId);
       if (!approverId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Este viajante ainda não tem um aprovador padrão definido. Peça a um administrador para configurá-lo em Cadastros > Viajantes e condutores antes de criar a viagem.' });
-      return operations.createTrip({ ...input, travelerId, approverId });
+      const created = await operations.createTrip({ ...input, travelerId, approverId });
+      if (created?.status === 'Aguardando aprovação') notifyTripRequested(created.id);
+      return created;
     }),
     update: protectedProcedure.input(tripFields.partial().extend({ id: idInput.shape.id })).mutation(async ({ ctx, input }) => {
       const { id, ...changes } = input;
@@ -87,6 +90,8 @@ export const operationsRouter = router({
       }
       const trip = await operations.updateTrip(id, finalChanges, scopeFor(ctx.user));
       if (!trip) throw notFound();
+      // Reenvio de uma viagem devolvida para aprovação: avisa o aprovador de novo.
+      if (changes.status === 'Aguardando aprovação' && trip.status === 'Aguardando aprovação') notifyTripRequested(trip.id);
       return trip;
     }),
     // Fluxo de fechamento: viajante envia -> admin valida comprovantes ->
@@ -101,6 +106,7 @@ export const operationsRouter = router({
     submitClosure: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
       const trip = await operations.submitTripClosure(input.id, scopeFor(ctx.user));
       if (!trip) throw notFound();
+      notifyClosureSubmitted(trip.id);
       return trip;
     }),
     validateReceipts: adminProcedure.input(idInput).mutation(async ({ input }) => {
@@ -155,6 +161,7 @@ export const operationsRouter = router({
     decide: protectedProcedure.input(z.object({ tripId: idInput.shape.id, decision: approvalDecision, comment: z.string().trim().min(3, 'Comentário obrigatório').max(2000) })).mutation(async ({ ctx, input }) => {
       const result = await operations.decideTripApproval({ ...input, approverId: ctx.user.id }, ctx.user.role === 'admin' || ctx.user.profile === 'admin');
       if (!result) throw forbidden();
+      if (input.decision === 'Aprovada') notifyTripApproved(input.tripId);
       return result;
     }),
   }),

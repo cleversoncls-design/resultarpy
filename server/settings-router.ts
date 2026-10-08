@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { organizationSettings } from '../drizzle/schema';
 import { getDb } from './db';
 import { adminProcedure, protectedProcedure, router } from './_core/trpc';
+import { emailRouter } from './email-router';
 
 const currencySchema = z.enum(['BRL', 'USD', 'PYG']);
 
@@ -16,6 +17,7 @@ async function ensureGlobalCurrency() {
 }
 
 export const settingsRouter = router({
+  email: emailRouter,
   globalCurrency: protectedProcedure.query(async () => ({ currency: await ensureGlobalCurrency() })),
   setGlobalCurrency: adminProcedure.input(z.object({ currency: currencySchema })).mutation(async ({ input }) => {
     const db = await getDb();
