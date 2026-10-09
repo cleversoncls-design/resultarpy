@@ -4,7 +4,7 @@ import { getDb } from './db';
 import { decryptSecret, encryptSecret } from './email-crypto';
 import { sendSmtpMail, type SmtpConfig, type SmtpSecurity } from './smtp-client';
 
-export type EmailEvent = 'trip_requested' | 'trip_approved' | 'trip_released' | 'closure_submitted' | 'test';
+export type EmailEvent = 'trip_requested' | 'trip_approved' | 'trip_released' | 'closure_submitted' | 'trip_cancelled' | 'test';
 
 async function requireDb() {
   const db = await getDb();
@@ -239,6 +239,20 @@ async function notifyClosureSubmittedNow(tripId: number) {
   });
 }
 
+async function notifyTripCancelledNow(tripId: number) {
+  const context = await loadTripContext(tripId);
+  if (!context) return;
+  const db = await requireDb();
+  const [canceller] = context.trip.cancelledByUserId ? await db.select().from(users).where(eq(users.id, context.trip.cancelledByUserId)).limit(1) : [];
+  // Viajante, aprovador e Administrativo ficam sabendo (sem repetir endereço).
+  const to = parseRecipients([context.travelerEmail, context.approverEmail, ...(await adminRecipients())].filter(Boolean).join(','));
+  await deliver({
+    event: 'trip_cancelled', tripId, to,
+    subject: `Viagem cancelada — ${context.trip.tripCode}`,
+    text: `A viagem abaixo foi cancelada${canceller?.name ? ` por ${canceller.name}` : ''}.\n\n${tripSummary(context)}\n\nMotivo: ${context.trip.cancelReason?.trim() || 'não informado'}\n${context.trip.requiresFleetVehicle ? '\nA reserva do veículo da frota foi cancelada e o veículo ficou liberado.\n' : ''}`,
+  });
+}
+
 function fireAndForget(label: string, task: Promise<unknown>) {
   task.catch((error) => console.error(`[email] aviso "${label}" não enviado:`, error instanceof Error ? error.message : error));
 }
@@ -246,4 +260,5 @@ function fireAndForget(label: string, task: Promise<unknown>) {
 export const notifyTripRequested = (tripId: number) => fireAndForget('trip_requested', notifyTripRequestedNow(tripId));
 export const notifyTripApproved = (tripId: number) => fireAndForget('trip_approved', notifyTripApprovedNow(tripId));
 export const notifyTripReleased = (tripId: number) => fireAndForget('trip_released', notifyTripReleasedNow(tripId));
+export const notifyTripCancelled = (tripId: number) => fireAndForget('trip_cancelled', notifyTripCancelledNow(tripId));
 export const notifyClosureSubmitted = (tripId: number) => fireAndForget('closure_submitted', notifyClosureSubmittedNow(tripId));

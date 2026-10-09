@@ -84,6 +84,12 @@ const translations: Record<TranslationKey, string> = {
 
   'Solicitado por': 'Solicitado por',
 
+  'Cancelada': 'Cancelada', 'Cancelar viagem': 'Cancelar viaje', 'Viagem cancelada': 'Viaje cancelado', 'Cancelada em': 'Cancelado el', 'não informado': 'no informado',
+  'Esta viagem não aceita mais alterações. Se precisar viajar, faça uma nova solicitação.': 'Este viaje ya no admite cambios. Si necesita viajar, haga una nueva solicitud.',
+  'Cancelar esta viagem?': '¿Cancelar este viaje?', 'Motivo do cancelamento': 'Motivo de la cancelación', 'Cancelando...': 'Cancelando...', 'Confirmar cancelamento': 'Confirmar cancelación',
+  'O cancelamento não pode ser desfeito. A reserva do veículo da frota, se houver, será liberada e o viajante, o aprovador e o Administrativo serão avisados por e-mail.': 'La cancelación no se puede deshacer. La reserva del vehículo de la flota, si existe, se liberará y el viajero, el aprobador y el Administrativo serán avisados por correo.',
+  'Explique por que a viagem foi cancelada...': 'Explique por qué se canceló el viaje...', 'Informe o motivo do cancelamento (mínimo 5 caracteres)': 'Informe el motivo de la cancelación (mínimo 5 caracteres)',
+
   'Senha': 'Contraseña', 'Entrar': 'Ingresar', 'Mostrar': 'Mostrar', 'Ocultar': 'Ocultar', 'Mostrar senha': 'Mostrar contraseña', 'Ocultar senha': 'Ocultar contraseña', 'Preciso recuperar meu acesso': 'Necesito recuperar mi acceso', 'Acesso privado da organização': 'Acceso privado de la organización', 'Usuários e permissões são gerenciados pelo Administrador.': 'Los usuarios y permisos son administrados por el Administrador.', 'Controle de Viagens e Frota': 'Control de Viajes y Flota',
 
   'Rascunho': 'Borrador', 'Rejeitadas / Devolvidas': 'Rechazadas / Devueltas', 'Buscar por código, destino, cliente ou responsável...': 'Buscar por código, destino, cliente o responsable...', 'Todos os status': 'Todos los estados', 'Nenhum cliente encontrado nas viagens listadas': 'Ningún cliente encontrado en los viajes listados', 'Início (AAAA-MM-DD)': 'Inicio (AAAA-MM-DD)', 'Fim (AAAA-MM-DD)': 'Fin (AAAA-MM-DD)', 'Destino': 'Destino', 'Responsável': 'Responsable', 'até': 'hasta', 'Abrir': 'Abrir', 'Nenhuma viagem para os filtros selecionados.': 'Ningún viaje para los filtros seleccionados.',

@@ -122,7 +122,9 @@ export async function startTrip(id: number, scope: Scope = {}) {
 
 export async function updateTrip(id: number, input: Partial<typeof trips.$inferInsert>, scope: Scope = {}) {
   const db = await requireDb();
-  if (!(await getTrip(id, scope))) return undefined;
+  const current = await getTrip(id, scope);
+  if (!current) return undefined;
+  assertNotCancelled(current);
   const [updated] = await db.update(trips).set(input).where(eq(trips.id, id)).returning();
   // Se a modalidade de transporte ou a exigência de veículo mudou (ex.: admin
   // trocou de "frota" para "próprio"/"ônibus"), reavalia se a viagem já pode
@@ -131,6 +133,40 @@ export async function updateTrip(id: number, input: Partial<typeof trips.$inferI
     return (await maybeReleaseTrip(id)) ?? updated;
   }
   return updated;
+}
+
+const CANCELLED_MESSAGE = 'Esta viagem foi cancelada e não pode mais ser alterada.';
+function assertNotCancelled(trip: { status: string }) {
+  if (trip.status === 'Cancelada') throw new Error(CANCELLED_MESSAGE);
+}
+
+// Etapas em que ainda dá para cancelar: da solicitação até "Liberada para
+// viagem". Depois que a viagem começa ("Em prestação") ou entra em
+// prestação de contas, o cancelamento deixa de ser possível.
+export const CANCELLABLE_TRIP_STATUSES = ['Aguardando aprovação', 'Devolvida', 'Aprovada', 'Em preparação', 'Liberada para viagem'] as const;
+
+// Cancela a viagem (status "Cancelada"), guarda motivo/quem/quando e libera o
+// veículo: a reserva de frota vinculada passa a "Cancelada" (o veículo volta a
+// poder ser alocado em outra viagem). Tudo na mesma transação.
+export async function cancelTrip(id: number, reason: string, userId: number, scope: Scope = {}) {
+  const db = await requireDb();
+  const trip = await getTrip(id, scope);
+  if (!trip) return undefined;
+  if (trip.status === 'Cancelada') throw new Error('Esta viagem já foi cancelada.');
+  if (!(CANCELLABLE_TRIP_STATUSES as readonly string[]).includes(trip.status)) {
+    throw new Error(`Não é possível cancelar uma viagem com status "${trip.status}". O cancelamento só vale até "Liberada para viagem".`);
+  }
+  return db.transaction(async (tx) => {
+    // O filtro por status evita cancelar uma viagem que mudou de etapa
+    // (ex.: o viajante clicou em "Iniciar viagem") entre a leitura e a gravação.
+    const [updated] = await tx.update(trips)
+      .set({ status: 'Cancelada', cancelledAt: new Date(), cancelReason: reason, cancelledByUserId: userId })
+      .where(and(eq(trips.id, id), inArray(trips.status, [...CANCELLABLE_TRIP_STATUSES])))
+      .returning();
+    if (!updated) throw new Error('A viagem mudou de etapa e não pode mais ser cancelada. Atualize a tela e confira o status.');
+    await tx.update(fleetReservations).set({ status: 'Cancelada' }).where(and(eq(fleetReservations.tripId, id), inArray(fleetReservations.status, ['Aguardando veículo', 'Reservado', 'Reservada'])));
+    return updated;
+  });
 }
 
 export async function deleteTrip(id: number, scope: Scope = {}) {
@@ -197,7 +233,9 @@ export async function listClosureQueue(input: PageInput) {
 // a viagem pode ser liberada.
 export async function confirmTripAdvance(id: number, depositedAmount: string, scope: Scope = {}) {
   const db = await requireDb();
-  if (!(await getTrip(id, scope))) return undefined;
+  const current = await getTrip(id, scope);
+  if (!current) return undefined;
+  assertNotCancelled(current);
   await db.update(trips).set({ advanceConfirmedAt: new Date(), advanceConfirmedAmount: depositedAmount }).where(eq(trips.id, id));
   return maybeReleaseTrip(id);
 }
@@ -206,7 +244,9 @@ export async function confirmTripAdvance(id: number, depositedAmount: string, sc
 // viagem pode ser liberada.
 export async function updateTripHotelNote(id: number, hotelNote: string | null, scope: Scope = {}) {
   const db = await requireDb();
-  if (!(await getTrip(id, scope))) return undefined;
+  const current = await getTrip(id, scope);
+  if (!current) return undefined;
+  assertNotCancelled(current);
   await db.update(trips).set({ hotelNote }).where(eq(trips.id, id));
   return maybeReleaseTrip(id);
 }
@@ -448,6 +488,7 @@ export async function createTripExpense(input: typeof tripExpenses.$inferInsert,
   const db = await requireDb();
   const trip = await getTrip(input.tripId, scope);
   if (!trip) return undefined;
+  assertNotCancelled(trip);
   // Depois que o Administrativo valida os comprovantes, a prestação fica
   // travada para o viajante — ele não pode mais incluir, editar ou
   // apagar despesas dessa viagem (o Administrativo continua podendo).

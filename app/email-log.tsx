@@ -12,6 +12,7 @@ const eventLabels: Record<string, string> = {
   trip_approved: 'Viagem aprovada',
   trip_released: 'Viagem liberada',
   closure_submitted: 'Prestação de contas',
+  trip_cancelled: 'Viagem cancelada',
   test: 'Teste',
 };
 

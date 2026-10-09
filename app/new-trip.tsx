@@ -100,7 +100,9 @@ export default function NewTripScreen() {
       transport: trip.transport ?? 'Veículo da frota',
       startsOn: trip.startsOn,
       endsOn: trip.endsOn,
-      status: trip.status,
+      // Viagem cancelada não é editável (o servidor recusa); "Cancelada" não
+      // existe entre os status que a tela de edição sabe enviar.
+      status: trip.status === 'Cancelada' ? 'Rascunho' : trip.status,
       requiresFleetVehicle: trip.requiresFleetVehicle,
       hasAdvance: trip.hasAdvance,
       needsHotel: trip.needsHotel,

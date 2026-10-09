@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { adminProcedure, protectedProcedure, router } from './_core/trpc';
 import * as operations from './operations-repository';
-import { notifyClosureSubmitted, notifyTripApproved, notifyTripRequested } from './email-service';
+import { notifyClosureSubmitted, notifyTripApproved, notifyTripCancelled, notifyTripRequested } from './email-service';
 
 const pageInput = z.object({
   page: z.number().int().min(1).default(1),
@@ -27,6 +27,9 @@ function normalizeBirthDate(value: unknown) {
   return value;
 }
 const tripStatus = z.enum(['Rascunho', 'Aguardando aprovação', 'Aprovada', 'Em preparação', 'Liberada para viagem', 'Em prestação', 'Finalizada', 'Rejeitada', 'Devolvida']);
+// "Cancelada" só entra por trips.cancel (com motivo e regras de etapa); por
+// isso fica de fora do tripStatus usado em criar/editar e só vale como filtro.
+const tripStatusFilter = z.enum(['Rascunho', 'Aguardando aprovação', 'Aprovada', 'Em preparação', 'Liberada para viagem', 'Em prestação', 'Finalizada', 'Rejeitada', 'Devolvida', 'Cancelada']);
 const approvalDecision = z.enum(['Aprovada', 'Rejeitada', 'Devolvida']);
 const approvalHistoryFields = { decision: approvalDecision.optional(), from: z.string().date().optional(), to: z.string().date().optional() };
 const approvalHistoryInput = idInput.extend({ ...approvalHistoryFields, page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(10) }).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
@@ -60,7 +63,7 @@ const billingReportInput = pageInput.extend(reportPeriod).refine((input) => !inp
 
 export const operationsRouter = router({
   trips: router({
-    list: protectedProcedure.input(pageInput.extend({ status: tripStatus.optional(), travelerId: z.number().int().positive().optional(), mine: z.boolean().default(false) })).query(({ ctx, input }) => operations.listTrips({ ...input, travelerId: ctx.user.role === 'admin' && !input.mine ? input.travelerId : undefined, userId: ctx.user.role === 'admin' && !input.mine ? undefined : ctx.user.id })),
+    list: protectedProcedure.input(pageInput.extend({ status: tripStatusFilter.optional(), travelerId: z.number().int().positive().optional(), mine: z.boolean().default(false) })).query(({ ctx, input }) => operations.listTrips({ ...input, travelerId: ctx.user.role === 'admin' && !input.mine ? input.travelerId : undefined, userId: ctx.user.role === 'admin' && !input.mine ? undefined : ctx.user.id })),
     // Usado só para decidir se o menu do Administrativo mostra "Minhas
     // viagens" (além de "Todas as viagens").
     hasOwnTrips: protectedProcedure.query(({ ctx }) => operations.hasOwnTrips(ctx.user.id)),
@@ -101,6 +104,21 @@ export const operationsRouter = router({
     startTrip: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
       const trip = await operations.startTrip(input.id, scopeFor(ctx.user));
       if (!trip) throw notFound();
+      return trip;
+    }),
+    // Cancela uma viagem já solicitada/aprovada (até "Liberada para viagem").
+    // O Administrativo cancela qualquer uma; o viajante só as próprias (o
+    // escopo abaixo faz getTrip não achar a viagem dos outros -> não encontrada).
+    cancel: protectedProcedure.input(z.object({ id: idInput.shape.id, reason: z.string().trim().min(5, 'Informe o motivo do cancelamento (mínimo 5 caracteres)').max(2000) })).mutation(async ({ ctx, input }) => {
+      const isAdmin = ctx.user.role === 'admin' || ctx.user.profile === 'admin';
+      let trip;
+      try {
+        trip = await operations.cancelTrip(input.id, input.reason, ctx.user.id, { userId: isAdmin ? undefined : ctx.user.id, admin: isAdmin });
+      } catch (error) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: error instanceof Error ? error.message : 'Não foi possível cancelar a viagem.' });
+      }
+      if (!trip) throw notFound();
+      notifyTripCancelled(trip.id);
       return trip;
     }),
     submitClosure: protectedProcedure.input(idInput).mutation(async ({ ctx, input }) => {
