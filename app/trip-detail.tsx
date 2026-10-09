@@ -164,6 +164,15 @@ export default function TripDetailScreen() {
     onSuccess: () => { tripQuery.refetch(); reservationQuery.refetch(); },
   });
 
+  // Cancelamento da viagem: pede confirmação e o motivo (obrigatório) antes.
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const cancelTripMutation = trpc.operations.trips.cancel.useMutation({
+    onSuccess: () => { setCancelOpen(false); setCancelReason(""); setCancelError(null); tripQuery.refetch(); reservationQuery.refetch(); },
+    onError: (error) => setCancelError(error.message),
+  });
+
   // Todos os hooks abaixo são sempre chamados, em toda renderização,
   // independentemente de a viagem já ter chegado ou não (regra do React).
   const tripExpenses = tripExpensesQuery.data?.items ?? [];
@@ -189,6 +198,9 @@ export default function TripDetailScreen() {
   // digitado numa viagem (ex.: valor do depósito) "vaza" para a próxima.
   useEffect(() => {
     setShowVehiclePicker(false);
+    setCancelOpen(false);
+    setCancelReason("");
+    setCancelError(null);
     setHotelNoteDraft(null);
     setEditingHotel(false);
     setDepositAmountDraft(null);
@@ -278,6 +290,10 @@ export default function TripDetailScreen() {
   const advanceValue = tripRecord.advanceAmount ?? "0";
   const flightDetails = tripRecord.flightDetails ?? undefined;
 
+  // Cancelamento só até "Liberada para viagem" (mesma regra do servidor).
+  const isCancelled = trip.status === "Cancelada";
+  const canCancel = ["Aguardando aprovação", "Devolvida", "Aprovada", "Em preparação", "Liberada para viagem"].includes(trip.status) && !started;
+
   // --- Pendências para liberação da viagem ---
   const vehicleAllocated = Boolean(reservation?.vehicleId);
   const vehiclePending = Boolean(tripRecord.requiresFleetVehicle) && !vehicleAllocated;
@@ -285,7 +301,7 @@ export default function TripDetailScreen() {
   const depositAmountValue = depositAmountDraft ?? advanceValue;
   const hotelNoteValue = hotelNoteDraft ?? tripRecord.hotelNote ?? "";
   const hotelPending = Boolean(tripRecord.needsHotel) && hotelNoteValue.trim() === "";
-  const showPendenciesBlock = isAdmin && (
+  const showPendenciesBlock = isAdmin && !isCancelled && (
     tripRecord.requiresFleetVehicle || tripRecord.hasAdvance || tripRecord.needsHotel
   );
 
@@ -420,6 +436,23 @@ export default function TripDetailScreen() {
               }
             />
           </View>
+          {isCancelled ? (
+            <View style={{ borderLeftWidth: 4, borderLeftColor: colors.error, backgroundColor: `${colors.error}12` }} className="mt-5 rounded-2xl border border-border p-5">
+              <Text style={{ color: colors.error }} className="text-lg font-bold">{t('Viagem cancelada')}</Text>
+              {tripRecord.cancelledAt ? <Text className="mt-1 text-xs text-muted">{t('Cancelada em')} {new Date(tripRecord.cancelledAt as unknown as string).toLocaleString("pt-BR")}</Text> : null}
+              <Text className="mt-3 text-sm leading-6 text-foreground">{t('Motivo')}: {tripRecord.cancelReason || t('não informado')}</Text>
+              <Text className="mt-2 text-xs text-muted">{t('Esta viagem não aceita mais alterações. Se precisar viajar, faça uma nova solicitação.')}</Text>
+            </View>
+          ) : canCancel ? (
+            <View className="mt-5 flex-row justify-end">
+              <Pressable
+                onPress={() => { setCancelError(null); setCancelOpen(true); }}
+                style={({ pressed }) => ({ borderColor: colors.error, borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, opacity: pressed ? 0.7 : 1 })}
+              >
+                <Text style={{ color: colors.error }} className="text-sm font-bold">{t('Cancelar viagem')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
           {tripRecord.notes ? (
             <View className="mt-5 rounded-2xl border border-border bg-surface p-5">
               <Text className="text-lg font-bold text-foreground">{t('Observações')}</Text>
@@ -730,6 +763,8 @@ export default function TripDetailScreen() {
             </>
           ) : null}
 
+          {!isCancelled ? (
+          <>
           <SectionHeader title={t('Controle da viagem de frota')} />
           <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="rounded-2xl border border-border bg-surface p-5">
             <View className="flex-row items-center">
@@ -979,11 +1014,13 @@ export default function TripDetailScreen() {
               last
             />
           </View>
+          </>
+          ) : null}
           <SectionHeader
             title={t('Despesas')}
             action={`${tripExpenses.length} ${t('itens')}`}
           />
-          {!isAdmin && !tripRecord.receiptsValidatedAt ? (
+          {!isAdmin && !tripRecord.receiptsValidatedAt && !isCancelled ? (
             <PrimaryButton
               label={t('Adicionar despesa')}
               onPress={() => router.push({ pathname: "/expenses", params: { tripId: String(trip.id) } })}
@@ -999,7 +1036,7 @@ export default function TripDetailScreen() {
             />
           )}
 
-          {!isAdmin ? (
+          {!isAdmin && !isCancelled ? (
             <View className="mt-4">
               {tripRecord.closureSubmittedAt ? (
                 <View style={{ backgroundColor: `${colors.success}18` }} className="rounded-xl p-3">
@@ -1028,6 +1065,49 @@ export default function TripDetailScreen() {
         </ScrollView>
       </View>
       <EventPhotoModal uri={viewingEventPhoto} onClose={() => setViewingEventPhoto(null)} />
+      <Modal visible={cancelOpen} transparent animationType="fade" onRequestClose={() => setCancelOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <View style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 20, width: "100%", maxWidth: 480 }}>
+            <Text className="text-xl font-bold text-foreground">{t('Cancelar esta viagem?')}</Text>
+            <Text className="mt-2 text-sm leading-5 text-muted">
+              {trip.destination} · {trip.startsOn} — {trip.endsOn}
+            </Text>
+            <Text className="mt-3 text-sm leading-5 text-foreground">
+              {t('O cancelamento não pode ser desfeito. A reserva do veículo da frota, se houver, será liberada e o viajante, o aprovador e o Administrativo serão avisados por e-mail.')}
+            </Text>
+            <Text className="mb-2 mt-4 text-xs font-bold uppercase tracking-widest text-muted">{t('Motivo do cancelamento')}</Text>
+            <TextInput
+              value={cancelReason}
+              onChangeText={(value) => { setCancelReason(value); setCancelError(null); }}
+              multiline
+              editable={!cancelTripMutation.isPending}
+              placeholder={t('Explique por que a viagem foi cancelada...')}
+              placeholderTextColor={colors.muted}
+              className="min-h-[90px] rounded-xl border border-border bg-background px-4 py-3 text-foreground"
+            />
+            {cancelError ? <Text style={{ color: colors.error }} className="mt-2 text-sm font-semibold">{cancelError}</Text> : null}
+            <View className="mt-5 flex-row gap-3">
+              <Pressable
+                onPress={() => setCancelOpen(false)}
+                disabled={cancelTripMutation.isPending}
+                style={({ pressed }) => ({ flex: 1, borderColor: colors.border, borderWidth: 1, borderRadius: 10, minHeight: 46, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.7 : 1 })}
+              >
+                <Text className="font-bold text-foreground">{t('Voltar')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (cancelReason.trim().length < 5) { setCancelError(t('Informe o motivo do cancelamento (mínimo 5 caracteres)')); return; }
+                  cancelTripMutation.mutate({ id: trip.id, reason: cancelReason.trim() });
+                }}
+                disabled={cancelTripMutation.isPending}
+                style={({ pressed }) => ({ flex: 1, backgroundColor: colors.error, borderRadius: 10, minHeight: 46, alignItems: "center", justifyContent: "center", opacity: pressed || cancelTripMutation.isPending ? 0.75 : 1 })}
+              >
+                <Text className="font-bold text-white">{cancelTripMutation.isPending ? t('Cancelando...') : t('Confirmar cancelamento')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }

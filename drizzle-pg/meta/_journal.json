@@ -176,6 +176,13 @@
       "when": 1790605107365,
       "tag": "0024_add_email_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1790691507365,
+      "tag": "0025_add_trip_cancellation",
+      "breakpoints": true
     }
   ]
 }

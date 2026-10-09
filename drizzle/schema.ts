@@ -75,6 +75,7 @@ export const tripStatusEnum = pgEnum("trip_status", [
   "Finalizada",
   "Rejeitada",
   "Devolvida",
+  "Cancelada",
 ]);
 export const approvalDecisionEnum = pgEnum("approval_decision", ["Aprovada", "Rejeitada", "Devolvida"]);
 export const maintenanceCategoryEnum = pgEnum("maintenance_category", ["Preventiva", "Corretiva"]);
@@ -368,6 +369,11 @@ export const trips = pgTable(
     closureSubmittedAt: timestamp("closure_submitted_at", { withTimezone: true }),
     receiptsValidatedAt: timestamp("receipts_validated_at", { withTimezone: true }),
     billedAt: timestamp("billed_at", { withTimezone: true }),
+    // Cancelamento (status "Cancelada"): quando, por quem e por quê. A viagem
+    // cancelada fica no histórico, mas não aceita mais nenhuma alteração.
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelReason: text("cancel_reason"),
+    cancelledByUserId: bigint("cancelled_by_user_id", { mode: "number" }).references(() => users.id),
     flightDetails: jsonb("flight_details").$type<{ passengerName?: string; passengerDocument?: string; passengerBirthDate?: string; airline?: string; flightNumber?: string; departureAirport?: string; arrivalAirport?: string } | null>(),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

@@ -8,7 +8,7 @@ import { useLanguage } from '@/lib/language-provider';
 // borda esquerda das linhas da tabela de viagens.
 export function statusTone(status: TripStatus | string, colors: ReturnType<typeof useColors>) {
   if (status.includes('Final') || status.includes('Liber') || status.includes('Aprov')) return { backgroundColor: `${colors.success}22`, color: colors.success };
-  if (status.includes('Reje')) return { backgroundColor: `${colors.error}22`, color: colors.error };
+  if (status.includes('Reje') || status.includes('Cancel')) return { backgroundColor: `${colors.error}22`, color: colors.error };
   return { backgroundColor: `${colors.warning}25`, color: colors.warning };
 }
 

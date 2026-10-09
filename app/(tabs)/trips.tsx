@@ -15,7 +15,7 @@ import { trpc } from '@/lib/trpc';
 // usava rótulos genéricos (Em andamento/Concluída/Cancelada) que não
 // existem de verdade no app; os filtros e o painel de KPIs abaixo usam só
 // os status que a viagem realmente pode ter.
-const TRIP_STATUSES = ['Rascunho', 'Aguardando aprovação', 'Aprovada', 'Em preparação', 'Liberada para viagem', 'Em prestação', 'Finalizada', 'Rejeitada', 'Devolvida'] as const;
+const TRIP_STATUSES = ['Rascunho', 'Aguardando aprovação', 'Aprovada', 'Em preparação', 'Liberada para viagem', 'Em prestação', 'Finalizada', 'Rejeitada', 'Devolvida', 'Cancelada'] as const;
 const IN_PROGRESS_STATUSES = ['Aprovada', 'Em preparação', 'Liberada para viagem', 'Em prestação'];
 
 function FilterChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -121,7 +121,7 @@ export default function TripsScreen() {
       <View className="mt-4 overflow-hidden rounded-2xl border border-border bg-surface">
         <View className="flex-row bg-background px-4 py-3"><Th label={t('Código')} width="w-[12%]" /><Th label={t('Destino')} width="w-[18%]" /><Th label={t('Status')} width="w-[15%]" /><Th label={t('Período')} width="w-[15%]" /><Th label={t('Cliente')} width="w-[16%]" /><Th label={t('Responsável')} width="w-[16%]" /><Th label="" width="w-[8%]" /></View>
         {filteredRows.map((row) => {
-          const canEdit = /^\d+$/.test(row.id);
+          const canEdit = /^\d+$/.test(row.id) && row.status !== 'Cancelada';
           const barColor = statusTone(row.status, colors).color;
           return <View key={row.id} className="flex-row items-center border-t border-border px-4 py-3.5" style={{ borderLeftWidth: 3, borderLeftColor: barColor }}>
             <Pressable onPress={() => openDetails(row.id)} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="w-[12%]"><Text className="text-xs font-bold text-foreground" numberOfLines={1}>{row.code}</Text></Pressable>
@@ -141,7 +141,7 @@ export default function TripsScreen() {
     ) : (
       <View className="mt-4" style={{ gap: 12 }}>
         {filteredRows.map((item) => {
-          const canEdit = /^\d+$/.test(item.id);
+          const canEdit = /^\d+$/.test(item.id) && item.status !== 'Cancelada';
           const openItem = () => openDetails(item.id);
           return <View key={item.id} className="rounded-3xl border border-border bg-surface p-5"><View className="flex-row items-start justify-between"><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })} className="flex-1"><Text className="text-xs font-bold tracking-wider text-muted">{item.code}</Text><Text className="mt-2 text-xl font-bold text-foreground">{item.destination}</Text><Text className="mt-1 text-sm text-muted">{item.startDate} — {item.endDate}</Text></Pressable><View className="items-end"><StatusPill status={item.status} />{canEdit ? <Pressable onPress={() => router.push({ pathname: '/new-trip', params: { tripId: item.id } })} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })} className="mt-3"><Text className="text-xs font-bold text-primary">{t('Editar')}</Text></Pressable> : null}</View></View><View className="mt-5 flex-row border-t border-border pt-4"><View className="flex-1"><Text className="text-xs text-muted">{t('Cliente')}</Text><Text className="mt-1 text-sm font-semibold text-foreground">{item.clientName ?? t('Sem cliente')}</Text></View><View className="items-end"><Text className="text-xs text-muted">{t('Adiantamento')}</Text><Text className="mt-1 text-sm font-bold text-foreground">{item.hasAdvance ? formatCurrency(item.amount, currency) : t('Não solicitado')}</Text></View></View><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })} className="mt-4 flex-row items-center"><IconSymbol name="airplane" size={16} color={colors.primary} /><Text className="ml-2 text-xs font-medium text-muted">{t(item.transport)}</Text><Text className="ml-auto text-xs font-semibold text-primary">{t('Abrir detalhes ›')}</Text></Pressable></View>;
         })}
