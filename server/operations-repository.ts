@@ -572,8 +572,31 @@ export async function createFleetReservation(input: typeof fleetReservations.$in
   return created;
 }
 
+// Estados da viagem em que o veículo da reserva já não pode ser trocado.
+const VEHICLE_LOCKED_TRIP_STATUSES = ['Em prestação', 'Finalizada', 'Cancelada', 'Rejeitada'] as const;
+
 export async function updateFleetReservation(id: number, input: Partial<typeof fleetReservations.$inferInsert>) {
   const db = await requireDb();
+  // Trocar (ou remover) o veículo só vale antes da saída: depois que o KM de
+  // saída foi registrado, ou que a viagem avançou/foi encerrada, o veículo
+  // fica como está para não bagunçar o histórico de KM e de uso da frota.
+  if ('vehicleId' in input) {
+    const [current] = await db
+      .select({ reservation: fleetReservations, tripStatus: trips.status })
+      .from(fleetReservations)
+      .innerJoin(trips, eq(fleetReservations.tripId, trips.id))
+      .where(eq(fleetReservations.id, id))
+      .limit(1);
+    const changing = current && (current.reservation.vehicleId ?? null) !== (input.vehicleId ?? null);
+    if (current && changing && current.reservation.vehicleId) {
+      if ((VEHICLE_LOCKED_TRIP_STATUSES as readonly string[]).includes(current.tripStatus)) {
+        throw new Error(`Não é possível trocar o veículo de uma viagem com status "${current.tripStatus}".`);
+      }
+      if (current.reservation.departureKm != null || current.reservation.departureAt != null) {
+        throw new Error('A viagem já saiu (KM de saída registrado); não é possível trocar o veículo.');
+      }
+    }
+  }
   const [updated] = await db.update(fleetReservations).set(input).where(eq(fleetReservations.id, id)).returning();
   // Se um veículo acabou de ser associado a esta reserva, reavalia se a
   // viagem correspondente já pode ser liberada.

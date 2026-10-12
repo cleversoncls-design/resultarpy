@@ -36,7 +36,7 @@ const translations: Record<TranslationKey, string> = {
 
   'Criar e administrar acessos': 'Crear y administrar accesos',
 
-  'Ocultar veículos disponíveis': 'Ocultar vehículos disponibles', 'Alocar veículo': 'Asignar vehículo', 'Confirmando...': 'Confirmando...', 'Confirmar depósito realizado': 'Confirmar depósito realizado', 'Salvar dados do hotel': 'Guardar datos del hotel', 'Enviando...': 'Enviando...', 'Alocando veículo...': 'Asignando vehículo...', 'Alterando modalidade...': 'Cambiando modalidad...',
+  'Ocultar veículos disponíveis': 'Ocultar vehículos disponibles', 'Trocar veículo': 'Cambiar vehículo', 'Alocar veículo': 'Asignar vehículo', 'Confirmando...': 'Confirmando...', 'Confirmar depósito realizado': 'Confirmar depósito realizado', 'Salvar dados do hotel': 'Guardar datos del hotel', 'Enviando...': 'Enviando...', 'Alocando veículo...': 'Asignando vehículo...', 'Alterando modalidade...': 'Cambiando modalidad...',
 
   'Disponível': 'Disponible',
 

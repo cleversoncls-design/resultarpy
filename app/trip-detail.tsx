@@ -297,6 +297,12 @@ export default function TripDetailScreen() {
   // --- Pendências para liberação da viagem ---
   const vehicleAllocated = Boolean(reservation?.vehicleId);
   const vehiclePending = Boolean(tripRecord.requiresFleetVehicle) && !vehicleAllocated;
+  // O Administrativo pode trocar o veículo enquanto a viagem não saiu: sem KM
+  // de saída registrado e antes da etapa "Em prestação" (o servidor confere de novo).
+  const canChangeVehicle = isAdmin && vehicleAllocated && !isCancelled
+    && reservation?.departureKm == null && !reservation?.departureAt
+    && !["Em prestação", "Finalizada", "Rejeitada"].includes(String(trip.status));
+  const otherAvailableVehicles = (availableVehiclesQuery.data?.items ?? []).filter((item) => item.id !== reservation?.vehicleId);
   const advancePending = Boolean(tripRecord.hasAdvance) && !tripRecord.advanceConfirmedAt;
   const depositAmountValue = depositAmountDraft ?? advanceValue;
   const hotelNoteValue = hotelNoteDraft ?? tripRecord.hotelNote ?? "";
@@ -517,9 +523,55 @@ export default function TripDetailScreen() {
                       </Text>
                     </View>
                     {vehicleAllocated ? (
-                      <Text className="mt-1 text-sm text-muted">
-                        {reservation?.vehicleBrand} {reservation?.vehicleModel} · {reservation?.vehiclePlate}
-                      </Text>
+                      <View>
+                        <Text className="mt-1 text-sm text-muted">
+                          {reservation?.vehicleBrand} {reservation?.vehicleModel} · {reservation?.vehiclePlate}
+                        </Text>
+                        {canChangeVehicle ? (
+                          <View className="mt-3 gap-2">
+                            <Pressable
+                              onPress={updateReservationMutation.isPending ? undefined : () => setShowVehiclePicker((current) => !current)}
+                              className="self-start rounded-xl border border-border px-3 py-2"
+                            >
+                              <Text className="text-xs font-bold text-primary">{showVehiclePicker ? t('Ocultar veículos disponíveis') : t('Trocar veículo')}</Text>
+                            </Pressable>
+                            <MutationFeedback
+                              isPending={updateReservationMutation.isPending}
+                              isSuccess={updateReservationMutation.isSuccess}
+                              isError={updateReservationMutation.isError}
+                              errorMessage={updateReservationMutation.error?.message}
+                              pendingLabel="Alocando veículo..."
+                              successLabel="Veículo alocado."
+                            />
+                            {showVehiclePicker ? (
+                              <View className="gap-2 rounded-xl border border-border overflow-hidden">
+                                {availableVehiclesQuery.isLoading ? (
+                                  <Text className="p-4 text-sm text-muted">{t('Carregando veículos disponíveis...')}</Text>
+                                ) : otherAvailableVehicles.length ? (
+                                  otherAvailableVehicles.map((item, index) => (
+                                    <Pressable
+                                      key={item.id}
+                                      onPress={() => allocateVehicle(item.id)}
+                                      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, backgroundColor: pressed ? colors.background : colors.surface })}
+                                      className={`flex-row items-center justify-between px-4 py-3 ${index > 0 ? "border-t border-border" : ""}`}
+                                    >
+                                      <View className="ml-1 flex-1">
+                                        <Text className="font-semibold text-foreground">{item.brand} {item.model}</Text>
+                                        <Text className="text-xs text-muted">{item.plate}</Text>
+                                      </View>
+                                      <View style={{ backgroundColor: colors.primary }} className="rounded-lg px-3 py-2">
+                                        <Text className="text-xs font-bold text-white">{t('Selecionar')}</Text>
+                                      </View>
+                                    </Pressable>
+                                  ))
+                                ) : (
+                                  <Text className="p-4 text-sm text-muted">{t('Nenhum veículo disponível no momento.')}</Text>
+                                )}
+                              </View>
+                            ) : null}
+                          </View>
+                        ) : null}
+                      </View>
                     ) : (
                       <View className="mt-3 gap-2">
                         <PrimaryButton
