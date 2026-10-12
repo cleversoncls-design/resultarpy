@@ -345,6 +345,9 @@ export const trips = pgTable(
     tripCode: varchar("trip_code", { length: 40 }).notNull(),
     travelerId: bigint("traveler_id", { mode: "number" }).notNull().references(() => travelers.id),
     approverId: bigint("approver_id", { mode: "number" }).references(() => users.id),
+    // Segunda pessoa que viaja junto (opcional). Quem solicita (travelerId) segue
+    // sendo o titular: lança os gastos, recebe o adiantamento e o reembolso.
+    companionId: bigint("companion_id", { mode: "number" }).references(() => travelers.id),
     clientId: bigint("client_id", { mode: "number" }).references(() => clients.id),
     unitId: bigint("unit_id", { mode: "number" }).references(() => units.id),
     origin: varchar("origin", { length: 120 }).notNull(),
@@ -398,6 +401,12 @@ export const tripExpenses = pgTable(
     currency: varchar("currency", { length: 3 }).default("BRL").notNull(),
     expenseGroup: varchar("expense_group", { length: 120 }),
     prepaid: boolean("prepaid").default(false).notNull(),
+    // Quantas pessoas o gasto atendeu (viajante + acompanhantes + convidados
+    // externos, ex.: almoço com um cliente). Os limites de reembolso/faturamento
+    // são por pessoa: limite x people.
+    people: integer("people").default(1).notNull(),
+    // Nomes dos acompanhantes/convidados atendidos além do viajante (texto livre).
+    guests: varchar("guests", { length: 500 }),
     billable: boolean("billable").default(true).notNull(),
     receiptUri: text("receipt_uri"),
     notes: text("notes"),

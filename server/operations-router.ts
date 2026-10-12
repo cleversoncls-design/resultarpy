@@ -48,7 +48,7 @@ const scopeFor = (user: { id: number; role: string }) => ({ userId: user.role ==
 // possível, antes, criar/editar uma viagem informando o próprio usuário
 // como approverId e depois aprová-la (auto-aprovação).
 const tripFields = z.object({
-  tripCode: z.string().min(3).max(40), travelerId: z.number().int().positive().optional(), clientId: z.number().int().positive().nullable().optional(), unitId: z.number().int().positive().nullable().optional(), origin: z.string().max(120).default(''), destination: z.string().min(1).max(120), country: z.string().max(80).nullable().optional(), area: z.string().max(120).nullable().optional(), transport: z.string().max(120).nullable().optional(), startsOn: z.string().date(), endsOn: z.string().date(), notes: z.string().max(4000).nullable().optional(), status: tripStatus.default('Aguardando aprovação'), requiresFleetVehicle: z.boolean().default(false), hasAdvance: z.boolean().default(false), needsHotel: z.boolean().default(false), advanceAmount: z.string().default('0'), flightDetails: z.object({ passengerName: z.string().max(180).optional(), passengerDocument: z.string().max(80).optional(), passengerBirthDate: z.preprocess(normalizeBirthDate, z.string().date().optional()), airline: z.string().max(120).optional(), flightNumber: z.string().max(40).optional(), departureAirport: z.string().max(12).optional(), arrivalAirport: z.string().max(12).optional() }).nullable().optional(),
+  tripCode: z.string().min(3).max(40), travelerId: z.number().int().positive().optional(), companionId: z.number().int().positive().nullable().optional(), clientId: z.number().int().positive().nullable().optional(), unitId: z.number().int().positive().nullable().optional(), origin: z.string().max(120).default(''), destination: z.string().min(1).max(120), country: z.string().max(80).nullable().optional(), area: z.string().max(120).nullable().optional(), transport: z.string().max(120).nullable().optional(), startsOn: z.string().date(), endsOn: z.string().date(), notes: z.string().max(4000).nullable().optional(), status: tripStatus.default('Aguardando aprovação'), requiresFleetVehicle: z.boolean().default(false), hasAdvance: z.boolean().default(false), needsHotel: z.boolean().default(false), advanceAmount: z.string().default('0'), flightDetails: z.object({ passengerName: z.string().max(180).optional(), passengerDocument: z.string().max(80).optional(), passengerBirthDate: z.preprocess(normalizeBirthDate, z.string().date().optional()), airline: z.string().max(120).optional(), flightNumber: z.string().max(40).optional(), departureAirport: z.string().max(12).optional(), arrivalAirport: z.string().max(12).optional() }).nullable().optional(),
   }).superRefine((input, ctx) => {
     if (input.transport !== 'Passagem aérea') return;
     const flight = input.flightDetails;
@@ -56,7 +56,7 @@ const tripFields = z.object({
       ctx.addIssue({ code: 'custom', path: ['flightDetails'], message: 'Dados do passageiro são obrigatórios para passagem aérea.' });
     }
   });
-const expenseFields = z.object({ tripId: z.number().int().positive(), expenseTypeId: z.number().int().positive(), occurredOn: z.string().date(), city: z.string().min(1).max(120), quantity: z.string().default('1'), unitValue: z.string(), currency: currencyCode.default('BRL'), expenseGroup: z.string().max(120).nullable().optional(), prepaid: z.boolean().default(false), billable: z.boolean().default(true), receiptUri: z.string().max(6000000, 'O comprovante é grande demais. Tente uma foto mais leve.').nullable().optional(), notes: z.string().max(2000).nullable().optional(), reviewNote: z.string().max(2000).nullable().optional() });
+const expenseFields = z.object({ tripId: z.number().int().positive(), expenseTypeId: z.number().int().positive(), occurredOn: z.string().date(), city: z.string().min(1).max(120), quantity: z.string().default('1'), unitValue: z.string(), currency: currencyCode.default('BRL'), expenseGroup: z.string().max(120).nullable().optional(), prepaid: z.boolean().default(false), people: z.number().int().min(1).max(20).default(1), guests: z.string().max(500).nullable().optional(), billable: z.boolean().default(true), receiptUri: z.string().max(6000000, 'O comprovante é grande demais. Tente uma foto mais leve.').nullable().optional(), notes: z.string().max(2000).nullable().optional(), reviewNote: z.string().max(2000).nullable().optional() });
 const reportPeriod = { tripId: z.number().int().positive().optional(), clientId: z.number().int().positive().optional(), from: z.string().date().optional(), to: z.string().date().optional() };
 const reimbursementReportInput = pageInput.extend(reportPeriod).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
 const billingReportInput = pageInput.extend(reportPeriod).refine((input) => !input.from || !input.to || input.from <= input.to, { path: ['to'], message: 'O período final deve ser igual ou posterior ao período inicial' });
@@ -64,6 +64,8 @@ const billingReportInput = pageInput.extend(reportPeriod).refine((input) => !inp
 export const operationsRouter = router({
   trips: router({
     list: protectedProcedure.input(pageInput.extend({ status: tripStatusFilter.optional(), travelerId: z.number().int().positive().optional(), mine: z.boolean().default(false) })).query(({ ctx, input }) => operations.listTrips({ ...input, travelerId: ctx.user.role === 'admin' && !input.mine ? input.travelerId : undefined, userId: ctx.user.role === 'admin' && !input.mine ? undefined : ctx.user.id })),
+    // Opções do campo "Acompanhante" (só id e nome; vale para qualquer usuário logado).
+    companionOptions: protectedProcedure.query(() => operations.listCompanionOptions()),
     // Usado só para decidir se o menu do Administrativo mostra "Minhas
     // viagens" (além de "Todas as viagens").
     hasOwnTrips: protectedProcedure.query(({ ctx }) => operations.hasOwnTrips(ctx.user.id)),
@@ -76,6 +78,7 @@ export const operationsRouter = router({
       // ver comentário em tripFields.
       const approverId = await operations.getTravelerApproverId(travelerId);
       if (!approverId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Este viajante ainda não tem um aprovador padrão definido. Peça a um administrador para configurá-lo em Cadastros > Viajantes e condutores antes de criar a viagem.' });
+      if (input.companionId && input.companionId === travelerId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'O acompanhante deve ser outra pessoa, diferente do viajante.' });
       const created = await operations.createTrip({ ...input, travelerId, approverId });
       if (created?.status === 'Aguardando aprovação') notifyTripRequested(created.id);
       return created;
@@ -90,6 +93,10 @@ export const operationsRouter = router({
         const approverId = await operations.getTravelerApproverId(changes.travelerId);
         if (!approverId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Este viajante ainda não tem um aprovador padrão definido. Peça a um administrador para configurá-lo em Cadastros > Viajantes e condutores antes de reatribuir a viagem.' });
         finalChanges.approverId = approverId;
+      }
+      if (changes.companionId) {
+        const current = await operations.getTrip(id, scopeFor(ctx.user));
+        if (current && changes.companionId === (changes.travelerId ?? current.travelerId)) throw new TRPCError({ code: 'BAD_REQUEST', message: 'O acompanhante deve ser outra pessoa, diferente do viajante.' });
       }
       const trip = await operations.updateTrip(id, finalChanges, scopeFor(ctx.user));
       if (!trip) throw notFound();
@@ -214,7 +221,13 @@ export const operationsRouter = router({
         return reservation;
       }),
       create: adminProcedure.input(z.object({ tripId: z.number().int().positive(), vehicleId: z.number().int().positive().nullable().optional(), driverId: z.number().int().positive(), status: reservationStatus.default('Aguardando veículo'), plannedStartOn: z.string().date(), plannedEndOn: z.string().date() })).mutation(({ input }) => operations.createFleetReservation(input)),
-      update: adminProcedure.input(z.object({ id: z.number().int().positive(), vehicleId: z.number().int().positive().nullable().optional(), status: reservationStatus.optional(), departureAt: z.coerce.date().nullable().optional(), departureKm: z.number().int().min(0).nullable().optional(), returnAt: z.coerce.date().nullable().optional(), returnKm: z.number().int().min(0).nullable().optional() })).mutation(({ input: { id, ...input } }) => operations.updateFleetReservation(id, input)),
+      update: adminProcedure.input(z.object({ id: z.number().int().positive(), vehicleId: z.number().int().positive().nullable().optional(), status: reservationStatus.optional(), departureAt: z.coerce.date().nullable().optional(), departureKm: z.number().int().min(0).nullable().optional(), returnAt: z.coerce.date().nullable().optional(), returnKm: z.number().int().min(0).nullable().optional() })).mutation(async ({ input: { id, ...input } }) => {
+        try {
+          return await operations.updateFleetReservation(id, input);
+        } catch (error) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: error instanceof Error ? error.message : 'Não foi possível atualizar a reserva.' });
+        }
+      }),
       // O próprio viajante registra o KM de saída/retorno da sua reserva.
       recordKm: protectedProcedure.input(z.object({ reservationId: z.number().int().positive(), departureKm: z.number().int().min(0).optional(), returnKm: z.number().int().min(0).optional() })).mutation(async ({ ctx, input }) => {
         const { reservationId, ...changes } = input;

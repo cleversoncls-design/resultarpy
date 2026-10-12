@@ -109,6 +109,7 @@ export default function ReimbursementsScreen() {
   const infoLines: ReportInfoLine[] | undefined = selectedTrip ? [
     { label: t('Viagem'), value: `${selectedTrip.tripCode} · ${selectedTrip.destination}` },
     { label: t('Viajante'), value: travelerName },
+    ...((selectedTrip as { companionName?: string | null } | undefined)?.companionName ? [{ label: t('Acompanhante'), value: String((selectedTrip as { companionName?: string | null }).companionName) }] : []),
     { label: t('Data Início Viagem'), value: selectedTrip.startsOn },
     { label: t('Data Fim Viagem'), value: selectedTrip.endsOn },
   ] : undefined;
@@ -229,6 +230,7 @@ export default function ReimbursementsScreen() {
               <Text className="mb-2 text-xs font-bold uppercase tracking-widest text-primary">{t('Dados da viagem')}</Text>
               <View className="flex-row flex-wrap gap-x-8 gap-y-2">
                 <InfoField label={t('Viajante')} value={travelerName} colors={colors} />
+                {(selectedTrip as { companionName?: string | null }).companionName ? <InfoField label={t('Acompanhante')} value={String((selectedTrip as { companionName?: string | null }).companionName)} colors={colors} /> : null}
                 <InfoField label={t('Data Início Viagem')} value={selectedTrip.startsOn} colors={colors} />
                 <InfoField label={t('Data Fim Viagem')} value={selectedTrip.endsOn} colors={colors} />
               </View>
@@ -287,7 +289,7 @@ export default function ReimbursementsScreen() {
                           </View>
                           <Text className="mt-1 font-bold text-foreground">{row.expenseTypeName} · {t('quantidade')} {row.quantity}</Text>
                           <Text className="mt-1 text-xs text-muted">{t('Gasto')}: {formatCurrency(Number(row.sourceAmount), validCurrency(row.sourceCurrency))}{row.sourceCurrency !== 'PYG' ? ` · ${t('Taxa da Moeda no dia')}: ${row.rate == null ? '—' : row.rate.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} · ${t('Gasto Convertido')}: ${formatPyg(row.spentPyg)}` : ''}</Text>
-                          <Text className="mt-1 text-xs text-muted">{t('Limite aplicado')}: {row.limit === null ? t('Não cadastrado') : formatCurrency(row.limit, validCurrency(row.currency))} · {row.profileCity ? `${t('Perfil')}: ${row.profileCity}` : t('Perfil genérico')}</Text>
+                          <Text className="mt-1 text-xs text-muted">{t('Limite aplicado')}: {row.limit === null ? t('Não cadastrado') : formatCurrency(row.limit, validCurrency(row.currency))} · {row.profileCity ? `${t('Perfil')}: ${row.profileCity}` : t('Perfil genérico')}{(row as { people?: number }).people && (row as { people?: number }).people! > 1 ? ` · ${(row as { people?: number }).people} ${t('pessoas')}${(row as { guests?: string | null }).guests ? ` (${(row as { guests?: string | null }).guests})` : ''}` : ''}</Text>
                           {row.reimbursementRejectedAt && row.reviewNote ? <Text style={{ color: colors.error }} className="mt-1 text-xs font-semibold">{t('Motivo')}: {row.reviewNote}</Text> : null}
                         </View>
                         <Text style={{ color: row.reimbursementRejectedAt ? colors.error : row.reimbursablePyg > 0 ? colors.success : colors.muted }} className="font-bold">{row.reimbursementRejectedAt ? t('Não reembolsável') : formatPyg(row.reimbursablePyg)}</Text>
