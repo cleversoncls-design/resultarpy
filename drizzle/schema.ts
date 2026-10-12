@@ -207,6 +207,10 @@ export const clients = pgTable(
     id: bigserial("id", { mode: "number" }).primaryKey(),
     name: varchar("name", { length: 180 }).notNull(),
     billingCurrency: varchar("billing_currency", { length: 3 }).default("BRL").notNull(),
+    // Tarifa cobrada do cliente por KM rodado com veículo da frota (ex.: 0,50 USD).
+    // Sem tarifa, a quilometragem não gera linha no relatório de faturamento.
+    kmRate: numeric("km_rate", { precision: 14, scale: 4 }),
+    kmRateCurrency: varchar("km_rate_currency", { length: 3 }).default("USD").notNull(),
     active: boolean("active").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },

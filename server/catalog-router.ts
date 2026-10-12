@@ -57,9 +57,16 @@ const cityUpdate = cityCreate.partial().extend({ id: idSchema, active: z.boolean
   "Informe ao menos um campo para atualizar",
 );
 
+// Tarifa por KM: texto vazio/nulo = sem tarifa; senão número maior que zero.
+const kmRateInput = z.string().trim().nullable().optional().refine(
+  (value) => !value || (Number.isFinite(Number(value.replace(',', '.'))) && Number(value.replace(',', '.')) > 0),
+  "A tarifa por KM deve ser um número maior que zero.",
+);
 const clientCreate = z.object({
   name: z.string().trim().min(1).max(180),
   billingCurrency: z.string().trim().length(3).default("BRL"),
+  kmRate: kmRateInput,
+  kmRateCurrency: z.string().trim().length(3).optional(),
 });
 const clientUpdate = clientCreate.partial().extend({ id: idSchema, active: z.boolean().optional() }).refine(
   ({ id: _id, ...data }) => Object.values(data).some((value) => value !== undefined),
