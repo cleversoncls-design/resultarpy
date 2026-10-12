@@ -18,7 +18,7 @@ export function prepareClientBillingProfile(input: {
   const currency = input.currency.trim().toUpperCase();
   const items = input.items
     .filter((item) => item.expenseTypeId && item.limitAmount.trim())
-    .map((item) => ({ expenseTypeId: Number(item.expenseTypeId), limitAmount: item.limitAmount.trim() }));
+    .map((item) => ({ expenseTypeId: Number(item.expenseTypeId), limitAmount: item.limitAmount.trim().replace(',', '.') }));
 
   if (!Number.isInteger(clientId) || clientId <= 0) throw new Error('Informe um cliente válido.');
   if (!/^[A-Z]{3}$/.test(currency)) throw new Error('Informe uma moeda válida com três letras.');

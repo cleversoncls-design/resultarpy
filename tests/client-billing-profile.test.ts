@@ -13,4 +13,8 @@ describe('cadastro agrupado de limites por cliente', () => {
   it('rejeita o mesmo tipo de gasto duas vezes', () => {
     expect(() => prepareClientBillingProfile({ clientId: '7', currency: 'BRL', items: [{ expenseTypeId: '1', limitAmount: '10' }, { expenseTypeId: '1', limitAmount: '20' }] })).toThrow('Não repita');
   });
+
+  it('aceita vírgula decimal e envia com ponto', () => {
+    expect(prepareClientBillingProfile({ clientId: '7', currency: 'USD', items: [{ expenseTypeId: '3', limitAmount: '0,50' }] }).items[0].limitAmount).toBe('0.50');
+  });
 });
