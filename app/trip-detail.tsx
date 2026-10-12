@@ -1080,7 +1080,7 @@ export default function TripDetailScreen() {
           {!isAdmin && !tripRecord.receiptsValidatedAt && !isCancelled ? (
             <PrimaryButton
               label={t('Adicionar despesa')}
-              onPress={() => router.push({ pathname: "/expenses", params: { tripId: String(trip.id) } })}
+              onPress={() => router.push({ pathname: "/expenses", params: { tripId: String(trip.id), novo: "1" } })}
             />
           ) : (
             // O Administrativo não lança despesas, e o viajante perde a
