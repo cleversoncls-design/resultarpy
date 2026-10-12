@@ -186,15 +186,30 @@ export async function getClient(id: number) {
   return rows[0] ?? null;
 }
 
-export async function createClient(input: Pick<InsertClient, "name" | "billingCurrency">) {
+type ClientKmInput = { kmRate?: string | null; kmRateCurrency?: string };
+
+// Tarifa por KM: vazio vira null (sem tarifa); a moeda é sempre maiúscula.
+function normalizeClientKm(input: ClientKmInput) {
+  const out: { kmRate?: string | null; kmRateCurrency?: string } = {};
+  if (input.kmRate !== undefined) {
+    const text = (input.kmRate ?? '').trim().replace(',', '.');
+    out.kmRate = text ? text : null;
+  }
+  if (input.kmRateCurrency !== undefined) out.kmRateCurrency = input.kmRateCurrency.trim().toUpperCase();
+  return out;
+}
+
+export async function createClient(input: Pick<InsertClient, "name" | "billingCurrency"> & ClientKmInput) {
   const db = await requireDb();
-  const rows = await db.insert(clients).values({ ...input, active: true }).returning();
+  const { kmRate: _kmRate, kmRateCurrency: _kmRateCurrency, ...base } = input;
+  const rows = await db.insert(clients).values({ ...base, ...normalizeClientKm(input), active: true }).returning();
   return rows[0];
 }
 
-export async function updateClient(id: number, input: Partial<Pick<InsertClient, "name" | "billingCurrency" | "active">>) {
+export async function updateClient(id: number, input: Partial<Pick<InsertClient, "name" | "billingCurrency" | "active">> & ClientKmInput) {
   const db = await requireDb();
-  const rows = await db.update(clients).set(input).where(eq(clients.id, id)).returning();
+  const { kmRate: _kmRate, kmRateCurrency: _kmRateCurrency, ...base } = input;
+  const rows = await db.update(clients).set({ ...base, ...normalizeClientKm(input) }).where(eq(clients.id, id)).returning();
   return rows[0] ?? null;
 }
 

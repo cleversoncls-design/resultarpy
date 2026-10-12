@@ -786,9 +786,40 @@ export async function listBillingReport(input: BillingReportInput) {
   for (const row of profilesRows) {
     if (row.expenseTypeId && row.limitAmount !== null) profileItems.set(`${row.clientId}:${row.expenseTypeId}`, { currency: row.currency, limitAmount: Number(row.limitAmount) });
   }
-  const maxDate = expenseRows.reduce<string | undefined>((max, row) => !max || row.expense.occurredOn > max ? row.expense.occurredOn : max, undefined);
+  // Quilometragem do veículo da frota: KM final − KM inicial da reserva viram
+  // uma linha de faturamento (km x tarifa por KM cadastrada no cliente). Só
+  // entram reservas com os dois KM informados e clientes com tarifa.
+  const kmFilters = [
+    input.tripId ? eq(fleetReservations.tripId, input.tripId) : undefined,
+    input.clientId ? eq(trips.clientId, input.clientId) : undefined,
+    input.userId && !input.admin ? eq(travelers.userId, input.userId) : undefined,
+    isNotNull(fleetReservations.departureKm),
+    isNotNull(fleetReservations.returnKm),
+    isNotNull(clients.kmRate),
+  ].filter(Boolean);
+  const kmRowsRaw = await db.select({
+    reservation: fleetReservations,
+    tripCode: trips.tripCode,
+    clientId: clients.id,
+    clientName: clients.name,
+    clientCurrency: clients.billingCurrency,
+    kmRate: clients.kmRate,
+    kmRateCurrency: clients.kmRateCurrency,
+    plate: vehicles.plate,
+  }).from(fleetReservations)
+    .innerJoin(trips, eq(fleetReservations.tripId, trips.id))
+    .leftJoin(travelers, eq(trips.travelerId, travelers.id))
+    .innerJoin(clients, eq(trips.clientId, clients.id))
+    .leftJoin(vehicles, eq(fleetReservations.vehicleId, vehicles.id))
+    .where(and(...kmFilters));
+  const kmRows = kmRowsRaw.map((row) => {
+    const km = (row.reservation.returnKm ?? 0) - (row.reservation.departureKm ?? 0);
+    const date = (row.reservation.returnAt ?? row.reservation.departureAt)?.toISOString().slice(0, 10) ?? row.reservation.plannedEndOn;
+    return { ...row, km, date };
+  }).filter((row) => row.km > 0 && Number(row.kmRate) > 0 && (!input.from || row.date >= input.from) && (!input.to || row.date <= input.to));
+  const maxDate = [...expenseRows.map((row) => row.expense.occurredOn), ...kmRows.map((row) => row.date)].reduce<string | undefined>((max, date) => !max || date > max ? date : max, undefined);
   const rateRows = await db.select({ rateDate: currencyRates.rateDate, fromCurrency: currencyRates.fromCurrency, toCurrency: currencyRates.toCurrency, rate: currencyRates.rate }).from(currencyRates).where(maxDate ? lte(currencyRates.rateDate, maxDate) : undefined).orderBy(desc(currencyRates.rateDate));
-  const items = expenseRows.map(({ expense, tripCode, clientId, clientName, clientCurrency, expenseTypeName }) => {
+  const expenseItems = expenseRows.map(({ expense, tripCode, clientId, clientName, clientCurrency, expenseTypeName }) => {
     const sourceCurrency = expense.currency.toUpperCase();
     const targetCurrency = (clientCurrency ?? 'BRL').toUpperCase();
     const configured = clientId ? profileItems.get(`${clientId}:${expense.expenseTypeId}`) : undefined;
@@ -803,6 +834,19 @@ export async function listBillingReport(input: BillingReportInput) {
     const billing = configured ? calculateBillingAmounts(spent, limit) : { billable: 0, difference: spent };
     return { id: expense.id, tripId: expense.tripId, tripCode, clientId, clientName: clientName ?? 'Sem cliente', date: expense.occurredOn, city: expense.city, expenseTypeId: expense.expenseTypeId, expenseTypeName: expenseTypeName ?? 'Tipo de gasto', quantity: expense.quantity, sourceAmount: expense.amount, sourceCurrency, currency: limitCurrency, rate: targetRate?.value ?? null, spent, limit, difference: billing.difference, billable: billing.billable, rateDate: sourceRate && targetRate ? (sourceRate.rateDate < targetRate.rateDate ? sourceRate.rateDate : targetRate.rateDate) : null, conversionAvailable: Boolean(sourceRate && targetRate) };
   });
+  const kmItems = kmRows.map((row) => {
+    const sourceCurrency = row.kmRateCurrency.toUpperCase();
+    const targetCurrency = (row.clientCurrency ?? 'BRL').toUpperCase();
+    const sourceAmount = row.km * Number(row.kmRate);
+    const sourceRate = rateFor(rateRows, sourceCurrency, 'PYG', row.date);
+    const targetRate = rateFor(rateRows, targetCurrency, 'PYG', row.date);
+    const spent = sourceRate && targetRate ? sourceAmount * sourceRate.value / targetRate.value : sourceAmount;
+    // Linha de quilometragem: id negativo (= -id da reserva) para não colidir com despesas.
+    return { id: -row.reservation.id, tripId: row.reservation.tripId, tripCode: row.tripCode, clientId: row.clientId, clientName: row.clientName, date: row.date, city: '', expenseTypeId: 0, expenseTypeName: `Quilometragem${row.plate ? ` · ${row.plate}` : ''}`, quantity: String(row.km), sourceAmount: sourceAmount.toFixed(2), sourceCurrency, currency: targetCurrency, rate: targetRate?.value ?? null, spent, limit: null as number | null, difference: 0, billable: spent, rateDate: sourceRate && targetRate ? (sourceRate.rateDate < targetRate.rateDate ? sourceRate.rateDate : targetRate.rateDate) : null, conversionAvailable: Boolean(sourceRate && targetRate), kind: 'km' as const };
+  });
+  const direction = input.direction === 'desc' ? -1 : 1;
+  const items = [...expenseItems.map((item) => ({ ...item, kind: 'expense' as const })), ...kmItems]
+    .sort((a, b) => direction * (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const paging = page(input);
   return { items: items.slice(paging.offset, paging.offset + paging.limit), page: input.page, pageSize: paging.limit, total: items.length, totalPages: Math.max(1, Math.ceil(items.length / paging.limit)) };
 }
