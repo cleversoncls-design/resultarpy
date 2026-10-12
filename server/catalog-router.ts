@@ -28,6 +28,9 @@ async function withCatalogErrors<T>(operation: () => Promise<T>) {
     if (code === "23505") {
       throw new TRPCError({ code: "CONFLICT", message: "Já existe um registro com os mesmos dados únicos" });
     }
+    if (code === "22P02" || code === "22003") {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Valor numérico inválido. Use apenas números (ex.: 0,50)." });
+    }
     if (code === "23503") {
       throw new TRPCError({ code: "CONFLICT", message: "O registro está vinculado a outros dados e não pode ser alterado dessa forma" });
     }
@@ -87,11 +90,12 @@ const expenseTypeCreate = z.object({
   description: z.string().trim().max(1000).nullable().optional(),
 });
 const currencyCode = z.enum(['BRL', 'USD', 'PYG']);
-const reimbursementProfileItem = z.object({ expenseTypeId: idSchema, limitAmount: z.string().trim().min(1) });
+const limitAmountInput = z.string().trim().min(1, 'Informe o valor.').transform((value) => value.replace(',', '.')).refine((value) => /^\d{1,12}(\.\d{1,4})?$/.test(value) && Number(value) > 0, 'Informe um valor maior que zero (ex.: 0,50).');
+const reimbursementProfileItem = z.object({ expenseTypeId: idSchema, limitAmount: limitAmountInput });
 const reimbursementProfileCreate = z.object({ city: z.string().trim().max(120).default(''), currency: currencyCode.default('BRL'), items: z.array(reimbursementProfileItem).min(1).max(100) }).superRefine((input, context) => { if (new Set(input.items.map((item) => item.expenseTypeId)).size !== input.items.length) context.addIssue({ code: 'custom', path: ['items'], message: 'Cada tipo de gasto pode aparecer somente uma vez por cidade e moeda.' }); });
 const reimbursementProfileUpdate = reimbursementProfileCreate.safeExtend({ id: idSchema });
 const currencyRateInput = z.object({ rateDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), fromCurrency: currencyCode, toCurrency: z.literal('PYG'), rate: z.string().trim().min(1), rateType: z.enum(['venda', 'referencial']), source: z.enum(['DNIT', 'BCP', 'Manual']), sourceUrl: z.string().url().nullable().optional() });
-const clientBillingProfileItem = z.object({ expenseTypeId: idSchema, limitAmount: z.string().trim().min(1) });
+const clientBillingProfileItem = z.object({ expenseTypeId: idSchema, limitAmount: limitAmountInput });
 const clientBillingProfileCreate = z.object({ clientId: idSchema, currency: z.string().trim().length(3), items: z.array(clientBillingProfileItem).min(1).max(100) }).superRefine((input, context) => { if (new Set(input.items.map((item) => item.expenseTypeId)).size !== input.items.length) context.addIssue({ code: 'custom', path: ['items'], message: 'Cada tipo de gasto pode aparecer somente uma vez por cliente.' }); });
 const clientBillingProfileUpdate = clientBillingProfileCreate.safeExtend({ id: idSchema });
 
@@ -168,8 +172,8 @@ export const catalogRouter = router({
   }),
   reimbursementLimits: router({
     list: adminProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listReimbursementLimitProfiles(input))),
-    create: adminProcedure.input(reimbursementProfileCreate).mutation(({ input }) => withCatalogErrors(async () => { for (const item of input.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new Error('Um dos tipos de gasto não foi encontrado ou está inativo.'); return catalog.createReimbursementLimitProfile(input); })),
-    update: adminProcedure.input(reimbursementProfileUpdate).mutation(({ input }) => withCatalogErrors(async () => { const { id, ...data } = input; for (const item of data.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new Error('Um dos tipos de gasto não foi encontrado ou está inativo.'); return requireFound(await catalog.updateReimbursementLimitProfile(id, data), 'Perfil de reembolso'); })),
+    create: adminProcedure.input(reimbursementProfileCreate).mutation(({ input }) => withCatalogErrors(async () => { for (const item of input.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Um dos tipos de gasto não foi encontrado ou está inativo.' }); return catalog.createReimbursementLimitProfile(input); })),
+    update: adminProcedure.input(reimbursementProfileUpdate).mutation(({ input }) => withCatalogErrors(async () => { const { id, ...data } = input; for (const item of data.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Um dos tipos de gasto não foi encontrado ou está inativo.' }); return requireFound(await catalog.updateReimbursementLimitProfile(id, data), 'Perfil de reembolso'); })),
     delete: adminProcedure.input(z.object({ id: idSchema })).mutation(({ input }) => withCatalogErrors(async () => requireFound(await catalog.deleteReimbursementLimitProfile(input.id), 'Perfil de reembolso'))),
   }),
   currencyRates: router({
@@ -180,8 +184,8 @@ export const catalogRouter = router({
   }),
   clientBillingLimits: router({
     list: adminProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listClientBillingProfiles(input))),
-    create: adminProcedure.input(clientBillingProfileCreate).mutation(({ input }) => withCatalogErrors(async () => { if (!(await catalog.getClient(input.clientId))) throw new Error('Cliente não encontrado ou inativo.'); for (const item of input.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new Error('Um dos tipos de gasto não foi encontrado ou está inativo.'); return catalog.createClientBillingProfile(input); })),
-    update: adminProcedure.input(clientBillingProfileUpdate).mutation(({ input }) => withCatalogErrors(async () => { const { id, ...data } = input; if (!(await catalog.getClient(data.clientId))) throw new Error('Cliente não encontrado ou inativo.'); for (const item of data.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new Error('Um dos tipos de gasto não foi encontrado ou está inativo.'); return requireFound(await catalog.updateClientBillingProfile(id, data), 'Limite de faturamento'); })),
+    create: adminProcedure.input(clientBillingProfileCreate).mutation(({ input }) => withCatalogErrors(async () => { if (await catalog.clientHasBillingProfile(input.clientId)) throw new TRPCError({ code: 'CONFLICT', message: 'Este cliente já tem limites cadastrados. Edite o cadastro existente para incluir novos tipos de gasto.' }); if (!(await catalog.getClient(input.clientId))) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cliente não encontrado ou inativo.' }); for (const item of input.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Um dos tipos de gasto não foi encontrado ou está inativo.' }); return catalog.createClientBillingProfile(input); })),
+    update: adminProcedure.input(clientBillingProfileUpdate).mutation(({ input }) => withCatalogErrors(async () => { const { id, ...data } = input; if (!(await catalog.getClient(data.clientId))) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cliente não encontrado ou inativo.' }); for (const item of data.items) if (!(await catalog.getExpenseType(item.expenseTypeId))) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Um dos tipos de gasto não foi encontrado ou está inativo.' }); return requireFound(await catalog.updateClientBillingProfile(id, data), 'Limite de faturamento'); })),
     delete: adminProcedure.input(z.object({ id: idSchema })).mutation(({ input }) => withCatalogErrors(async () => requireFound(await catalog.deleteClientBillingProfile(input.id), 'Limite de faturamento'))),
   }),
   translations: router({

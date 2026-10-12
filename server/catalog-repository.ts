@@ -501,6 +501,12 @@ export async function listClientBillingProfiles(input: CatalogListInput) {
   return result(items, input, filteredProfiles.length);
 }
 
+export async function clientHasBillingProfile(clientId: number) {
+  const db = await requireDb();
+  const rows = await db.select({ id: clientBillingProfiles.id }).from(clientBillingProfiles).where(eq(clientBillingProfiles.clientId, clientId)).limit(1);
+  return rows.length > 0;
+}
+
 export async function createClientBillingProfile(input: ClientBillingProfileInput) {
   const db = await requireDb();
   return db.transaction(async (tx) => {
