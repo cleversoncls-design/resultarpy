@@ -166,7 +166,8 @@ async function loadTripContext(tripId: number) {
   const [traveler] = await db.select().from(travelers).where(eq(travelers.id, trip.travelerId)).limit(1);
   const [travelerUser] = traveler?.userId ? await db.select().from(users).where(eq(users.id, traveler.userId)).limit(1) : [];
   const [approver] = trip.approverId ? await db.select().from(users).where(eq(users.id, trip.approverId)).limit(1) : [];
-  return { trip, travelerName: traveler?.name ?? 'Viajante', travelerEmail: travelerUser?.email ?? undefined, approverEmail: approver?.email ?? undefined, approverName: approver?.name ?? undefined };
+  const [companion] = trip.companionId ? await db.select().from(travelers).where(eq(travelers.id, trip.companionId)).limit(1) : [];
+  return { trip, companionName: companion?.name ?? undefined, travelerName: traveler?.name ?? 'Viajante', travelerEmail: travelerUser?.email ?? undefined, approverEmail: approver?.email ?? undefined, approverName: approver?.name ?? undefined };
 }
 
 type TripContext = NonNullable<Awaited<ReturnType<typeof loadTripContext>>>;
@@ -180,6 +181,7 @@ function tripSummary(context: TripContext) {
   return [
     `Viagem: ${trip.tripCode}`,
     `Viajante: ${context.travelerName}`,
+    ...(context.companionName ? [`Acompanhante: ${context.companionName}`] : []),
     `Destino: ${trip.origin ? `${trip.origin} → ` : ''}${trip.destination}`,
     `Período: ${formatDate(trip.startsOn)} a ${formatDate(trip.endsOn)}`,
     ...(link ? ['', `Acesse o sistema: ${link}`] : []),

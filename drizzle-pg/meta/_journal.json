@@ -183,6 +183,13 @@
       "when": 1790691507365,
       "tag": "0025_add_trip_cancellation",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790777907365,
+      "tag": "0026_add_trip_companion",
+      "breakpoints": true
     }
   ]
 }

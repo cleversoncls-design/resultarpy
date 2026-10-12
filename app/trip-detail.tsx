@@ -435,6 +435,11 @@ export default function TripDetailScreen() {
               <Text className="mt-1 text-sm text-muted">
                   {trip.startsOn} — {trip.endsOn} · {clientLabel}
               </Text>
+              {(trip as { companionName?: string | null }).companionName ? (
+                <Text className="mt-1 text-sm text-muted">
+                  {t('Acompanhante')}: {(trip as { companionName?: string | null }).companionName}
+                </Text>
+              ) : null}
             </View>
             <StatusPill
               status={

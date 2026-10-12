@@ -1,7 +1,11 @@
+import { alias } from 'drizzle-orm/pg-core';
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { getDb } from './db';
 import { notifyTripReleased } from './email-service';
 import { clients, clientBillingProfileItems, clientBillingProfiles, currencyRates, expenseTypes, fleetEventPhotos, fleetEvents, fleetReservations, fleetWorkOrders, reimbursementLimitProfileItems, reimbursementLimitProfiles, travelers, tripApprovals, tripExpenses, trips, users, vehicles } from '../drizzle/schema';
+
+// Segundo "travelers" no join: o acompanhante da viagem.
+const companions = alias(travelers, 'companions');
 
 export type PageInput = { page: number; pageSize: number; search?: string; direction?: 'asc' | 'desc' };
 type Scope = { userId?: number; admin?: boolean };
@@ -56,10 +60,17 @@ export async function listTrips(input: PageInput & { status?: string; travelerId
   // fazia para uma viagem só) para a tabela "Minhas viagens" no padrão do
   // protótipo poder mostrar Cliente e Responsável reais, em vez de só
   // "Cliente vinculado"/"Sem cliente".
-  const query = db.select({ trip: trips, clientName: clients.name, travelerName: travelers.name }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).leftJoin(clients, eq(trips.clientId, clients.id));
+  const query = db.select({ trip: trips, clientName: clients.name, travelerName: travelers.name, companionName: companions.name }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).leftJoin(companions, eq(trips.companionId, companions.id)).leftJoin(clients, eq(trips.clientId, clients.id));
   const rows = await query.where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(trips.startsOn) : asc(trips.startsOn)).limit(paging.limit).offset(paging.offset);
   const [{ total }] = await db.select({ total: count() }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(filters.length ? and(...filters) : undefined);
-  return { items: rows.map(({ trip, clientName, travelerName }) => ({ ...trip, clientName, travelerName })), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+  return { items: rows.map(({ trip, clientName, travelerName, companionName }) => ({ ...trip, clientName, travelerName, companionName })), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+}
+
+// Opções do campo "Acompanhante": só id e nome dos viajantes ativos, para
+// qualquer usuário logado (a lista completa do cadastro é só do Administrativo).
+export async function listCompanionOptions() {
+  const db = await requireDb();
+  return db.select({ id: travelers.id, name: travelers.name }).from(travelers).where(eq(travelers.active, true)).orderBy(asc(travelers.name));
 }
 
 // Aprovador padrão do viajante -- usado em trips.create/update (router) pra
@@ -74,9 +85,9 @@ export async function getTravelerApproverId(travelerId: number) {
 export async function getTrip(id: number, scope: Scope = {}) {
   const db = await requireDb();
   const filters = [eq(trips.id, id), scope.admin ? undefined : scope.userId ? eq(travelers.userId, scope.userId) : undefined].filter(Boolean);
-  const [row] = await db.select({ trip: trips, clientName: clients.name, travelerName: travelers.name }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).leftJoin(clients, eq(trips.clientId, clients.id)).where(and(...filters)).limit(1);
+  const [row] = await db.select({ trip: trips, clientName: clients.name, travelerName: travelers.name, companionName: companions.name }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).leftJoin(companions, eq(trips.companionId, companions.id)).leftJoin(clients, eq(trips.clientId, clients.id)).where(and(...filters)).limit(1);
   if (!row) return undefined;
-  return { ...row.trip, clientName: row.clientName, travelerName: row.travelerName };
+  return { ...row.trip, clientName: row.clientName, travelerName: row.travelerName, companionName: row.companionName };
 }
 
 export async function createTrip(input: typeof trips.$inferInsert) {
@@ -454,7 +465,8 @@ export async function listReimbursementReport(input: ReimbursementReportInput) {
     const sourceRate = rateFor(rateRows, sourceCurrency, 'PYG', expense.occurredOn);
     const targetRate = rateFor(rateRows, limitCurrency, 'PYG', expense.occurredOn);
     const spentInLimitCurrency = sourceRate && targetRate ? Number(expense.amount) * sourceRate.value / targetRate.value : Number(expense.amount);
-    const limitAmount = configuredLimit?.limitAmount ?? null;
+    // Os limites cadastrados são por pessoa: com acompanhante o gasto atende 2 pessoas.
+    const limitAmount = configuredLimit ? configuredLimit.limitAmount * (expense.people ?? 1) : null;
     const reimbursableAmount = limitAmount === null ? spentInLimitCurrency : Math.min(spentInLimitCurrency, limitAmount);
     const excessInLimitCurrency = Math.max(0, spentInLimitCurrency - reimbursableAmount); const isRejected = Boolean(expense.reimbursementRejectedAt);
     // Além dos valores na moeda do perfil de reembolso (usados para
@@ -464,7 +476,7 @@ export async function listReimbursementReport(input: ReimbursementReportInput) {
     const spentPyg = sourceRate ? Number(expense.amount) * sourceRate.value : Number(expense.amount);
     const reimbursablePyg = isRejected ? 0 : (targetRate ? reimbursableAmount * targetRate.value : reimbursableAmount);
     const excessPyg = isRejected ? 0 : (targetRate ? excessInLimitCurrency * targetRate.value : excessInLimitCurrency);
-    return { id: expense.id, tripId: expense.tripId, tripCode, clientName: clientName ?? 'Sem cliente', date: expense.occurredOn, city: expense.city, expenseTypeId: expense.expenseTypeId, expenseTypeName: expenseTypeName ?? 'Tipo de gasto', quantity: expense.quantity, unitValue: expense.unitValue, sourceAmount: expense.amount, sourceCurrency, currency: limitCurrency, rate: sourceRate?.value ?? null, spent: spentInLimitCurrency, limit: limitAmount, reimbursable: isRejected ? 0 : reimbursableAmount, excess: isRejected ? 0 : excessInLimitCurrency, spentPyg, reimbursablePyg, excessPyg, receiptUri: expense.receiptUri, reviewNote: expense.reviewNote, reimbursementRejectedAt: expense.reimbursementRejectedAt, profileCity: profile?.city || null, rateDate: sourceRate && targetRate ? (sourceRate.rateDate < targetRate.rateDate ? sourceRate.rateDate : targetRate.rateDate) : null, conversionAvailable: Boolean(sourceRate && targetRate) };
+    return { id: expense.id, tripId: expense.tripId, tripCode, clientName: clientName ?? 'Sem cliente', date: expense.occurredOn, city: expense.city, expenseTypeId: expense.expenseTypeId, expenseTypeName: expenseTypeName ?? 'Tipo de gasto', quantity: expense.quantity, people: expense.people, guests: expense.guests, unitValue: expense.unitValue, sourceAmount: expense.amount, sourceCurrency, currency: limitCurrency, rate: sourceRate?.value ?? null, spent: spentInLimitCurrency, limit: limitAmount, reimbursable: isRejected ? 0 : reimbursableAmount, excess: isRejected ? 0 : excessInLimitCurrency, spentPyg, reimbursablePyg, excessPyg, receiptUri: expense.receiptUri, reviewNote: expense.reviewNote, reimbursementRejectedAt: expense.reimbursementRejectedAt, profileCity: profile?.city || null, rateDate: sourceRate && targetRate ? (sourceRate.rateDate < targetRate.rateDate ? sourceRate.rateDate : targetRate.rateDate) : null, conversionAvailable: Boolean(sourceRate && targetRate) };
   });
   const pageSize = Math.min(Math.max(input.pageSize, 1), 100);
   const offset = Math.max(input.page - 1, 0) * pageSize;
@@ -493,8 +505,21 @@ export async function createTripExpense(input: typeof tripExpenses.$inferInsert,
   // travada para o viajante — ele não pode mais incluir, editar ou
   // apagar despesas dessa viagem (o Administrativo continua podendo).
   if (!scope.admin && trip.receiptsValidatedAt) throw new Error('Esta viagem já teve os comprovantes validados e não pode mais receber novas despesas.');
-  const [created] = await db.insert(tripExpenses).values(input).returning();
+  const [created] = await db.insert(tripExpenses).values({ ...input, people: peopleFor(input.people), guests: guestsFor(input.guests) }).returning();
   return created;
+}
+
+export const MAX_EXPENSE_PEOPLE = 20;
+
+// "Pessoas atendidas" = viajante + acompanhantes + convidados externos (ex.:
+// um cliente num almoço). Sempre entre 1 e MAX_EXPENSE_PEOPLE.
+function peopleFor(requested?: number | null) {
+  return Math.min(Math.max(Math.trunc(requested ?? 1) || 1, 1), MAX_EXPENSE_PEOPLE);
+}
+
+function guestsFor(value?: string | null) {
+  const text = (value ?? '').trim();
+  return text ? text.slice(0, 500) : null;
 }
 
 export async function updateTripExpense(id: number, input: Partial<typeof tripExpenses.$inferInsert>, scope: Scope = {}) {
@@ -505,7 +530,10 @@ export async function updateTripExpense(id: number, input: Partial<typeof tripEx
     const trip = await getTrip(expense.tripId, scope);
     if (trip?.receiptsValidatedAt) throw new Error('Esta viagem já teve os comprovantes validados e não pode mais ser alterada.');
   }
-  const [updated] = await db.update(tripExpenses).set(input).where(eq(tripExpenses.id, id)).returning();
+  const changes = { ...input };
+  if (input.people !== undefined) changes.people = peopleFor(input.people);
+  if (input.guests !== undefined) changes.guests = guestsFor(input.guests);
+  const [updated] = await db.update(tripExpenses).set(changes).where(eq(tripExpenses.id, id)).returning();
   return updated;
 }
 
@@ -768,7 +796,7 @@ export async function listBillingReport(input: BillingReportInput) {
     const sourceRate = rateFor(rateRows, sourceCurrency, 'PYG', expense.occurredOn);
     const targetRate = rateFor(rateRows, limitCurrency, 'PYG', expense.occurredOn);
     const spent = sourceRate && targetRate ? Number(expense.amount) * sourceRate.value / targetRate.value : Number(expense.amount);
-    const limit = configured?.limitAmount ?? null;
+    const limit = configured ? configured.limitAmount * (expense.people ?? 1) : null;
     // Só gera faturamento quando o tipo de gasto está explicitamente
     // vinculado ao cliente (na tela "Limites por cliente"). Antes, um tipo
     // de gasto sem vínculo caía no valor cheio por engano.
