@@ -182,6 +182,7 @@ export default function TripDetailScreen() {
   );
   const [started, setStarted] = useState(Boolean(reservation?.departureKm));
   const [finished, setFinished] = useState(false);
+  const [correctingKm, setCorrectingKm] = useState(false);
   const [departureKm, setDepartureKm] = useState(
     reservation?.departureKm?.toString() ?? "",
   );
@@ -299,6 +300,9 @@ export default function TripDetailScreen() {
   const vehiclePending = Boolean(tripRecord.requiresFleetVehicle) && !vehicleAllocated;
   // O Administrativo pode trocar o veículo enquanto a viagem não saiu: sem KM
   // de saída registrado e antes da etapa "Em prestação" (o servidor confere de novo).
+  // Corrigir o KM final: viajante da viagem ou Administrativo, enquanto a viagem não foi concluída.
+  const canCorrectKm = Boolean(reservation?.id) && Boolean(reservation?.returnKm)
+    && !["Finalizada", "Cancelada", "Rejeitada"].includes(String(trip.status));
   const canChangeVehicle = isAdmin && vehicleAllocated && !isCancelled
     && reservation?.departureKm == null && !reservation?.departureAt
     && !["Em prestação", "Finalizada", "Rejeitada"].includes(String(trip.status));
@@ -378,6 +382,7 @@ export default function TripDetailScreen() {
       return;
     }
     setFinished(true);
+    setCorrectingKm(false);
     if (reservation?.id) {
       recordKmMutation.mutate({ reservationId: reservation.id, returnKm: km });
     }
@@ -866,7 +871,7 @@ export default function TripDetailScreen() {
                   <TextInput
                     value={returnKm}
                     onChangeText={setReturnKm}
-                    editable={started && !finished}
+                    editable={started && (!finished || correctingKm)}
                     keyboardType="numeric"
                     placeholder={t('Ex.: 74820')}
                     placeholderTextColor={colors.muted}
@@ -874,6 +879,19 @@ export default function TripDetailScreen() {
                   />
                 </View>
               </View>
+              {finished && correctingKm ? (
+                <View className="gap-2">
+                  <PrimaryButton label={t('Salvar KM final')} onPress={finishTrip} />
+                  <Pressable onPress={() => { setCorrectingKm(false); setReturnKm(String(reservation?.returnKm ?? '')); }} className="items-center py-2">
+                    <Text className="text-sm font-semibold text-muted">{t('Cancelar correção')}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              {finished && !correctingKm && canCorrectKm ? (
+                <Pressable onPress={() => { setTripActionError(null); setTripActionSuccess(null); setCorrectingKm(true); }} className="items-center rounded-xl border border-border py-3">
+                  <Text className="font-semibold text-foreground">{t('Corrigir KM final')}</Text>
+                </Pressable>
+              ) : null}
               {!isAdmin ? (
                 !started ? (
                   <PrimaryButton label={t('Iniciar viagem')} onPress={startTrip} />
