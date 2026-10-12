@@ -882,13 +882,13 @@ export default function TripDetailScreen() {
               {finished && correctingKm ? (
                 <View className="gap-2">
                   <PrimaryButton label={t('Salvar KM final')} onPress={finishTrip} />
-                  <Pressable onPress={() => { setCorrectingKm(false); setReturnKm(String(reservation?.returnKm ?? '')); }} className="items-center py-2">
+                  <Pressable onPress={() => { setCorrectingKm(false); setReturnKm(String(reservation?.returnKm ?? '')); }} style={{ alignItems: 'center', paddingVertical: 8 }}>
                     <Text className="text-sm font-semibold text-muted">{t('Cancelar correção')}</Text>
                   </Pressable>
                 </View>
               ) : null}
               {finished && !correctingKm && canCorrectKm ? (
-                <Pressable onPress={() => { setTripActionError(null); setTripActionSuccess(null); setCorrectingKm(true); }} className="items-center rounded-xl border border-border py-3">
+                <Pressable onPress={() => { setTripActionError(null); setTripActionSuccess(null); setCorrectingKm(true); }} style={{ alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16 }}>
                   <Text className="font-semibold text-foreground">{t('Corrigir KM final')}</Text>
                 </Pressable>
               ) : null}
