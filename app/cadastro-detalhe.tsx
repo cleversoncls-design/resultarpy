@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/hooks/use-auth';
+import { confirmAction, showMessage } from '@/lib/dialogs';
 import { useLanguage } from '@/lib/language-provider';
 import { trpc } from '@/lib/trpc';
 import { prepareClientBillingProfile } from '@/lib/client-billing-profile';
@@ -307,24 +308,23 @@ export default function CatalogDetailScreen() {
 
   const confirmArchive = (id: string, name: string) => {
     if (!liveEnabled || !kind) return;
-    Alert.alert(t('Arquivar cadastro'), `${t('Deseja arquivar')} ${name}?`, [
-      { text: t('Cancelar'), style: 'cancel' },
-      { text: t('Arquivar'), style: 'destructive', onPress: () => void (async () => {
-        try {
-          if (kind === 'units') await archiveUnit.mutateAsync({ id: Number(id) });
-          if (kind === 'cities') await archiveCity.mutateAsync({ id: Number(id) });
-          if (kind === 'clients') await archiveClient.mutateAsync({ id: Number(id) });
-          if (kind === 'travelers') await archiveTraveler.mutateAsync({ id: Number(id) });
-          if (kind === 'expenseTypes') await archiveExpenseType.mutateAsync({ id: Number(id) });
-          if (kind === 'reimbursementLimits') await deleteReimbursementLimit.mutateAsync({ id: Number(id) });
-          if (kind === 'clientBillingLimits') await deleteClientBillingLimit.mutateAsync({ id: Number(id) });
-          if (kind === 'maintenanceReasons') await archiveMaintenanceReason.mutateAsync({ id: Number(id) });
-          refresh();
-        } catch (error) {
-          Alert.alert(t('Não foi possível arquivar o cadastro.'), error instanceof Error ? error.message : '');
-        }
-      })() },
-    ]);
+    void (async () => {
+      const confirmed = await confirmAction({ title: t('Arquivar cadastro'), message: `${t('Deseja arquivar')} ${name}?`, confirmLabel: t('Arquivar'), cancelLabel: t('Cancelar'), destructive: true });
+      if (!confirmed) return;
+      try {
+        if (kind === 'units') await archiveUnit.mutateAsync({ id: Number(id) });
+        if (kind === 'cities') await archiveCity.mutateAsync({ id: Number(id) });
+        if (kind === 'clients') await archiveClient.mutateAsync({ id: Number(id) });
+        if (kind === 'travelers') await archiveTraveler.mutateAsync({ id: Number(id) });
+        if (kind === 'expenseTypes') await archiveExpenseType.mutateAsync({ id: Number(id) });
+        if (kind === 'reimbursementLimits') await deleteReimbursementLimit.mutateAsync({ id: Number(id) });
+        if (kind === 'clientBillingLimits') await deleteClientBillingLimit.mutateAsync({ id: Number(id) });
+        if (kind === 'maintenanceReasons') await archiveMaintenanceReason.mutateAsync({ id: Number(id) });
+        refresh();
+      } catch (error) {
+        showMessage(t('Não foi possível arquivar o cadastro.'), error instanceof Error ? error.message : '');
+      }
+    })();
   };
 
   if (!kind) {

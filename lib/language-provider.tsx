@@ -53,6 +53,7 @@ const translations: Record<TranslationKey, string> = {
   'Confirmar': 'Confirmar', 'Informe um valor maior que zero (ex.: 0,50).': 'Informe un valor mayor que cero (ej.: 0,50).', 'Nenhum tipo de gasto incluído.': 'Ningún tipo de gasto incluido.', 'Selecione o tipo de gasto.': 'Seleccione el tipo de gasto.',
 
   'Compra': 'Compra', 'Venda': 'Venta', 'Mostrar mais datas': 'Mostrar más fechas', 'Cotações oficiais em Guaraní (PYG) por data. O valor de venda é sempre o utilizado para faturar os clientes e converter os gastos.': 'Cotizaciones oficiales en Guaraníes (PYG) por fecha. El valor de venta es siempre el utilizado para facturar a los clientes y convertir los gastos.',
+  'Quilometragem': 'Kilometraje', 'Detalhe do cadastro': 'Detalle del registro', 'Detalhe da viagem': 'Detalle del viaje', 'Detalhe do veículo': 'Detalle del vehículo', 'Reserva de veículo': 'Reserva de vehículo', 'Traduções': 'Traducciones', 'Registro de e-mails': 'Registro de correos electrónicos', 'Adicionar usuário': 'Agregar usuario', 'Perfil administrativo': 'Perfil administrativo', 'Perfil aprovador': 'Perfil aprobador', 'Perfil viajante': 'Perfil viajero', 'Conta': 'Cuenta',
   'Disponível': 'Disponible',
 
   'Condutor definido': 'Conductor definido', 'KM da manutenção': 'KM del mantenimiento', 'KM de saída': 'KM de salida', 'do intervalo': 'del intervalo', 'km atuais': 'km actuales',
