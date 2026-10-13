@@ -56,6 +56,7 @@ const translations: Record<TranslationKey, string> = {
   'Quilometragem': 'Kilometraje', 'Detalhe do cadastro': 'Detalle del registro', 'Detalhe da viagem': 'Detalle del viaje', 'Detalhe do veículo': 'Detalle del vehículo', 'Reserva de veículo': 'Reserva de vehículo', 'Traduções': 'Traducciones', 'Registro de e-mails': 'Registro de correos electrónicos', 'Adicionar usuário': 'Agregar usuario', 'Perfil administrativo': 'Perfil administrativo', 'Perfil aprovador': 'Perfil aprobador', 'Perfil viajante': 'Perfil viajero', 'Conta': 'Cuenta',
   'DD/MM/AAAA': 'DD/MM/AAAA', 'Informe o vencimento do extintor no formato DD/MM/AAAA.': 'Informe el vencimiento del extintor en el formato DD/MM/AAAA.',
   'Nenhuma viagem em andamento ou programada': 'Ningún viaje en curso o programado', 'Viagens canceladas, rejeitadas ou finalizadas não aparecem aqui.': 'Los viajes cancelados, rechazados o finalizados no aparecen aquí.',
+  'Ordens de serviço': 'Órdenes de servicio', 'Nenhuma ordem de serviço registrada para este veículo.': 'Ninguna orden de servicio registrada para este vehículo.', 'Abrir OS': 'Abrir OS', 'Concluir': 'Concluir',
   'Disponível': 'Disponible',
 
   'Condutor definido': 'Conductor definido', 'KM da manutenção': 'KM del mantenimiento', 'KM de saída': 'KM de salida', 'do intervalo': 'del intervalo', 'km atuais': 'km actuales',

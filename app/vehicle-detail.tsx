@@ -23,11 +23,18 @@ export default function VehicleDetailScreen() {
     { vehicleId: vehicleId as number, page: 1, pageSize: 20, direction: 'desc' },
     { enabled: isAuthenticated && vehicleId !== undefined },
   );
+  // Ordens de serviço deste veículo (mais recentes primeiro).
+  const workOrdersQuery = trpc.operations.fleet.workOrders.list.useQuery(
+    { vehicleId: vehicleId as number, page: 1, pageSize: 20, direction: 'desc' },
+    { enabled: isAuthenticated && vehicleId !== undefined },
+  );
   const updateVehicleStatus = trpc.operations.fleet.vehicles.update.useMutation({
     onSuccess: () => { void vehicleQuery.refetch(); },
   });
   const vehicle = vehicleQuery.data;
   const reservations = reservationsQuery.data?.items ?? [];
+  const workOrders = workOrdersQuery.data?.items ?? [];
+  const openWorkOrder = workOrders.find((order) => order.status === 'Em andamento');
 
   if (!isAuthenticated || !isAdmin) {
     return <ScreenContainer edges={['top', 'bottom', 'left', 'right']} className="items-center justify-center px-6"><View className="w-full max-w-md rounded-2xl border border-border bg-surface p-6"><Text className="text-xl font-bold text-foreground">{t('Acesso restrito')}</Text><Text className="mt-2 text-sm leading-5 text-muted">{t('Somente o Administrativo pode gerenciar veículos.')}</Text><Pressable onPress={() => router.back()} style={({ pressed }) => ({ backgroundColor: colors.primary, borderRadius: 10, minHeight: 44, marginTop: 20, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.75 : 1 })}><Text className="font-bold text-white">{t('Voltar')}</Text></Pressable></View></ScreenContainer>;
@@ -76,11 +83,34 @@ export default function VehicleDetailScreen() {
               <IconSymbol name="wrench.and.screwdriver.fill" size={20} color={colors.warning} />
               <Text style={{ color: colors.warning }} className="ml-3 font-bold">{vehicle.status === 'Em manutenção' ? t('Já está em manutenção') : updateVehicleStatus.isPending ? t('Salvando...') : t('Bloquear como Em manutenção')}</Text>
             </Pressable>
-            <Pressable onPress={() => router.push({ pathname: '/new-work-order', params: { vehicleId: String(vehicle.id) } })} style={({ pressed }) => ({ borderColor: colors.success, borderWidth: 1, borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', opacity: pressed ? 0.72 : 1 })}>
+            <Pressable onPress={() => router.push({ pathname: '/new-work-order', params: openWorkOrder ? { workOrderId: String(openWorkOrder.id), concluir: '1' } : { vehicleId: String(vehicle.id) } })} style={({ pressed }) => ({ borderColor: colors.success, borderWidth: 1, borderRadius: 14, padding: 16, flexDirection: 'row', alignItems: 'center', opacity: pressed ? 0.72 : 1 })}>
               <IconSymbol name="checkmark.seal.fill" size={20} color={colors.success} />
-              <Text style={{ color: colors.success }} className="ml-3 font-bold">{t('Registrar manutenção concluída')}</Text>
+              <Text style={{ color: colors.success }} className="ml-3 font-bold">{openWorkOrder ? `${t('Concluir')} OS-${openWorkOrder.id}` : t('Registrar manutenção concluída')}</Text>
             </Pressable>
           </View>
+
+          <Text className="mb-3 mt-8 text-xs font-bold uppercase tracking-widest text-muted">{t('Ordens de serviço')}</Text>
+          {workOrders.length === 0 ? (
+            <View className="rounded-2xl border border-border bg-surface p-5">
+              <Text className="text-sm text-muted">{t('Nenhuma ordem de serviço registrada para este veículo.')}</Text>
+            </View>
+          ) : (
+            <View className="gap-3">
+              {workOrders.map((order) => (
+                <Pressable key={order.id} onPress={() => router.push({ pathname: '/new-work-order', params: { workOrderId: String(order.id) } })} style={({ pressed }) => ({ borderLeftWidth: 3, borderLeftColor: statusTone(order.status, colors).color, opacity: pressed ? 0.7 : 1 })} className="rounded-2xl border border-border bg-surface p-4">
+                  <View className="flex-row items-start justify-between">
+                    <View className="flex-1 pr-3">
+                      <Text className="text-xs font-bold tracking-wider text-muted">OS-{order.id} · {formatDateLoose(order.maintenanceDate)}</Text>
+                      <Text className="mt-1 text-sm font-semibold text-foreground">{t(order.maintenanceType)} · KM {order.vehicleKm.toLocaleString('pt-BR')}</Text>
+                      {order.observation ? <Text className="mt-1 text-xs text-muted" numberOfLines={2}>{order.observation}</Text> : null}
+                    </View>
+                    <StatusPill status={order.status} />
+                  </View>
+                  <Text className="mt-2 text-xs font-bold text-primary">{t('Abrir OS')} ›</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
           <Text className="mb-3 mt-8 text-xs font-bold uppercase tracking-widest text-muted">{t('Histórico de viagens')}</Text>
           {reservations.length === 0 ? (

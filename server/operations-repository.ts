@@ -2,6 +2,7 @@ import { alias } from 'drizzle-orm/pg-core';
 import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
 import { getDb } from './db';
 import { notifyTripReleased } from './email-service';
+import { vehicleUpdateForWorkOrder } from './work-order-rules';
 import { clients, clientBillingProfileItems, clientBillingProfiles, currencyRates, expenseTypes, fleetEventPhotos, fleetEvents, fleetReservations, fleetWorkOrders, reimbursementLimitProfileItems, reimbursementLimitProfiles, travelers, tripApprovals, tripExpenses, trips, users, vehicles } from '../drizzle/schema';
 
 // Segundo "travelers" no join: o acompanhante da viagem.
@@ -740,24 +741,36 @@ export async function getWorkOrder(id: number) {
   return order;
 }
 
+// Reflete a OS no veículo (status e KM) — regras em server/work-order-rules.ts.
+async function applyWorkOrderToVehicle(order: { id: number; vehicleId: number; vehicleKm: number; status: 'Em andamento' | 'Concluída' | 'Cancelada' }) {
+  const db = await requireDb();
+  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, order.vehicleId)).limit(1);
+  if (!vehicle) return;
+  const [{ open }] = await db.select({ open: count() }).from(fleetWorkOrders).where(and(eq(fleetWorkOrders.vehicleId, order.vehicleId), eq(fleetWorkOrders.status, 'Em andamento'), ne(fleetWorkOrders.id, order.id)));
+  const update = vehicleUpdateForWorkOrder({ status: order.status, vehicleKm: order.vehicleKm, vehicle: { status: vehicle.status, currentKm: vehicle.currentKm, lastMaintenanceKm: vehicle.lastMaintenanceKm }, hasOtherOpenOrders: Number(open) > 0 });
+  if (Object.keys(update).length > 0) await updateVehicle(order.vehicleId, update);
+}
+
 export async function createWorkOrder(input: typeof fleetWorkOrders.$inferInsert) {
   const db = await requireDb();
   const [created] = await db.insert(fleetWorkOrders).values(input).returning();
-  if (created) await updateVehicle(created.vehicleId, { currentKm: created.vehicleKm, lastMaintenanceKm: created.vehicleKm, status: 'Disponível' });
+  if (created) await applyWorkOrderToVehicle(created);
   return created;
 }
 
 export async function updateWorkOrder(id: number, input: Partial<typeof fleetWorkOrders.$inferInsert>) {
   const db = await requireDb();
   const [updated] = await db.update(fleetWorkOrders).set(input).where(eq(fleetWorkOrders.id, id)).returning();
-  if (updated && (input.vehicleKm !== undefined || input.status === 'Concluída')) await updateVehicle(updated.vehicleId, { currentKm: updated.vehicleKm, lastMaintenanceKm: updated.vehicleKm, status: 'Disponível' });
+  if (updated) await applyWorkOrderToVehicle(updated);
   return updated;
 }
 
 export async function deleteWorkOrder(id: number) {
   const db = await requireDb();
-  const [deleted] = await db.delete(fleetWorkOrders).where(eq(fleetWorkOrders.id, id)).returning({ id: fleetWorkOrders.id });
-  return deleted;
+  const [deleted] = await db.delete(fleetWorkOrders).where(eq(fleetWorkOrders.id, id)).returning();
+  // Excluir uma OS em andamento libera o veículo (se não houver outra OS aberta).
+  if (deleted && deleted.status === 'Em andamento') await applyWorkOrderToVehicle({ ...deleted, status: 'Cancelada' });
+  return deleted ? { id: deleted.id } : deleted;
 }
 
 
