@@ -62,7 +62,7 @@ export default function ApprovalsScreen() {
     id: String(trip.id),
     traveler: t('Viajante vinculado'),
     destination: trip.destination,
-    dates: `${trip.startsOn} – ${trip.endsOn}`,
+    dates: `${formatDateDisplay(trip.startsOn) || trip.startsOn} – ${formatDateDisplay(trip.endsOn) || trip.endsOn}`,
     client: trip.clientId ? t('Cliente vinculado') : t('Sem cliente'),
     amount: Number(trip.advanceAmount),
     status: trip.status,
@@ -222,7 +222,7 @@ export default function ApprovalsScreen() {
                     <Pressable disabled={historyPage >= globalHistoryQuery.data.totalPages} onPress={() => setHistoryPage((page) => Math.min(page + 1, globalHistoryQuery.data!.totalPages))} style={({ pressed }) => [{ borderColor: colors.border, opacity: pressed || historyPage >= globalHistoryQuery.data.totalPages ? 0.45 : 1 }]} className="rounded-xl border px-3 py-2"><Text className="font-bold text-foreground">{t('Próxima')} ›</Text></Pressable>
                   </View>
                 </View>
-                {globalHistoryExportQuery.data?.length ? <View className="mt-3"><ReportExportActions title={`${t('Histórico de decisões')} · ${t(activeTab)}`} filename={`historico-aprovacoes-${activeTab}`} columns={[{ key: 'trip', label: 'Viagem' }, { key: 'client', label: 'Cliente' }, { key: 'decision', label: 'Decisão' }, { key: 'approver', label: 'Aprovador' }, { key: 'date', label: 'Data' }, { key: 'comment', label: 'Comentário' }]} rows={globalHistoryExportQuery.data.map((entry) => ({ trip: `${entry.tripCode} · ${entry.destination}`, client: entry.clientName, decision: t(entry.decision), approver: entry.approverName, date: new Date(entry.decidedAt).toLocaleString(), comment: entry.comment ?? t('Sem comentário') }))} /></View> : null}
+                {globalHistoryExportQuery.data?.length ? <View className="mt-3"><ReportExportActions title={`${t('Histórico de decisões')} · ${t(activeTab)}`} filename={`historico-aprovacoes-${activeTab}`} columns={[{ key: 'trip', label: 'Viagem' }, { key: 'client', label: 'Cliente' }, { key: 'decision', label: 'Decisão' }, { key: 'approver', label: 'Aprovador' }, { key: 'date', label: 'Data' }, { key: 'comment', label: 'Comentário' }]} rows={globalHistoryExportQuery.data.map((entry) => ({ trip: `${entry.tripCode} · ${entry.destination}`, client: entry.clientName, decision: t(entry.decision), approver: entry.approverName, date: new Date(entry.decidedAt).toLocaleString('pt-BR'), comment: entry.comment ?? t('Sem comentário') }))} /></View> : null}
               </>
             ) : null}
           </View>

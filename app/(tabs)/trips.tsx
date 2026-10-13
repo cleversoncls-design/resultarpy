@@ -10,6 +10,7 @@ import { useLanguage } from '@/lib/language-provider';
 import { useCurrency } from '@/lib/currency-provider';
 import { useAuth } from '@/hooks/use-auth';
 import { trpc } from '@/lib/trpc';
+import { formatDateInput, formatDateLoose, parseBrazilianDate } from '@/lib/date-utils';
 
 // Categorias reais do enum trip_status (drizzle/schema.ts) — o protótipo
 // usava rótulos genéricos (Em andamento/Concluída/Cancelada) que não
@@ -76,18 +77,20 @@ export default function TripsScreen() {
 
   const clientOptions = useMemo(() => Array.from(new Set(rows.map((row) => row.clientName).filter((name): name is string => Boolean(name)))).sort().map((name) => ({ id: name, label: name })), [rows]);
 
+  const periodStartIso = parseBrazilianDate(periodStart) ?? '';
+  const periodEndIso = parseBrazilianDate(periodEnd) ?? '';
   const filteredRows = useMemo(() => rows.filter((row) => {
     if (statusFilter && row.status !== statusFilter) return false;
     if (clientFilter && row.clientName !== clientFilter) return false;
-    if (periodStart && row.startDate < periodStart) return false;
-    if (periodEnd && row.endDate > periodEnd) return false;
+    if (periodStartIso && row.startDate < periodStartIso) return false;
+    if (periodEndIso && row.endDate > periodEndIso) return false;
     if (search.trim()) {
       const needle = search.trim().toLocaleLowerCase();
       const haystack = `${row.code} ${row.destination} ${row.clientName ?? ''} ${row.travelerName ?? ''}`.toLocaleLowerCase();
       if (!haystack.includes(needle)) return false;
     }
     return true;
-  }), [rows, statusFilter, clientFilter, periodStart, periodEnd, search]);
+  }), [rows, statusFilter, clientFilter, periodStartIso, periodEndIso, search]);
 
   const kpiAwaiting = rows.filter((row) => row.status === 'Aguardando aprovação').length;
   const kpiInProgress = rows.filter((row) => IN_PROGRESS_STATUSES.includes(row.status)).length;
@@ -114,7 +117,7 @@ export default function TripsScreen() {
       <Text className="mb-2 mt-4 text-xs font-semibold text-muted">{t('Cliente')}</Text>
       <CatalogSearch value={clientFilter} options={clientOptions} placeholder={t('Pesquisar cliente (vazio = todos)')} emptyLabel={t('Nenhum cliente encontrado nas viagens listadas')} onChange={setClientFilter} />
       <Text className="mb-2 mt-4 text-xs font-semibold text-muted">{t('Período')}</Text>
-      <View className="flex-row gap-2"><TextInput value={periodStart} onChangeText={setPeriodStart} placeholder={t('Início (AAAA-MM-DD)')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="flex-1 rounded-xl border px-3 py-2.5 text-sm" /><TextInput value={periodEnd} onChangeText={setPeriodEnd} placeholder={t('Fim (AAAA-MM-DD)')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="flex-1 rounded-xl border px-3 py-2.5 text-sm" /></View>
+      <View className="flex-row gap-2"><TextInput value={periodStart} onChangeText={(value) => setPeriodStart(formatDateInput(value))} keyboardType="numbers-and-punctuation" placeholder={t('Início (DD/MM/AAAA)')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="flex-1 rounded-xl border px-3 py-2.5 text-sm" /><TextInput value={periodEnd} onChangeText={(value) => setPeriodEnd(formatDateInput(value))} keyboardType="numbers-and-punctuation" placeholder={t('Fim (DD/MM/AAAA)')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="flex-1 rounded-xl border px-3 py-2.5 text-sm" /></View>
     </View>
 
     {isDesktop ? (
@@ -127,7 +130,7 @@ export default function TripsScreen() {
             <Pressable onPress={() => openDetails(row.id)} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="w-[12%]"><Text className="text-xs font-bold text-foreground" numberOfLines={1}>{row.code}</Text></Pressable>
             <Pressable onPress={() => openDetails(row.id)} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="w-[18%] pr-2"><Text className="text-xs text-foreground" numberOfLines={1}>{row.destination}</Text></Pressable>
             <View className="w-[15%]"><StatusPill status={row.status} /></View>
-            <View className="w-[15%]"><Text className="text-xs text-foreground">{row.startDate}</Text><Text className="mt-0.5 text-[11px] text-muted">{t('até')} {row.endDate}</Text></View>
+            <View className="w-[15%]"><Text className="text-xs text-foreground">{formatDateLoose(row.startDate)}</Text><Text className="mt-0.5 text-[11px] text-muted">{t('até')} {formatDateLoose(row.endDate)}</Text></View>
             <Text className="w-[16%] pr-2 text-xs text-foreground" numberOfLines={1}>{row.clientName ?? t('Sem cliente')}</Text>
             <Text className="w-[16%] pr-2 text-xs text-foreground" numberOfLines={1}>{row.travelerName ?? t('Não informado')}</Text>
             <View className="w-[8%] items-end gap-1">
@@ -143,7 +146,7 @@ export default function TripsScreen() {
         {filteredRows.map((item) => {
           const canEdit = /^\d+$/.test(item.id) && item.status !== 'Cancelada';
           const openItem = () => openDetails(item.id);
-          return <View key={item.id} className="rounded-3xl border border-border bg-surface p-5"><View className="flex-row items-start justify-between"><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })} className="flex-1"><Text className="text-xs font-bold tracking-wider text-muted">{item.code}</Text><Text className="mt-2 text-xl font-bold text-foreground">{item.destination}</Text><Text className="mt-1 text-sm text-muted">{item.startDate} — {item.endDate}</Text></Pressable><View className="items-end"><StatusPill status={item.status} />{canEdit ? <Pressable onPress={() => router.push({ pathname: '/new-trip', params: { tripId: item.id } })} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })} className="mt-3"><Text className="text-xs font-bold text-primary">{t('Editar')}</Text></Pressable> : null}</View></View><View className="mt-5 flex-row border-t border-border pt-4"><View className="flex-1"><Text className="text-xs text-muted">{t('Cliente')}</Text><Text className="mt-1 text-sm font-semibold text-foreground">{item.clientName ?? t('Sem cliente')}</Text></View><View className="items-end"><Text className="text-xs text-muted">{t('Adiantamento')}</Text><Text className="mt-1 text-sm font-bold text-foreground">{item.hasAdvance ? formatCurrency(item.amount, currency) : t('Não solicitado')}</Text></View></View><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })} className="mt-4 flex-row items-center"><IconSymbol name="airplane" size={16} color={colors.primary} /><Text className="ml-2 text-xs font-medium text-muted">{t(item.transport)}</Text><Text className="ml-auto text-xs font-semibold text-primary">{t('Abrir detalhes ›')}</Text></Pressable></View>;
+          return <View key={item.id} className="rounded-3xl border border-border bg-surface p-5"><View className="flex-row items-start justify-between"><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })} className="flex-1"><Text className="text-xs font-bold tracking-wider text-muted">{item.code}</Text><Text className="mt-2 text-xl font-bold text-foreground">{item.destination}</Text><Text className="mt-1 text-sm text-muted">{formatDateLoose(item.startDate)} — {formatDateLoose(item.endDate)}</Text></Pressable><View className="items-end"><StatusPill status={item.status} />{canEdit ? <Pressable onPress={() => router.push({ pathname: '/new-trip', params: { tripId: item.id } })} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })} className="mt-3"><Text className="text-xs font-bold text-primary">{t('Editar')}</Text></Pressable> : null}</View></View><View className="mt-5 flex-row border-t border-border pt-4"><View className="flex-1"><Text className="text-xs text-muted">{t('Cliente')}</Text><Text className="mt-1 text-sm font-semibold text-foreground">{item.clientName ?? t('Sem cliente')}</Text></View><View className="items-end"><Text className="text-xs text-muted">{t('Adiantamento')}</Text><Text className="mt-1 text-sm font-bold text-foreground">{item.hasAdvance ? formatCurrency(item.amount, currency) : t('Não solicitado')}</Text></View></View><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })} className="mt-4 flex-row items-center"><IconSymbol name="airplane" size={16} color={colors.primary} /><Text className="ml-2 text-xs font-medium text-muted">{t(item.transport)}</Text><Text className="ml-auto text-xs font-semibold text-primary">{t('Abrir detalhes ›')}</Text></Pressable></View>;
         })}
         {filteredRows.length === 0 ? <View><SectionHeader title={t('Nenhuma viagem')} /><PrimaryButton label={t('Criar solicitação')} onPress={() => router.push('/new-trip')} /></View> : null}
       </View>

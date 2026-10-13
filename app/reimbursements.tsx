@@ -14,6 +14,7 @@ import type { ReportImage, ReportInfoLine, ReportRow as ExportRow } from '@/lib/
 import { summarizeTrips, type HeaderTrip } from '@/lib/trip-header';
 import { TripPicker } from '@/components/trip-picker';
 import type { PickerTrip } from '@/lib/trip-picker';
+import { formatDateLoose } from '@/lib/date-utils';
 
 type ReimbursementRow = {
   id: number;
@@ -135,7 +136,7 @@ export default function ReimbursementsScreen() {
   ];
   const exportRows: ExportRow[] = rows.map((row) => ({
     trip: `${row.tripCode} · ${row.clientName}`,
-    date: row.date,
+    date: formatDateLoose(row.date),
     city: row.city,
     concept: row.expenseTypeName,
     sourceSpent: formatCurrency(Number(row.sourceAmount), validCurrency(row.sourceCurrency)),
@@ -183,7 +184,7 @@ export default function ReimbursementsScreen() {
   const receiptImages: ReportImage[] = rows
     .filter((row) => row.receiptUri?.startsWith('data:image') && !row.reimbursementRejectedAt)
     .map((row) => ({
-      label: `${row.tripCode} · ${row.date} · ${row.expenseTypeName} · ${formatCurrency(Number(row.sourceAmount), validCurrency(row.sourceCurrency))}`,
+      label: `${row.tripCode} · ${formatDateLoose(row.date)} · ${row.expenseTypeName} · ${formatCurrency(Number(row.sourceAmount), validCurrency(row.sourceCurrency))}`,
       uri: row.receiptUri as string,
     }));
 
@@ -317,7 +318,7 @@ export default function ReimbursementsScreen() {
                       <View className="flex-row items-start justify-between">
                         <View className="min-w-0 flex-1">
                           <View className="flex-row flex-wrap items-center gap-2">
-                            <Text className="text-xs font-bold tracking-wider text-muted">{row.tripCode} · {row.date} · {row.city}</Text>
+                            <Text className="text-xs font-bold tracking-wider text-muted">{row.tripCode} · {formatDateLoose(row.date)} · {row.city}</Text>
                             {row.reimbursementRejectedAt ? <View style={{ backgroundColor: `${colors.error}18` }} className="rounded-full px-2 py-0.5"><Text style={{ color: colors.error }} className="text-[10px] font-bold uppercase">{t('Rejeitado')}</Text></View> : null}
                           </View>
                           <Text className="mt-1 font-bold text-foreground">{row.expenseTypeName} · {t('quantidade')} {row.quantity}</Text>
@@ -329,7 +330,7 @@ export default function ReimbursementsScreen() {
                       </View>
                       <View className="mt-3 flex-row flex-wrap items-center justify-between gap-2">
                         <Text className="text-xs text-muted">{row.excessPyg > 0 ? `${t('Excedente não reembolsável')}: ${formatPyg(row.excessPyg)}` : t('Dentro do limite')}</Text>
-                        <Text className="text-xs font-bold text-success">{row.conversionAvailable ? `${t('Cotação')}: ${row.rateDate ?? t('data não informada')}` : t('Cotação indisponível')}</Text>
+                        <Text className="text-xs font-bold text-success">{row.conversionAvailable ? `${t('Cotação')}: ${row.rateDate ? formatDateLoose(row.rateDate) : t('data não informada')}` : t('Cotação indisponível')}</Text>
                       </View>
                     </View>
                   ))}
@@ -355,7 +356,7 @@ export default function ReimbursementsScreen() {
                             )}
                           </Pressable>
                           <View className="flex-1">
-                            <Text className="text-xs font-bold tracking-wider text-muted">{row.tripCode} · {row.date}</Text>
+                            <Text className="text-xs font-bold tracking-wider text-muted">{row.tripCode} · {formatDateLoose(row.date)}</Text>
                             <Text className="mt-1 font-bold text-foreground">{row.expenseTypeName} · {formatCurrency(Number(row.sourceAmount), validCurrency(row.sourceCurrency))}</Text>
                             {row.reimbursementRejectedAt ? (
                               <View className="mt-2 flex-row items-center gap-2">

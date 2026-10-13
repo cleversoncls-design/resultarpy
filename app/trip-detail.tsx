@@ -23,7 +23,7 @@ import { useLanguage } from "@/lib/language-provider";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
 import { ReportExportActions } from "@/components/report-export-actions";
-import { formatDateDisplay } from '@/lib/date-utils';
+import { formatDateDisplay, formatDateLoose } from '@/lib/date-utils';
 
 const STATUS_ORDER = [
   "Aguardando aprovação",
@@ -498,7 +498,7 @@ export default function TripDetailScreen() {
                 rows={[
                   { campo: t('Passageiro'), valor: flightDetails.passengerName || t('Não informado') },
                   { campo: t('Documento / Passaporte'), valor: flightDetails.passengerDocument || t('Não informado') },
-                  { campo: t('Data de nascimento'), valor: flightDetails.passengerBirthDate || t('Não informado') },
+                  { campo: t('Data de nascimento'), valor: flightDetails.passengerBirthDate ? formatDateLoose(flightDetails.passengerBirthDate) : t('Não informado') },
                   { campo: t('Companhia aérea'), valor: flightDetails.airline || t('Não informado') },
                   { campo: t('Voo'), valor: flightDetails.flightNumber || t('Não informado') },
                   { campo: t('Trecho'), valor: `${flightDetails.departureAirport || '—'} → ${flightDetails.arrivalAirport || '—'}` },
