@@ -38,13 +38,14 @@ function downloadWeb(content: BlobPart, filename: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-function tableHtml(title: string, columns: ReportColumn[], rows: ReportRow[], infoLines: ReportInfoLine[], summaryRow?: ReportRow, images: ReportImage[] = []) {
+function tableHtml(title: string, columns: ReportColumn[], rows: ReportRow[], infoLines: ReportInfoLine[], summaryRow?: ReportRow, images: ReportImage[] = [], footerLines: ReportInfoLine[] = []) {
+  const footerHtml = footerLines.length ? `<table class="info" style="margin-top:16px">${footerLines.map((line) => `<tr><th>${line.label}</th><td><b>${line.value}</b></td></tr>`).join('')}</table>` : '';
   const infoHtml = infoLines.length ? `<table class="info">${infoLines.map((line) => `<tr><th>${line.label}</th><td>${line.value}</td></tr>`).join('')}</table>` : '';
   const head = columns.map((column) => `<th>${column.label}</th>`).join('');
   const body = rows.map((row) => `<tr>${columns.map((column) => `<td>${String(row[column.key] ?? '').replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] ?? char))}</td>`).join('')}</tr>`).join('');
   const summaryHtml = summaryRow ? `<tr class="summary">${columns.map((column) => `<td>${String(summaryRow[column.key] ?? '')}</td>`).join('')}</tr>` : '';
   const imagesHtml = images.length ? images.map((image) => `<div class="receipt"><p>${image.label}</p><img src="${image.uri}" /></div>`).join('') : '';
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,sans-serif;color:#151718;padding:24px}h1{font-size:20px}table.info{margin-bottom:16px;font-size:12px}table.info th{text-align:left;padding:2px 12px 2px 0;color:#555}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #d7dce0;padding:7px;text-align:left}th{background:#f1f3f4}tr:nth-child(even){background:#fafafa}tr.summary td{font-weight:bold;background:#eef1f3;border-top:2px solid #171717}.receipt{page-break-before:always;margin-top:20px}.receipt p{font-weight:bold;font-size:13px}.receipt img{max-width:100%;max-height:900px}</style></head><body><h1>${title}</h1>${infoHtml}<table><thead><tr>${head}</tr></thead><tbody>${body}${summaryHtml}</tbody></table>${imagesHtml}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,sans-serif;color:#151718;padding:24px}h1{font-size:20px}table.info{margin-bottom:16px;font-size:12px}table.info th{text-align:left;padding:2px 12px 2px 0;color:#555}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #d7dce0;padding:7px;text-align:left}th{background:#f1f3f4}tr:nth-child(even){background:#fafafa}tr.summary td{font-weight:bold;background:#eef1f3;border-top:2px solid #171717}.receipt{page-break-before:always;margin-top:20px}.receipt p{font-weight:bold;font-size:13px}.receipt img{max-width:100%;max-height:900px}</style></head><body><h1>${title}</h1>${infoHtml}<table><thead><tr>${head}</tr></thead><tbody>${body}${summaryHtml}</tbody></table>${footerHtml}${imagesHtml}</body></html>`;
 }
 
 export async function exportReport(
@@ -53,11 +54,13 @@ export async function exportReport(
   filename: string,
   columns: ReportColumn[],
   rows: ReportRow[],
-  options?: { infoLines?: ReportInfoLine[]; summaryRow?: ReportRow; images?: ReportImage[] },
+  options?: { infoLines?: ReportInfoLine[]; summaryRow?: ReportRow; images?: ReportImage[]; footerLines?: ReportInfoLine[] },
 ) {
   const infoLines = options?.infoLines ?? [];
   const summaryRow = options?.summaryRow;
   const images = options?.images ?? [];
+  // Linhas de fechamento impressas depois da tabela (ex.: adiantamento e saldos).
+  const footerLines = options?.footerLines ?? [];
   const safeFilename = filename.replace(/[^a-zA-Z0-9-_]/g, '-');
 
   if (format === 'csv') {
@@ -65,7 +68,8 @@ export async function exportReport(
     const headerRow = columns.map((column) => escapeCsv(column.label)).join(';');
     const dataRows = rows.map((row) => columns.map((column) => escapeCsv(row[column.key])).join(';'));
     const summaryLine = summaryRow ? [columns.map((column) => escapeCsv(summaryRow[column.key] ?? '')).join(';')] : [];
-    const csv = [...infoRows, ...(infoRows.length ? [''] : []), headerRow, ...dataRows, ...summaryLine].join('\n');
+    const footerRows = footerLines.map((line) => `${escapeCsv(line.label)};${escapeCsv(line.value)}`);
+    const csv = [...infoRows, ...(infoRows.length ? [''] : []), headerRow, ...dataRows, ...summaryLine, ...(footerRows.length ? ['', ...footerRows] : [])].join('\n');
     if (Platform.OS === 'web') downloadWeb(`\ufeff${csv}`, `${safeFilename}.csv`, 'text/csv;charset=utf-8');
     else {
       const uri = `${FileSystem.cacheDirectory}${safeFilename}.csv`;
@@ -84,6 +88,10 @@ export async function exportReport(
     sheetRows.push(columns.map((column) => column.label));
     rows.forEach((row) => sheetRows.push(columns.map((column) => row[column.key] ?? '')));
     if (summaryRow) sheetRows.push(columns.map((column) => summaryRow[column.key] ?? ''));
+    if (footerLines.length) {
+      sheetRows.push([]);
+      footerLines.forEach((line) => sheetRows.push([line.label, line.value]));
+    }
     const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Relatório');
@@ -118,6 +126,13 @@ export async function exportReport(
       table: { headerRows: 1, widths: columns.map(() => '*'), body: tableBody },
       layout: { fillColor: (rowIndex: number) => (rowIndex > 0 && rowIndex < tableBody.length - (summaryRow ? 1 : 0) && rowIndex % 2 === 0 ? '#f8f8f8' : null) },
     });
+    if (footerLines.length) {
+      content.push({
+        margin: [0, 12, 0, 0],
+        table: { widths: ['auto', 'auto'], body: footerLines.map((line) => [{ text: line.label, bold: true, fontSize: 10 }, { text: line.value, fontSize: 10, bold: true }]) },
+        layout: 'noBorders',
+      });
+    }
     // Comprovantes anexados — cada imagem entra numa página própria, com
     // o rótulo de referência (viagem, data, tipo, valor) acima dela.
     // A página principal pode ficar "deitada" (landscape) quando há
@@ -141,7 +156,7 @@ export async function exportReport(
     return;
   }
 
-  const html = tableHtml(title, columns, rows, infoLines, summaryRow, images);
+  const html = tableHtml(title, columns, rows, infoLines, summaryRow, images, footerLines);
   const result = await Print.printToFileAsync({ html });
   if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: title });
 }

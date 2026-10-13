@@ -3,12 +3,12 @@ import { useColors } from '@/hooks/use-colors';
 import { exportReport, type ReportColumn, type ReportImage, type ReportInfoLine, type ReportRow } from '@/lib/report-export';
 import { useLanguage } from '@/lib/language-provider';
 
-export function ReportExportActions({ title, filename, columns, rows, infoLines, summaryRow, images }: { title: string; filename: string; columns: ReportColumn[]; rows: ReportRow[]; infoLines?: ReportInfoLine[]; summaryRow?: ReportRow; images?: ReportImage[] }) {
+export function ReportExportActions({ title, filename, columns, rows, infoLines, summaryRow, images, footerLines }: { title: string; filename: string; columns: ReportColumn[]; rows: ReportRow[]; infoLines?: ReportInfoLine[]; summaryRow?: ReportRow; images?: ReportImage[]; footerLines?: ReportInfoLine[] }) {
   const colors = useColors();
   const { t } = useLanguage();
   const run = async (format: 'xlsx' | 'csv' | 'pdf', label: string) => {
     try {
-      await exportReport(format, title, filename, columns, rows, { infoLines, summaryRow, images: format === 'pdf' ? images : undefined });
+      await exportReport(format, title, filename, columns, rows, { infoLines, summaryRow, footerLines, images: format === 'pdf' ? images : undefined });
     } catch (error) {
       Alert.alert(t('Exportação não concluída'), error instanceof Error ? error.message : `${t('Não foi possível gerar o arquivo')} ${label}.`);
     }
