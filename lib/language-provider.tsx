@@ -57,6 +57,7 @@ const translations: Record<TranslationKey, string> = {
   'DD/MM/AAAA': 'DD/MM/AAAA', 'Informe o vencimento do extintor no formato DD/MM/AAAA.': 'Informe el vencimiento del extintor en el formato DD/MM/AAAA.',
   'Nenhuma viagem em andamento ou programada': 'Ningún viaje en curso o programado', 'Viagens canceladas, rejeitadas ou finalizadas não aparecem aqui.': 'Los viajes cancelados, rechazados o finalizados no aparecen aquí.',
   'Ordens de serviço': 'Órdenes de servicio', 'Nenhuma ordem de serviço registrada para este veículo.': 'Ninguna orden de servicio registrada para este vehículo.', 'Abrir OS': 'Abrir OS', 'Concluir': 'Concluir',
+  'Reinicia o ciclo de revisão': 'Reinicia el ciclo de revisión', 'Ao concluir uma OS com este motivo, o KM da última manutenção do veículo é atualizado (ex.: revisão periódica, troca de óleo). Deixe desmarcado para avarias, pneus e outros reparos.': 'Al concluir una OS con este motivo, se actualiza el KM del último mantenimiento del vehículo (ej.: revisión periódica, cambio de aceite). Déjelo sin marcar para averías, neumáticos y otras reparaciones.',
   'Disponível': 'Disponible',
 
   'Condutor definido': 'Conductor definido', 'KM da manutenção': 'KM del mantenimiento', 'KM de saída': 'KM de salida', 'do intervalo': 'del intervalo', 'km atuais': 'km actuales',

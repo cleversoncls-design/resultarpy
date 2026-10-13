@@ -173,8 +173,8 @@ export const catalogRouter = router({
   }),
   maintenanceReasons: router({
     list: adminProcedure.input(listInput).query(({ input }) => withCatalogErrors(() => catalog.listMaintenanceReasons(input))),
-    create: adminProcedure.input(z.object({ name: z.string().trim().min(1).max(160), description: z.string().trim().max(2000).nullable().optional(), category: z.enum(['Preventiva', 'Corretiva']) })).mutation(({ input }) => withCatalogErrors(() => catalog.createMaintenanceReason(input))),
-    update: adminProcedure.input(z.object({ id: idSchema, name: z.string().trim().min(1).max(160).optional(), description: z.string().trim().max(2000).nullable().optional(), category: z.enum(['Preventiva', 'Corretiva']).optional(), active: z.boolean().optional() })).mutation(({ input: { id, ...data } }) => withCatalogErrors(() => catalog.updateMaintenanceReason(id, data))),
+    create: adminProcedure.input(z.object({ name: z.string().trim().min(1).max(160), description: z.string().trim().max(2000).nullable().optional(), category: z.enum(['Preventiva', 'Corretiva']), resetsMaintenanceCycle: z.boolean().optional() })).mutation(({ input }) => withCatalogErrors(() => catalog.createMaintenanceReason(input))),
+    update: adminProcedure.input(z.object({ id: idSchema, name: z.string().trim().min(1).max(160).optional(), description: z.string().trim().max(2000).nullable().optional(), category: z.enum(['Preventiva', 'Corretiva']).optional(), resetsMaintenanceCycle: z.boolean().optional(), active: z.boolean().optional() })).mutation(({ input: { id, ...data } }) => withCatalogErrors(() => catalog.updateMaintenanceReason(id, data))),
     archive: adminProcedure.input(z.object({ id: idSchema })).mutation(({ input }) => withCatalogErrors(async () => requireFound(await catalog.archiveMaintenanceReason(input.id), 'Motivo de manutenção'))),
   }),
   reimbursementLimits: router({

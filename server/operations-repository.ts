@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte,
 import { getDb } from './db';
 import { notifyTripReleased } from './email-service';
 import { vehicleUpdateForWorkOrder } from './work-order-rules';
+import { maintenanceReasons } from '../drizzle/schema';
 import { clients, clientBillingProfileItems, clientBillingProfiles, currencyRates, expenseTypes, fleetEventPhotos, fleetEvents, fleetReservations, fleetWorkOrders, reimbursementLimitProfileItems, reimbursementLimitProfiles, travelers, tripApprovals, tripExpenses, trips, users, vehicles } from '../drizzle/schema';
 
 // Segundo "travelers" no join: o acompanhante da viagem.
@@ -742,12 +743,13 @@ export async function getWorkOrder(id: number) {
 }
 
 // Reflete a OS no veículo (status e KM) — regras em server/work-order-rules.ts.
-async function applyWorkOrderToVehicle(order: { id: number; vehicleId: number; vehicleKm: number; status: 'Em andamento' | 'Concluída' | 'Cancelada' }) {
+async function applyWorkOrderToVehicle(order: { id: number; vehicleId: number; reasonId: number | null; vehicleKm: number; status: 'Em andamento' | 'Concluída' | 'Cancelada' }) {
   const db = await requireDb();
   const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, order.vehicleId)).limit(1);
   if (!vehicle) return;
   const [{ open }] = await db.select({ open: count() }).from(fleetWorkOrders).where(and(eq(fleetWorkOrders.vehicleId, order.vehicleId), eq(fleetWorkOrders.status, 'Em andamento'), ne(fleetWorkOrders.id, order.id)));
-  const update = vehicleUpdateForWorkOrder({ status: order.status, vehicleKm: order.vehicleKm, vehicle: { status: vehicle.status, currentKm: vehicle.currentKm, lastMaintenanceKm: vehicle.lastMaintenanceKm }, hasOtherOpenOrders: Number(open) > 0 });
+  const [reason] = order.reasonId ? await db.select({ resets: maintenanceReasons.resetsMaintenanceCycle }).from(maintenanceReasons).where(eq(maintenanceReasons.id, order.reasonId)).limit(1) : [];
+  const update = vehicleUpdateForWorkOrder({ resetsMaintenanceCycle: Boolean(reason?.resets), status: order.status, vehicleKm: order.vehicleKm, vehicle: { status: vehicle.status, currentKm: vehicle.currentKm, lastMaintenanceKm: vehicle.lastMaintenanceKm }, hasOtherOpenOrders: Number(open) > 0 });
   if (Object.keys(update).length > 0) await updateVehicle(order.vehicleId, update);
 }
 

@@ -204,6 +204,13 @@
       "when": 1790950707365,
       "tag": "0028_add_currency_buy_rate",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791037107365,
+      "tag": "0029_add_reason_resets_cycle",
+      "breakpoints": true
     }
   ]
 }
