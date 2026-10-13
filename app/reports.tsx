@@ -146,7 +146,7 @@ export default function ReportsScreen() {
   const exportRows: ReportRow[] = rows.map((row) => ({
     trip: `${row.tripCode} · ${row.clientName}`,
     date: row.date,
-    concept: row.expenseTypeName,
+    concept: row.kind === 'km' ? row.expenseTypeName.replace(/^Quilometragem/, t('Quilometragem')) : row.expenseTypeName,
     quantity: row.kind === 'km' ? `${row.quantity} km` : row.quantity,
     sourceSpent: formatCurrency(Number(row.sourceAmount), validCurrency(row.sourceCurrency)),
     rate: row.rate == null ? '—' : row.rate.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }),
