@@ -78,7 +78,11 @@ async function fetchText(url: string) {
   return response.text();
 }
 
-async function fetchOfficialRates(rateDate: string) {
+export type OfficialRates =
+  | { source: 'DNIT'; rateType: 'venda'; sourceUrl: string; table: DnitDailyRow[] }
+  | { source: 'BCP'; rateType: 'referencial'; sourceUrl: string; parsed: ParsedRate[] };
+
+async function fetchOfficialRates(rateDate: string): Promise<OfficialRates> {
   try {
     const table = parseDnitMonthlyTable(await fetchText(DNIT_CURRENCY_URL), rateDate);
     if (table.length === 0) throw new Error(`A DNIT não possui cotação disponível para ${rateDate}.`);
@@ -90,9 +94,9 @@ async function fetchOfficialRates(rateDate: string) {
   }
 }
 
-export function buildRateInputs(rateDate: string, official: Awaited<ReturnType<typeof fetchOfficialRates>>, manualKeys: Set<string> = new Set()): CurrencyRateInput[] {
+export function buildRateInputs(rateDate: string, official: OfficialRates, manualKeys: Set<string> = new Set()): CurrencyRateInput[] {
   const base = { toCurrency: 'PYG' as const, rateType: official.rateType, source: official.source, sourceUrl: official.sourceUrl };
-  if ('parsed' in official) {
+  if (official.source === 'BCP') {
     return [{ ...base, rateDate, fromCurrency: 'PYG', rate: '1' }, ...official.parsed.map((item) => ({ ...base, rateDate, fromCurrency: item.fromCurrency, rate: item.rate, buyRate: item.buyRate ?? null }))];
   }
   // A DNIT publica o mês inteiro: gravamos todos os dias já publicados (o dia atual usa a última cotação disponível),

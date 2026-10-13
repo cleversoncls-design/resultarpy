@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatCurrencyDay, formatRateValue, groupCurrencyRates } from '../lib/currency-table';
-import { buildRateInputs, parseDnitMonthlyRates, parseDnitMonthlyTable } from '../server/currency-rates';
+import { buildRateInputs, type OfficialRates, parseDnitMonthlyRates, parseDnitMonthlyTable } from '../server/currency-rates';
 
 const html = '<div data-analytics-asset-title="Tipos de cambios del mes de Octubre 2026"><table><tbody>'
   + '<tr><td>12</td><td>5.690,00</td><td>5.710,00</td><td>1.140,00</td><td>1.145,00</td></tr>'
@@ -22,7 +22,7 @@ describe('currency table', () => {
   });
 
   it('builds one input per day and does not overwrite manual rates', () => {
-    const official = { source: 'DNIT' as const, rateType: 'venda' as const, sourceUrl: 'x', table: parseDnitMonthlyTable(html, '2026-10-13') };
+    const official: OfficialRates = { source: 'DNIT', rateType: 'venda', sourceUrl: 'x', table: parseDnitMonthlyTable(html, '2026-10-13') };
     const inputs = buildRateInputs('2026-10-13', official, new Set(['2026-10-12|USD']));
     expect(inputs.filter((input) => input.fromCurrency === 'USD').map((input) => input.rateDate)).toEqual(['2026-10-13']);
     expect(inputs.filter((input) => input.fromCurrency === 'BRL').map((input) => input.rateDate)).toEqual(['2026-10-13', '2026-10-12']);
