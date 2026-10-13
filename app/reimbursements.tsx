@@ -124,7 +124,7 @@ export default function ReimbursementsScreen() {
     { key: 'sourceSpent', label: t('Gasto') },
     { key: 'rate', label: t('Taxa da Moeda no dia') },
     { key: 'spent', label: t('Gasto Convertido') },
-    { key: 'reimbursable', label: t('A reembolsar') },
+    { key: 'reimbursable', label: t('Reembolsável') },
     { key: 'excess', label: t('Excedente') },
   ];
   const exportRows: ExportRow[] = rows.map((row) => ({
@@ -143,6 +143,27 @@ export default function ReimbursementsScreen() {
   const spentTotal = formatPyg(rows.reduce((sum, row) => sum + row.spentPyg, 0));
   const reimbursableTotal = formatPyg(rows.reduce((sum, row) => sum + row.reimbursablePyg, 0));
   const excessTotal = formatPyg(rows.reduce((sum, row) => sum + row.excessPyg, 0));
+  // Adiantamento x gastos: por viagem, o que foi pago de adiantamento (valor
+  // confirmado pelo Administrativo, em Guaraní) é comparado com o Reembolsável.
+  // Reembolsável menor que o adiantamento → o viajante devolve a diferença;
+  // maior → a empresa reembolsa a diferença.
+  const tripsInScope = selectedTrip
+    ? [selectedTrip]
+    : Array.from(new Set(rows.map((row) => row.tripId))).map((id) => trips.find((trip) => trip.id === id)).filter((trip): trip is NonNullable<typeof trip> => Boolean(trip));
+  const settlement = tripsInScope.reduce((acc, trip) => {
+    const advance = Number((trip as { advanceConfirmedAmount?: string | null }).advanceConfirmedAmount ?? 0) || 0;
+    const reimbursable = rows.filter((row) => row.tripId === trip.id).reduce((sum, row) => sum + row.reimbursablePyg, 0);
+    return { advance: acc.advance + advance, toReturn: acc.toReturn + Math.max(advance - reimbursable, 0), toReimburse: acc.toReimburse + Math.max(reimbursable - advance, 0) };
+  }, { advance: 0, toReturn: 0, toReimburse: 0 });
+  const advanceTotal = formatPyg(settlement.advance);
+  const toReturnTotal = formatPyg(settlement.toReturn);
+  const toReimburseTotal = formatPyg(settlement.toReimburse);
+  const footerLines: ReportInfoLine[] = [
+    { label: t('Reembolsável'), value: reimbursableTotal },
+    { label: t('Valor pago por adiantamento'), value: advanceTotal },
+    { label: t('Saldo a devolver'), value: toReturnTotal },
+    { label: t('Saldo a reembolsar'), value: toReimburseTotal },
+  ];
   // Somatório pedido especificamente para Gasto, Gasto Convertido, A
   // reembolsar e Excedente (as demais colunas ficam em branco).
   const summaryRow: ExportRow = {
@@ -264,10 +285,21 @@ export default function ReimbursementsScreen() {
                   <MetricCard label={t('Gasto informado')} value={spentTotal} accent={colors.primary} />
                 </View>
                 <View className={isNarrow ? 'w-[48%]' : 'flex-1'}>
-                  <MetricCard label={t('A reembolsar')} value={reimbursableTotal} accent={colors.success} />
+                  <MetricCard label={t('Reembolsável')} value={reimbursableTotal} accent={colors.success} />
                 </View>
                 <View className={isNarrow ? 'w-[48%]' : 'flex-1'}>
                   <MetricCard label={t('Excedente')} value={excessTotal} accent={rows.some((row) => row.excessPyg > 0) ? colors.warning : colors.success} />
+                </View>
+              </View>
+              <View className={isNarrow ? 'mt-3 flex-row flex-wrap gap-3' : 'mt-3 flex-row gap-3'}>
+                <View className={isNarrow ? 'w-[48%]' : 'flex-1'}>
+                  <MetricCard label={t('Valor pago por adiantamento')} value={advanceTotal} accent={colors.primary} />
+                </View>
+                <View className={isNarrow ? 'w-[48%]' : 'flex-1'}>
+                  <MetricCard label={t('Saldo a devolver')} value={toReturnTotal} accent={settlement.toReturn > 0 ? colors.warning : colors.success} />
+                </View>
+                <View className={isNarrow ? 'w-[48%]' : 'flex-1'}>
+                  <MetricCard label={t('Saldo a reembolsar')} value={toReimburseTotal} accent={colors.success} />
                 </View>
               </View>
 
@@ -343,7 +375,7 @@ export default function ReimbursementsScreen() {
                 </>
               ) : null}
 
-              <ReportExportActions title={t('Reembolso ao viajante')} filename={`relatorio-reembolso-${tripId ?? 'todas'}`} columns={exportColumns} rows={exportRows} infoLines={infoLines} summaryRow={summaryRow} images={receiptImages} />
+              <ReportExportActions title={t('Reembolso ao viajante')} filename={`relatorio-reembolso-${tripId ?? 'todas'}`} columns={exportColumns} rows={exportRows} infoLines={infoLines} summaryRow={summaryRow} footerLines={footerLines} images={receiptImages} />
               {hasConversionWarning && (
                 <View className="mt-5 flex-row items-center rounded-2xl border border-warning/20 bg-warning/10 p-4">
                   <Text className="flex-1 text-sm leading-5 text-foreground">{t('Há eventos sem cotação histórica suficiente. Atualize o cadastro diário de moedas antes de concluir o fechamento.')}</Text>
