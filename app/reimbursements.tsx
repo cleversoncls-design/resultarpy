@@ -87,7 +87,8 @@ export default function ReimbursementsScreen() {
   );
   const reportQuery = trpc.operations.reports.reimbursement.useQuery(
     { page: 1, pageSize: 100, direction: 'asc', ...(tripId ? { tripId } : {}) },
-    { enabled: isAuthenticated },
+    // O relatório só carrega depois que uma viagem é escolhida.
+    { enabled: isAuthenticated && Boolean(tripId) },
   );
 
   const rows = useMemo(() => (reportQuery.data?.items ?? []) as ReimbursementRow[], [reportQuery.data]);
@@ -109,10 +110,8 @@ export default function ReimbursementsScreen() {
     onSuccess: () => { void reportQuery.refetch(); setRejectingId(null); setRejectReason(''); },
   });
 
-  // Viagens do relatório: a filtrada ou, em "Todas", as que têm gasto na lista.
-  const tripsInScope = selectedTrip
-    ? [selectedTrip]
-    : Array.from(new Set(rows.map((row) => row.tripId))).map((id) => trips.find((trip) => trip.id === id)).filter((trip): trip is NonNullable<typeof trip> => Boolean(trip));
+  // Viagem do relatório: só existe depois que uma viagem é escolhida no filtro.
+  const tripsInScope = selectedTrip ? [selectedTrip] : [];
   const header = summarizeTrips(tripsInScope as unknown as HeaderTrip[]);
   const headerTraveler = header?.travelers || travelerName;
   const infoLines: ReportInfoLine[] | undefined = header ? [
@@ -254,14 +253,20 @@ export default function ReimbursementsScreen() {
             </View>
           ) : null}
 
-          {reportQuery.isLoading && (
+          {!tripId && (
+            <View className="mt-6 rounded-2xl border border-dashed border-border bg-surface p-6">
+              <Text className="text-sm text-muted">{t('Selecione uma viagem para ver o relatório de reembolso.')}</Text>
+            </View>
+          )}
+
+          {Boolean(tripId) && reportQuery.isLoading && (
             <View className="mt-6 flex-row items-center rounded-2xl border border-border bg-surface p-5">
               <ActivityIndicator color={colors.primary} />
               <Text className="ml-3 text-sm text-muted">{t('Carregando relatório...')}</Text>
             </View>
           )}
 
-          {reportQuery.isError && (
+          {Boolean(tripId) && reportQuery.isError && (
             <View className="mt-6 rounded-2xl border border-error bg-surface p-5">
               <Text className="font-semibold text-error">{t('Não foi possível carregar o relatório.')}</Text>
               <Text className="mt-1 text-sm text-muted">{t('Verifique a API e tente novamente.')}</Text>
@@ -271,7 +276,7 @@ export default function ReimbursementsScreen() {
             </View>
           )}
 
-          {!reportQuery.isLoading && !reportQuery.isError && (
+          {Boolean(tripId) && !reportQuery.isLoading && !reportQuery.isError && (
             <>
               <View className={isNarrow ? 'mt-6 flex-row flex-wrap gap-3' : 'mt-6 flex-row gap-3'}>
                 <View className={isNarrow ? 'w-[48%]' : 'flex-1'}>
