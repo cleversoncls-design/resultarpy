@@ -50,6 +50,8 @@ const translations: Record<TranslationKey, string> = {
 
   'O limite específico da cidade tem prioridade; quando não existe, o sistema aplica o perfil genérico. Valores são sempre convertidos para Guaraní pela cotação diária registrada.': 'El límite específico de la ciudad tiene prioridad; cuando no existe, el sistema aplica el perfil genérico. Los valores siempre se convierten a Guaraníes según la cotización diaria registrada.', 'Selecione uma viagem para ver o relatório de faturamento.': 'Seleccione un viaje para ver el informe de facturación.', 'Selecione uma viagem para ver o relatório de reembolso.': 'Seleccione un viaje para ver el informe de reembolso.', 'Motivo (ex.: foto ilegível, comprovante de outra pessoa...)': 'Motivo (ej.: foto ilegible, comprobante de otra persona...)',
 
+  'Confirmar': 'Confirmar', 'Informe um valor maior que zero (ex.: 0,50).': 'Informe un valor mayor que cero (ej.: 0,50).', 'Nenhum tipo de gasto incluído.': 'Ningún tipo de gasto incluido.', 'Selecione o tipo de gasto.': 'Seleccione el tipo de gasto.',
+
   'Disponível': 'Disponible',
 
   'Condutor definido': 'Conductor definido', 'KM da manutenção': 'KM del mantenimiento', 'KM de saída': 'KM de salida', 'do intervalo': 'del intervalo', 'km atuais': 'km actuales',
