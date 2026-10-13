@@ -1,11 +1,13 @@
-import { upsertCurrencyRates, type CurrencyRateInput } from './catalog-repository';
+import { listCurrencyRatesInRange, upsertCurrencyRates, type CurrencyRateInput } from './catalog-repository';
 
 export const DNIT_CURRENCY_URL = 'https://www.dnit.gov.py/en/web/portal-institucional/cotizaciones';
 export const BCP_CURRENCY_URL = 'https://www.bcp.gov.py/webapps/web/cotizacion/monedas';
 const ASUNCION_TIME_ZONE = 'America/Asuncion';
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-type ParsedRate = { fromCurrency: 'USD' | 'BRL'; rate: string };
+// rate = valor de VENDA (usado para faturar); buyRate = valor de COMPRA (informativo).
+type ParsedRate = { fromCurrency: 'USD' | 'BRL'; rate: string; buyRate?: string | null };
+export type DnitDailyRow = { date: string; usdBuy: string; usdSale: string; brlBuy: string; brlSale: string };
 
 function htmlText(value: string) {
   return value.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/\s+/g, ' ').trim();
@@ -32,18 +34,28 @@ function tableRows(html: string) {
   return [...html.matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((match) => [...match[0].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => htmlText(cell[1])));
 }
 
-export function parseDnitMonthlyRates(html: string, targetDate: string): ParsedRate[] {
+export function parseDnitMonthlyTable(html: string, targetDate: string): DnitDailyRow[] {
   const [year, month, day] = targetDate.split('-').map(Number);
   const title = `Tipos de cambios del mes de ${MONTHS[month - 1]} ${year}`;
   const titleIndex = html.toLocaleLowerCase().indexOf(title.toLocaleLowerCase());
   if (titleIndex < 0) throw new Error(`A DNIT não publicou a seção mensal de ${month}/${year}.`);
   const tableEnd = html.indexOf('</table>', titleIndex);
   const table = html.slice(titleIndex, tableEnd > titleIndex ? tableEnd : titleIndex + 500000);
-  const rows = tableRows(table);
-  const candidates = rows.filter((cells) => /^\d{1,2}$/.test(cells[0] ?? '') && cells.length >= 5).map((cells) => ({ day: Number(cells[0]), usdSale: cells[2], brlSale: cells[4] })).filter((row) => row.day <= day).sort((a, b) => b.day - a.day);
-  const row = candidates[0];
+  const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+  return tableRows(table)
+    .filter((cells) => /^\d{1,2}$/.test(cells[0] ?? '') && cells.length >= 5 && Number(cells[0]) <= day)
+    .map((cells) => ({ date: `${monthPrefix}-${String(Number(cells[0])).padStart(2, '0')}`, usdBuy: parseLocalizedNumber(cells[1]), usdSale: parseLocalizedNumber(cells[2]), brlBuy: parseLocalizedNumber(cells[3]), brlSale: parseLocalizedNumber(cells[4]) }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export function dnitRowRates(row: DnitDailyRow): ParsedRate[] {
+  return [{ fromCurrency: 'USD', rate: row.usdSale, buyRate: row.usdBuy }, { fromCurrency: 'BRL', rate: row.brlSale, buyRate: row.brlBuy }];
+}
+
+export function parseDnitMonthlyRates(html: string, targetDate: string): ParsedRate[] {
+  const row = parseDnitMonthlyTable(html, targetDate)[0];
   if (!row) throw new Error(`A DNIT não possui cotação disponível para ${targetDate}.`);
-  return [{ fromCurrency: 'USD', rate: parseLocalizedNumber(row.usdSale) }, { fromCurrency: 'BRL', rate: parseLocalizedNumber(row.brlSale) }];
+  return dnitRowRates(row);
 }
 
 export function parseBcpDailyRates(html: string): ParsedRate[] {
@@ -66,10 +78,15 @@ async function fetchText(url: string) {
   return response.text();
 }
 
-async function fetchOfficialRates(rateDate: string) {
+export type OfficialRates =
+  | { source: 'DNIT'; rateType: 'venda'; sourceUrl: string; table: DnitDailyRow[] }
+  | { source: 'BCP'; rateType: 'referencial'; sourceUrl: string; parsed: ParsedRate[] };
+
+async function fetchOfficialRates(rateDate: string): Promise<OfficialRates> {
   try {
-    const parsed = parseDnitMonthlyRates(await fetchText(DNIT_CURRENCY_URL), rateDate);
-    return { source: 'DNIT' as const, rateType: 'venda' as const, sourceUrl: DNIT_CURRENCY_URL, parsed };
+    const table = parseDnitMonthlyTable(await fetchText(DNIT_CURRENCY_URL), rateDate);
+    if (table.length === 0) throw new Error(`A DNIT não possui cotação disponível para ${rateDate}.`);
+    return { source: 'DNIT' as const, rateType: 'venda' as const, sourceUrl: DNIT_CURRENCY_URL, table };
   } catch (dnitError) {
     console.warn(`[currency] DNIT indisponível: ${dnitError instanceof Error ? dnitError.message : String(dnitError)}; usando BCP.`);
     const parsed = parseBcpDailyRates(await fetchText(BCP_CURRENCY_URL));
@@ -77,10 +94,34 @@ async function fetchOfficialRates(rateDate: string) {
   }
 }
 
+export function buildRateInputs(rateDate: string, official: OfficialRates, manualKeys: Set<string> = new Set()): CurrencyRateInput[] {
+  const base = { toCurrency: 'PYG' as const, rateType: official.rateType, source: official.source, sourceUrl: official.sourceUrl };
+  if (official.source === 'BCP') {
+    return [{ ...base, rateDate, fromCurrency: 'PYG', rate: '1' }, ...official.parsed.map((item) => ({ ...base, rateDate, fromCurrency: item.fromCurrency, rate: item.rate, buyRate: item.buyRate ?? null }))];
+  }
+  // A DNIT publica o mês inteiro: gravamos todos os dias já publicados (o dia atual usa a última cotação disponível),
+  // sem sobrescrever cotações informadas manualmente em dias anteriores.
+  const inputs: CurrencyRateInput[] = [{ ...base, rateDate, fromCurrency: 'PYG', rate: '1' }];
+  const latest = official.table[0];
+  for (const row of official.table) {
+    const day = row.date;
+    for (const item of dnitRowRates(row)) {
+      if (manualKeys.has(`${day}|${item.fromCurrency}`)) continue;
+      inputs.push({ ...base, rateDate: day, fromCurrency: item.fromCurrency, rate: item.rate, buyRate: item.buyRate ?? null });
+    }
+  }
+  if (latest && latest.date !== rateDate && !manualKeys.has(`${rateDate}|USD`)) {
+    for (const item of dnitRowRates(latest)) inputs.push({ ...base, rateDate, fromCurrency: item.fromCurrency, rate: item.rate, buyRate: item.buyRate ?? null });
+  }
+  return inputs;
+}
+
 export async function syncOfficialCurrencyRates(rateDate = asuncionDate()) {
   const official = await fetchOfficialRates(rateDate);
-  const inputs: CurrencyRateInput[] = [{ rateDate, fromCurrency: 'PYG', toCurrency: 'PYG', rate: '1', rateType: official.rateType, source: official.source, sourceUrl: official.sourceUrl }, ...official.parsed.map((item) => ({ rateDate, fromCurrency: item.fromCurrency, toCurrency: 'PYG' as const, rate: item.rate, rateType: official.rateType, source: official.source, sourceUrl: official.sourceUrl }))];
-  return upsertCurrencyRates(inputs);
+  const monthStart = `${rateDate.slice(0, 7)}-01`;
+  const existing = await listCurrencyRatesInRange(monthStart, rateDate);
+  const manualKeys = new Set(existing.filter((row) => row.source === 'Manual').map((row) => `${row.rateDate}|${row.fromCurrency}`));
+  return upsertCurrencyRates(buildRateInputs(rateDate, official, manualKeys));
 }
 
 let schedulerStarted = false;

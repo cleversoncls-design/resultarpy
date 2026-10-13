@@ -6,16 +6,16 @@ describe('currency rates sources', () => {
   it('parses DNIT sale rates for USD and BRL from the requested day', () => {
     const html = '<div data-analytics-asset-title="Tipos de cambios del mes de Agosto 2026"><table><thead><tr><th></th><th>DÓLAR</th><th></th><th>REAL</th><th></th></tr><tr><th></th><th>Compra</th><th>Venta</th><th>Compra</th><th>Venta</th></tr></thead><tbody><tr><td>24</td><td>5.950,00</td><td>5.970,96</td><td>1.170,00</td><td>1.175,62</td></tr><tr><td>25</td><td>5.960,00</td><td>5.980,10</td><td>1.180,00</td><td>1.183,20</td></tr></tbody></table></div>';
     expect(parseDnitMonthlyRates(html, '2026-08-25')).toEqual([
-      { fromCurrency: 'USD', rate: '5980.10000000' },
-      { fromCurrency: 'BRL', rate: '1183.20000000' },
+      { fromCurrency: 'USD', rate: '5980.10000000', buyRate: '5960.00000000' },
+      { fromCurrency: 'BRL', rate: '1183.20000000', buyRate: '1180.00000000' },
     ]);
   });
 
   it('uses the most recent available DNIT row when the requested day is not published yet', () => {
     const html = '<div data-analytics-asset-title="Tipos de cambios del mes de Agosto 2026"><table><tbody><tr><td>01</td><td>5.900,00</td><td>5.910,00</td><td>1.150,00</td><td>1.155,00</td></tr><tr><td>03</td><td>5.920,00</td><td>5.930,00</td><td>1.160,00</td><td>1.165,00</td></tr></tbody></table></div>';
     expect(parseDnitMonthlyRates(html, '2026-08-04')).toEqual([
-      { fromCurrency: 'USD', rate: '5930.00000000' },
-      { fromCurrency: 'BRL', rate: '1165.00000000' },
+      { fromCurrency: 'USD', rate: '5930.00000000', buyRate: '5920.00000000' },
+      { fromCurrency: 'BRL', rate: '1165.00000000', buyRate: '1160.00000000' },
     ]);
   });
 

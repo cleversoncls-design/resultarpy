@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
   clients,
@@ -404,7 +404,7 @@ export async function deleteReimbursementLimitProfile(id: number) {
   return rows[0] ?? null;
 }
 
-export type CurrencyRateInput = { rateDate: string; fromCurrency: string; toCurrency: string; rate: string; rateType: 'venda' | 'referencial'; source: 'DNIT' | 'BCP' | 'Manual'; sourceUrl?: string | null };
+export type CurrencyRateInput = { rateDate: string; fromCurrency: string; toCurrency: string; rate: string; buyRate?: string | null; rateType: 'venda' | 'referencial'; source: 'DNIT' | 'BCP' | 'Manual'; sourceUrl?: string | null };
 
 export async function listCurrencyRates(input: { rateDate?: string; page: number; pageSize: number }) {
   const db = await requireDb();
@@ -421,7 +421,7 @@ export async function upsertCurrencyRates(items: CurrencyRateInput[]) {
   return db.transaction(async (tx) => {
     const saved = [];
     for (const item of items) {
-      const rows = await tx.insert(currencyRates).values({ ...item, fromCurrency: item.fromCurrency.toUpperCase(), toCurrency: item.toCurrency.toUpperCase(), rateType: item.rateType, source: item.source }).onConflictDoUpdate({ target: [currencyRates.rateDate, currencyRates.fromCurrency, currencyRates.toCurrency], set: { rate: item.rate, rateType: item.rateType, source: item.source, sourceUrl: item.sourceUrl ?? null, fetchedAt: new Date() } }).returning();
+      const rows = await tx.insert(currencyRates).values({ ...item, fromCurrency: item.fromCurrency.toUpperCase(), toCurrency: item.toCurrency.toUpperCase(), rateType: item.rateType, source: item.source }).onConflictDoUpdate({ target: [currencyRates.rateDate, currencyRates.fromCurrency, currencyRates.toCurrency], set: { rate: item.rate, buyRate: item.buyRate ?? null, rateType: item.rateType, source: item.source, sourceUrl: item.sourceUrl ?? null, fetchedAt: new Date() } }).returning();
       if (rows[0]) saved.push(rows[0]);
     }
     return saved;
@@ -435,7 +435,12 @@ export async function getCurrencyRatesForDate(rateDate: string) {
 
 export async function listLatestCurrencyRates() {
   const db = await requireDb();
-  return db.select().from(currencyRates).orderBy(desc(currencyRates.rateDate), desc(currencyRates.fetchedAt), asc(currencyRates.fromCurrency)).limit(20);
+  return db.select().from(currencyRates).where(ne(currencyRates.fromCurrency, currencyRates.toCurrency)).orderBy(desc(currencyRates.rateDate), asc(currencyRates.fromCurrency)).limit(200);
+}
+
+export async function listCurrencyRatesInRange(fromDate: string, toDate: string) {
+  const db = await requireDb();
+  return db.select().from(currencyRates).where(and(gte(currencyRates.rateDate, fromDate), lte(currencyRates.rateDate, toDate)));
 }
 
 export async function listClientBillingLimits(input: CatalogListInput) {
