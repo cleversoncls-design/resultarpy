@@ -320,7 +320,9 @@ export const currencyRates = pgTable(
     rateDate: date("rate_date").notNull(),
     fromCurrency: varchar("from_currency", { length: 3 }).notNull(),
     toCurrency: varchar("to_currency", { length: 3 }).default("PYG").notNull(),
+    // "rate" é sempre o valor de VENDA (usado para faturar/converter); "buyRate" é o valor de compra, apenas informativo.
     rate: numeric("rate", { precision: 20, scale: 8 }).notNull(),
+    buyRate: numeric("buy_rate", { precision: 20, scale: 8 }),
     rateType: varchar("rate_type", { length: 20 }).default("venda").notNull(),
     source: varchar("source", { length: 20 }).notNull(),
     sourceUrl: text("source_url"),
