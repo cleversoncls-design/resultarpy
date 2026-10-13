@@ -46,6 +46,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Reembolsável': 'Reembolsable', 'Valor pago por adiantamento': 'Valor pagado por anticipo', 'Saldo a devolver': 'Saldo a devolver', 'Saldo a reembolsar': 'Saldo a reembolsar',
 
+  'Ver lista de viagens': 'Ver lista de viajes', 'Pesquisar por código, destino ou viajante': 'Buscar por código, destino o viajero',
+
   'Disponível': 'Disponible',
 
   'Condutor definido': 'Conductor definido', 'KM da manutenção': 'KM del mantenimiento', 'KM de saída': 'KM de salida', 'do intervalo': 'del intervalo', 'km atuais': 'km actuales',

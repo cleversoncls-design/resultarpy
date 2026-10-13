@@ -12,6 +12,8 @@ import { formatCurrency, type Currency } from '@/lib/currency';
 import { ReportExportActions } from '@/components/report-export-actions';
 import type { ReportImage, ReportInfoLine, ReportRow as ExportRow } from '@/lib/report-export';
 import { summarizeTrips, type HeaderTrip } from '@/lib/trip-header';
+import { TripPicker } from '@/components/trip-picker';
+import type { PickerTrip } from '@/lib/trip-picker';
 
 type ReimbursementRow = {
   id: number;
@@ -236,18 +238,7 @@ export default function ReimbursementsScreen() {
 
           <View className="mt-6 rounded-2xl border border-border bg-surface p-4">
             <Text className="mb-2 text-xs font-bold uppercase tracking-widest text-muted">{t('Filtrar por viagem')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-              <FilterChip label={t('Todas')} selected={!tripId} onPress={() => setTripId(undefined)} colors={colors} />
-              {trips.map((trip) => (
-                <FilterChip
-                  key={trip.id}
-                  label={`${trip.tripCode} · ${trip.destination}`}
-                  selected={tripId === trip.id}
-                  onPress={() => setTripId(trip.id)}
-                  colors={colors}
-                />
-              ))}
-            </ScrollView>
+            <TripPicker trips={trips as unknown as PickerTrip[]} value={tripId} onChange={setTripId} />
           </View>
 
           {header ? (
@@ -399,25 +390,6 @@ export default function ReimbursementsScreen() {
         </ScrollView>
       </View>
     </ScreenContainer>
-  );
-}
-
-function FilterChip({ label, selected, onPress, colors }: { label: string; selected: boolean; onPress: () => void; colors: ReturnType<typeof useColors> }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        backgroundColor: selected ? colors.primary : colors.background,
-        borderColor: selected ? colors.primary : colors.border,
-        borderWidth: 1,
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        opacity: pressed ? 0.7 : 1,
-      })}
-    >
-      <Text style={{ color: selected ? '#fff' : colors.foreground }} className="text-xs font-bold">{label}</Text>
-    </Pressable>
   );
 }
 
