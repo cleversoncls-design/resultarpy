@@ -23,6 +23,7 @@ import { useLanguage } from "@/lib/language-provider";
 import { useAuth } from "@/hooks/use-auth";
 import { trpc } from "@/lib/trpc";
 import { ReportExportActions } from "@/components/report-export-actions";
+import { formatDateDisplay } from '@/lib/date-utils';
 
 const STATUS_ORDER = [
   "Aguardando aprovação",
@@ -432,13 +433,18 @@ export default function TripDetailScreen() {
           <View className="flex-row items-start justify-between">
             <View>
               <Text className="text-xs font-bold tracking-wider text-muted">
-                {trip.id}
+                {trip.tripCode ?? trip.id}
               </Text>
-              <Text className="mt-2 text-3xl font-bold text-foreground">
+              {(trip as { travelerName?: string | null }).travelerName ? (
+                <Text className="mt-2 text-base font-semibold text-foreground">
+                  {(trip as { travelerName?: string | null }).travelerName}
+                </Text>
+              ) : null}
+              <Text className="mt-1 text-3xl font-bold text-foreground">
                 {trip.destination}
               </Text>
               <Text className="mt-1 text-sm text-muted">
-                  {trip.startsOn} — {trip.endsOn} · {clientLabel}
+                  {formatDateDisplay(trip.startsOn) || trip.startsOn} — {formatDateDisplay(trip.endsOn) || trip.endsOn} · {clientLabel}
               </Text>
               {(trip as { companionName?: string | null }).companionName ? (
                 <Text className="mt-1 text-sm text-muted">
@@ -1145,7 +1151,7 @@ export default function TripDetailScreen() {
           <View style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 16, padding: 20, width: "100%", maxWidth: 480 }}>
             <Text className="text-xl font-bold text-foreground">{t('Cancelar esta viagem?')}</Text>
             <Text className="mt-2 text-sm leading-5 text-muted">
-              {trip.destination} · {trip.startsOn} — {trip.endsOn}
+              {trip.destination} · {formatDateDisplay(trip.startsOn) || trip.startsOn} — {formatDateDisplay(trip.endsOn) || trip.endsOn}
             </Text>
             <Text className="mt-3 text-sm leading-5 text-foreground">
               {t('O cancelamento não pode ser desfeito. A reserva do veículo da frota, se houver, será liberada e o viajante, o aprovador e o Administrativo serão avisados por e-mail.')}
