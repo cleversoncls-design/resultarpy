@@ -11,7 +11,7 @@ import { trpc } from '@/lib/trpc';
 import { formatCurrency, type Currency } from '@/lib/currency';
 import { ReportExportActions } from '@/components/report-export-actions';
 import type { ReportImage, ReportInfoLine, ReportRow as ExportRow } from '@/lib/report-export';
-import { formatDateDisplay } from '@/lib/date-utils';
+import { summarizeTrips, type HeaderTrip } from '@/lib/trip-header';
 
 type ReimbursementRow = {
   id: number;
@@ -92,7 +92,6 @@ export default function ReimbursementsScreen() {
   const trips = tripsQuery.data?.items ?? [];
   const travelers = travelersQuery.data?.items ?? [];
   const selectedTrip = tripId ? trips.find((trip) => trip.id === tripId) : undefined;
-  const selectedVehiclePlate = (selectedTrip as { vehiclePlate?: string | null } | undefined)?.vehiclePlate ?? null;
   const selectedTraveler = selectedTrip
     ? (isAdminViewer ? travelers.find((traveler) => traveler.id === (selectedTrip as any).travelerId) : undefined)
     : undefined;
@@ -108,12 +107,18 @@ export default function ReimbursementsScreen() {
     onSuccess: () => { void reportQuery.refetch(); setRejectingId(null); setRejectReason(''); },
   });
 
-  const infoLines: ReportInfoLine[] | undefined = selectedTrip ? [
-    { label: t('Viajante'), value: travelerName },
-    ...((selectedTrip as { companionName?: string | null } | undefined)?.companionName ? [{ label: t('Acompanhante'), value: String((selectedTrip as { companionName?: string | null }).companionName) }] : []),
-    { label: t('Data Saída'), value: formatDateDisplay(selectedTrip.startsOn) || selectedTrip.startsOn },
-    { label: t('Data Retorno'), value: formatDateDisplay(selectedTrip.endsOn) || selectedTrip.endsOn },
-    ...(selectedVehiclePlate ? [{ label: t('Veículo'), value: selectedVehiclePlate }] : []),
+  // Viagens do relatório: a filtrada ou, em "Todas", as que têm gasto na lista.
+  const tripsInScope = selectedTrip
+    ? [selectedTrip]
+    : Array.from(new Set(rows.map((row) => row.tripId))).map((id) => trips.find((trip) => trip.id === id)).filter((trip): trip is NonNullable<typeof trip> => Boolean(trip));
+  const header = summarizeTrips(tripsInScope as unknown as HeaderTrip[]);
+  const headerTraveler = header?.travelers || travelerName;
+  const infoLines: ReportInfoLine[] | undefined = header ? [
+    { label: t('Viajante'), value: headerTraveler },
+    ...(header.companions ? [{ label: t('Acompanhante'), value: header.companions }] : []),
+    { label: t('Data Saída'), value: header.startsOn },
+    { label: t('Data Retorno'), value: header.endsOn },
+    ...(header.vehicles ? [{ label: t('Veículo'), value: header.vehicles }] : []),
   ] : undefined;
 
   const exportColumns = [
@@ -147,9 +152,6 @@ export default function ReimbursementsScreen() {
   // confirmado pelo Administrativo, em Guaraní) é comparado com o Reembolsável.
   // Reembolsável menor que o adiantamento → o viajante devolve a diferença;
   // maior → a empresa reembolsa a diferença.
-  const tripsInScope = selectedTrip
-    ? [selectedTrip]
-    : Array.from(new Set(rows.map((row) => row.tripId))).map((id) => trips.find((trip) => trip.id === id)).filter((trip): trip is NonNullable<typeof trip> => Boolean(trip));
   const settlement = tripsInScope.reduce((acc, trip) => {
     const advance = Number((trip as { advanceConfirmedAmount?: string | null }).advanceConfirmedAmount ?? 0) || 0;
     const reimbursable = rows.filter((row) => row.tripId === trip.id).reduce((sum, row) => sum + row.reimbursablePyg, 0);
@@ -248,15 +250,15 @@ export default function ReimbursementsScreen() {
             </ScrollView>
           </View>
 
-          {selectedTrip ? (
+          {header ? (
             <View className="mt-4 rounded-2xl border border-primary/30 bg-primary/5 p-4">
               <Text className="mb-2 text-xs font-bold uppercase tracking-widest text-primary">{t('Dados da viagem')}</Text>
               <View className="flex-row flex-wrap gap-x-8 gap-y-2">
-                <InfoField label={t('Viajante')} value={travelerName} colors={colors} />
-                {(selectedTrip as { companionName?: string | null }).companionName ? <InfoField label={t('Acompanhante')} value={String((selectedTrip as { companionName?: string | null }).companionName)} colors={colors} /> : null}
-                <InfoField label={t('Data Saída')} value={formatDateDisplay(selectedTrip.startsOn) || selectedTrip.startsOn} colors={colors} />
-                <InfoField label={t('Data Retorno')} value={formatDateDisplay(selectedTrip.endsOn) || selectedTrip.endsOn} colors={colors} />
-                {selectedVehiclePlate ? <InfoField label={t('Veículo')} value={selectedVehiclePlate} colors={colors} /> : null}
+                <InfoField label={t('Viajante')} value={headerTraveler} colors={colors} />
+                {header.companions ? <InfoField label={t('Acompanhante')} value={header.companions} colors={colors} /> : null}
+                <InfoField label={t('Data Saída')} value={header.startsOn} colors={colors} />
+                <InfoField label={t('Data Retorno')} value={header.endsOn} colors={colors} />
+                {header.vehicles ? <InfoField label={t('Veículo')} value={header.vehicles} colors={colors} /> : null}
               </View>
             </View>
           ) : null}
