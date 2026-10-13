@@ -448,6 +448,8 @@ export const maintenanceReasons = pgTable(
     name: varchar("name", { length: 160 }).notNull(),
     description: text("description"),
     category: maintenanceCategoryEnum("category").notNull(),
+    // Só os motivos marcados (ex.: revisão periódica) atualizam o "KM da última manutenção" do veículo.
+    resetsMaintenanceCycle: boolean("resets_maintenance_cycle").default(false).notNull(),
     active: boolean("active").default(true).notNull(),
   },
   (table) => ({ nameUnique: uniqueIndex("maintenance_reasons_name_unique").on(table.name) }),

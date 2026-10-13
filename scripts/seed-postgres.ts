@@ -82,12 +82,12 @@ async function seed() {
     `);
 
     await client.query(`
-	INSERT INTO maintenance_reasons (name, category)
-	SELECT name, category::maintenance_category FROM (VALUES
-  	('Revisão periódica', 'Preventiva'),
-  	('Avaria mecânica', 'Corretiva'),
-  	('Troca de pneus', 'Preventiva')
-	) AS defaults(name, category)
+	INSERT INTO maintenance_reasons (name, category, resets_maintenance_cycle)
+	SELECT name, category::maintenance_category, resets FROM (VALUES
+  	('Revisão periódica', 'Preventiva', true),
+  	('Avaria mecânica', 'Corretiva', false),
+  	('Troca de pneus', 'Preventiva', false)
+	) AS defaults(name, category, resets)
 	WHERE NOT EXISTS (SELECT 1 FROM maintenance_reasons)     
     `);
 

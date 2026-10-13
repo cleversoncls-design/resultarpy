@@ -5,6 +5,7 @@ import { ScreenContainer } from '@/components/screen-container';
 import { formatCurrency } from '@/lib/currency';
 import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/hooks/use-auth';
+import { StatusPill } from '@/components/app-ui';
 import { ReportExportActions } from '@/components/report-export-actions';
 import { useLanguage } from '@/lib/language-provider';
 import { trpc } from '@/lib/trpc';
@@ -125,17 +126,18 @@ export default function MaintenanceReportScreen() {
           ) : (
             <View style={{ borderTopWidth: 3, borderTopColor: colors.primary }} className="rounded-2xl border border-border bg-surface p-2">
               {filtered.map((order) => (
-                <View key={order.id} className="border-b border-border p-4 last:border-b-0">
+                <Pressable key={order.id} onPress={() => router.push({ pathname: '/new-work-order', params: { workOrderId: String(order.id) } })} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })} className="border-b border-border p-4 last:border-b-0">
                   <View className="flex-row items-start justify-between">
                     <View className="flex-1">
                       <Text className="text-xs font-bold tracking-wider text-muted">OS-{order.id} · {formatDateLoose(order.maintenanceDate)}</Text>
                       <Text className="mt-1 font-bold text-foreground">{vehicleName(order.vehicleId)}</Text>
                       <Text className="mt-1 text-sm text-muted">{t(order.maintenanceType)} · {reasonName(order.reasonId)}</Text>
                     </View>
-                    <Text className="font-bold text-foreground">{formatCurrency(Number(order.costAmount))}</Text>
+                    <View className="items-end"><Text className="font-bold text-foreground">{formatCurrency(Number(order.costAmount))}</Text><View className="mt-2"><StatusPill status={order.status} /></View></View>
                   </View>
                   <Text className="mt-2 text-xs text-muted">{t('KM')}: {order.vehicleKm.toLocaleString('pt-BR')} · {order.observation ?? ''}</Text>
-                </View>
+                  <Text className="mt-2 text-xs font-bold text-primary">{t('Abrir OS')} ›</Text>
+                </Pressable>
               ))}
             </View>
           )}

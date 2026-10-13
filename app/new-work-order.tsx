@@ -14,7 +14,7 @@ export default function NewWorkOrderScreen() {
   const colors = useColors();
   const { isAuthenticated } = useAuth();
   const { t } = useLanguage();
-  const params = useLocalSearchParams<{ workOrderId?: string }>();
+  const params = useLocalSearchParams<{ workOrderId?: string; concluir?: string }>();
   const editId = typeof params.workOrderId === 'string' && /^\d+$/.test(params.workOrderId) ? Number(params.workOrderId) : undefined;
   const vehiclesQuery = trpc.operations.fleet.vehicles.list.useQuery({ page: 1, pageSize: 100, direction: 'asc' }, { enabled: isAuthenticated });
   const reasonsQuery = trpc.catalogs.maintenanceReasons.list.useQuery({ page: 1, pageSize: 100, includeInactive: false, direction: 'asc' }, { enabled: isAuthenticated });
@@ -45,8 +45,8 @@ export default function NewWorkOrderScreen() {
     setDate(order.maintenanceDate);
     setObservation(order.observation ?? '');
     setCost(order.costAmount);
-    setStatus(order.status);
-  }, [maintenanceReasons, workOrderQuery.data]);
+    setStatus(params.concluir === '1' && order.status === 'Em andamento' ? 'Concluída' : order.status);
+  }, [maintenanceReasons, workOrderQuery.data, params.concluir]);
 
   const save = async () => {
     setFeedback(null);

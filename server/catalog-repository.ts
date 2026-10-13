@@ -569,13 +569,13 @@ export async function listMaintenanceReasons(input: CatalogListInput) {
   return result(items, input, Number(countRows[0]?.count ?? 0));
 }
 
-export async function createMaintenanceReason(input: { name: string; description?: string | null; category: 'Preventiva' | 'Corretiva' }) {
+export async function createMaintenanceReason(input: { name: string; description?: string | null; category: 'Preventiva' | 'Corretiva'; resetsMaintenanceCycle?: boolean }) {
   const db = await requireDb();
   const rows = await db.insert(maintenanceReasons).values({ ...input, active: true }).returning();
   return rows[0];
 }
 
-export async function updateMaintenanceReason(id: number, input: Partial<{ name: string; description: string | null; category: 'Preventiva' | 'Corretiva'; active: boolean }>) {
+export async function updateMaintenanceReason(id: number, input: Partial<{ name: string; description: string | null; category: 'Preventiva' | 'Corretiva'; resetsMaintenanceCycle: boolean; active: boolean }>) {
   const db = await requireDb();
   const rows = await db.update(maintenanceReasons).set(input).where(eq(maintenanceReasons.id, id)).returning();
   return rows[0] ?? null;
