@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useLanguage } from '@/lib/language-provider';
 import { trpc } from '@/lib/trpc';
 import { formatDateLoose } from '@/lib/date-utils';
+import { ExtinguisherBadge } from '@/components/extinguisher-badge';
 
 export default function VehicleDetailScreen() {
   const colors = useColors();
@@ -65,6 +66,7 @@ export default function VehicleDetailScreen() {
               <InfoRow label={t('Última manutenção')} value={`${vehicle.lastMaintenanceKm.toLocaleString('pt-BR')} km`} />
               <InfoRow label={t('Intervalo de manutenção')} value={`${vehicle.maintenanceIntervalKm.toLocaleString('pt-BR')} km`} />
               <InfoRow label={t('Vencimento do extintor')} value={vehicle.fireExtinguisherExpiresOn ? formatDateLoose(vehicle.fireExtinguisherExpiresOn) : t('Não informado')} />
+              <ExtinguisherBadge dueIso={vehicle.fireExtinguisherExpiresOn ? String(vehicle.fireExtinguisherExpiresOn).slice(0, 10) : ''} />
               {vehicle.notes ? <InfoRow label={t('Observações')} value={vehicle.notes} /> : null}
             </View>
           </View>
