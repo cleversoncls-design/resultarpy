@@ -1,5 +1,5 @@
 import { alias } from 'drizzle-orm/pg-core';
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNotNull, isNull, lte, ne, or } from 'drizzle-orm';
 import { getDb } from './db';
 import { notifyTripReleased } from './email-service';
 import { clients, clientBillingProfileItems, clientBillingProfiles, currencyRates, expenseTypes, fleetEventPhotos, fleetEvents, fleetReservations, fleetWorkOrders, reimbursementLimitProfileItems, reimbursementLimitProfiles, travelers, tripApprovals, tripExpenses, trips, users, vehicles } from '../drizzle/schema';
@@ -47,6 +47,21 @@ export async function hasOwnTrips(userId: number) {
   return Boolean(row);
 }
 
+// Placa do veículo da frota de cada viagem (reserva mais recente que não foi
+// cancelada), para os cabeçalhos dos relatórios e da tela da viagem.
+async function plateByTrip(db: Awaited<ReturnType<typeof requireDb>>, tripIds: number[]) {
+  const map = new Map<number, string>();
+  if (tripIds.length === 0) return map;
+  const rows = await db
+    .select({ tripId: fleetReservations.tripId, plate: vehicles.plate })
+    .from(fleetReservations)
+    .innerJoin(vehicles, eq(fleetReservations.vehicleId, vehicles.id))
+    .where(and(inArray(fleetReservations.tripId, tripIds), ne(fleetReservations.status, 'Cancelada')))
+    .orderBy(asc(fleetReservations.id));
+  for (const row of rows) map.set(row.tripId, row.plate);
+  return map;
+}
+
 export async function listTrips(input: PageInput & { status?: string; travelerId?: number; userId?: number }) {
   const db = await requireDb();
   const filters = [
@@ -63,7 +78,8 @@ export async function listTrips(input: PageInput & { status?: string; travelerId
   const query = db.select({ trip: trips, clientName: clients.name, travelerName: travelers.name, companionName: companions.name }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).leftJoin(companions, eq(trips.companionId, companions.id)).leftJoin(clients, eq(trips.clientId, clients.id));
   const rows = await query.where(filters.length ? and(...filters) : undefined).orderBy(input.direction === 'desc' ? desc(trips.startsOn) : asc(trips.startsOn)).limit(paging.limit).offset(paging.offset);
   const [{ total }] = await db.select({ total: count() }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).where(filters.length ? and(...filters) : undefined);
-  return { items: rows.map(({ trip, clientName, travelerName, companionName }) => ({ ...trip, clientName, travelerName, companionName })), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
+  const plates = await plateByTrip(db, rows.map(({ trip }) => trip.id));
+  return { items: rows.map(({ trip, clientName, travelerName, companionName }) => ({ ...trip, clientName, travelerName, companionName, vehiclePlate: plates.get(trip.id) ?? null })), page: input.page, pageSize: paging.limit, total, totalPages: Math.ceil(Number(total) / paging.limit) };
 }
 
 // Opções do campo "Acompanhante": só id e nome dos viajantes ativos, para
@@ -87,7 +103,8 @@ export async function getTrip(id: number, scope: Scope = {}) {
   const filters = [eq(trips.id, id), scope.admin ? undefined : scope.userId ? eq(travelers.userId, scope.userId) : undefined].filter(Boolean);
   const [row] = await db.select({ trip: trips, clientName: clients.name, travelerName: travelers.name, companionName: companions.name }).from(trips).leftJoin(travelers, eq(trips.travelerId, travelers.id)).leftJoin(companions, eq(trips.companionId, companions.id)).leftJoin(clients, eq(trips.clientId, clients.id)).where(and(...filters)).limit(1);
   if (!row) return undefined;
-  return { ...row.trip, clientName: row.clientName, travelerName: row.travelerName, companionName: row.companionName };
+  const plates = await plateByTrip(db, [row.trip.id]);
+  return { ...row.trip, clientName: row.clientName, travelerName: row.travelerName, companionName: row.companionName, vehiclePlate: plates.get(row.trip.id) ?? null };
 }
 
 export async function createTrip(input: typeof trips.$inferInsert) {

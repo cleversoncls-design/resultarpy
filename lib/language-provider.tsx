@@ -42,6 +42,8 @@ const translations: Record<TranslationKey, string> = {
 
   'KM rodado a faturar': 'KM recorrido a facturar',
 
+  'Data Saída': 'Fecha Salida', 'Data Retorno': 'Fecha Retorno',
+
   'Disponível': 'Disponible',
 
   'Condutor definido': 'Conductor definido', 'KM da manutenção': 'KM del mantenimiento', 'KM de saída': 'KM de salida', 'do intervalo': 'del intervalo', 'km atuais': 'km actuales',

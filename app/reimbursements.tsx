@@ -11,6 +11,7 @@ import { trpc } from '@/lib/trpc';
 import { formatCurrency, type Currency } from '@/lib/currency';
 import { ReportExportActions } from '@/components/report-export-actions';
 import type { ReportImage, ReportInfoLine, ReportRow as ExportRow } from '@/lib/report-export';
+import { formatDateDisplay } from '@/lib/date-utils';
 
 type ReimbursementRow = {
   id: number;
@@ -91,6 +92,7 @@ export default function ReimbursementsScreen() {
   const trips = tripsQuery.data?.items ?? [];
   const travelers = travelersQuery.data?.items ?? [];
   const selectedTrip = tripId ? trips.find((trip) => trip.id === tripId) : undefined;
+  const selectedVehiclePlate = (selectedTrip as { vehiclePlate?: string | null } | undefined)?.vehiclePlate ?? null;
   const selectedTraveler = selectedTrip
     ? (isAdminViewer ? travelers.find((traveler) => traveler.id === (selectedTrip as any).travelerId) : undefined)
     : undefined;
@@ -107,11 +109,11 @@ export default function ReimbursementsScreen() {
   });
 
   const infoLines: ReportInfoLine[] | undefined = selectedTrip ? [
-    { label: t('Viagem'), value: `${selectedTrip.tripCode} · ${selectedTrip.destination}` },
     { label: t('Viajante'), value: travelerName },
     ...((selectedTrip as { companionName?: string | null } | undefined)?.companionName ? [{ label: t('Acompanhante'), value: String((selectedTrip as { companionName?: string | null }).companionName) }] : []),
-    { label: t('Data Início Viagem'), value: selectedTrip.startsOn },
-    { label: t('Data Fim Viagem'), value: selectedTrip.endsOn },
+    { label: t('Data Saída'), value: formatDateDisplay(selectedTrip.startsOn) || selectedTrip.startsOn },
+    { label: t('Data Retorno'), value: formatDateDisplay(selectedTrip.endsOn) || selectedTrip.endsOn },
+    ...(selectedVehiclePlate ? [{ label: t('Veículo'), value: selectedVehiclePlate }] : []),
   ] : undefined;
 
   const exportColumns = [
@@ -231,8 +233,9 @@ export default function ReimbursementsScreen() {
               <View className="flex-row flex-wrap gap-x-8 gap-y-2">
                 <InfoField label={t('Viajante')} value={travelerName} colors={colors} />
                 {(selectedTrip as { companionName?: string | null }).companionName ? <InfoField label={t('Acompanhante')} value={String((selectedTrip as { companionName?: string | null }).companionName)} colors={colors} /> : null}
-                <InfoField label={t('Data Início Viagem')} value={selectedTrip.startsOn} colors={colors} />
-                <InfoField label={t('Data Fim Viagem')} value={selectedTrip.endsOn} colors={colors} />
+                <InfoField label={t('Data Saída')} value={formatDateDisplay(selectedTrip.startsOn) || selectedTrip.startsOn} colors={colors} />
+                <InfoField label={t('Data Retorno')} value={formatDateDisplay(selectedTrip.endsOn) || selectedTrip.endsOn} colors={colors} />
+                {selectedVehiclePlate ? <InfoField label={t('Veículo')} value={selectedVehiclePlate} colors={colors} /> : null}
               </View>
             </View>
           ) : null}

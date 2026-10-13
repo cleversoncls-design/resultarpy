@@ -38,6 +38,8 @@ describePostgres('KM rodado no faturamento (PostgreSQL)', () => {
     const vehicle = await caller.operations.fleet.vehicles.create({ brand: 'Toyota', modelYear: 2024, color: 'Prata', unitId: unit!.id, currentKm: 10000, lastMaintenanceKm: 9000, maintenanceIntervalKm: 10000, fireExtinguisherExpiresOn: null, notes: 'Registro temporário do teste', plate: `KM${stamp}`.slice(0, 10), model: 'Faturamento KM' });
     const trip = await caller.operations.trips.create({ travelerId: traveler!.id, clientId: client!.id, unitId: unit!.id, origin: 'São Paulo', destination: 'Asunción', country: 'Paraguai', area: 'Comercial', transport: 'Veículo da frota', startsOn: '2026-11-02', endsOn: '2026-11-05', requiresFleetVehicle: true, hasAdvance: false, needsHotel: false, advanceAmount: '0', tripCode: `KM-${stamp}`, status: 'Aprovada' });
     const reservation = await caller.operations.fleet.reservations.create({ tripId: trip.id, vehicleId: vehicle.id, driverId: traveler!.id, status: 'Reservada', plannedStartOn: '2026-11-02', plannedEndOn: '2026-11-05' });
+    // A placa do veículo da reserva sai junto da viagem (cabeçalhos dos relatórios).
+    expect((await caller.operations.trips.get({ id: trip.id })).vehiclePlate).toBe(vehicle.plate);
     const billing = () => caller.operations.reports.billing({ page: 1, pageSize: 50, direction: 'asc', tripId: trip.id });
 
     // Só com o KM de saída, ainda não há o que faturar.
