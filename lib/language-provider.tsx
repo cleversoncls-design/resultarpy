@@ -48,7 +48,7 @@ const translations: Record<TranslationKey, string> = {
 
   'Ver lista de viagens': 'Ver lista de viajes', 'Pesquisar por código, destino ou viajante': 'Buscar por código, destino o viajero',
 
-  'O limite específico da cidade tem prioridade; quando não existe, o sistema aplica o perfil genérico. Valores são sempre convertidos para Guaraní pela cotação diária registrada.': 'El límite específico de la ciudad tiene prioridad; cuando no existe, el sistema aplica el perfil genérico. Los valores siempre se convierten a Guaraníes según la cotización diaria registrada.', 'Selecione uma viagem para ver o relatório de reembolso.': 'Seleccione un viaje para ver el informe de reembolso.', 'Motivo (ex.: foto ilegível, comprovante de outra pessoa...)': 'Motivo (ej.: foto ilegible, comprobante de otra persona...)',
+  'O limite específico da cidade tem prioridade; quando não existe, o sistema aplica o perfil genérico. Valores são sempre convertidos para Guaraní pela cotação diária registrada.': 'El límite específico de la ciudad tiene prioridad; cuando no existe, el sistema aplica el perfil genérico. Los valores siempre se convierten a Guaraníes según la cotización diaria registrada.', 'Selecione uma viagem para ver o relatório de faturamento.': 'Seleccione un viaje para ver el informe de facturación.', 'Selecione uma viagem para ver o relatório de reembolso.': 'Seleccione un viaje para ver el informe de reembolso.', 'Motivo (ex.: foto ilegível, comprovante de outra pessoa...)': 'Motivo (ej.: foto ilegible, comprobante de otra persona...)',
 
   'Disponível': 'Disponible',
 
