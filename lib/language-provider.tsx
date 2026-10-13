@@ -40,6 +40,8 @@ const translations: Record<TranslationKey, string> = {
 
   'Corrigir KM final': 'Corregir KM final', 'Salvar KM final': 'Guardar KM final', 'Cancelar correção': 'Cancelar corrección',
 
+  'KM rodado a faturar': 'KM recorrido a facturar',
+
   'Disponível': 'Disponible',
 
   'Condutor definido': 'Conductor definido', 'KM da manutenção': 'KM del mantenimiento', 'KM de saída': 'KM de salida', 'do intervalo': 'del intervalo', 'km atuais': 'km actuales',
