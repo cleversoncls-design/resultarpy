@@ -8,6 +8,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/hooks/use-auth';
 import { useLanguage } from '@/lib/language-provider';
 import { trpc } from '@/lib/trpc';
+import { formatDateLoose } from '@/lib/date-utils';
 
 export default function FleetReservationScreen() {
   const colors = useColors();
@@ -80,7 +81,7 @@ export default function FleetReservationScreen() {
                   <View>
                     <Text className="text-xs font-bold tracking-wider text-muted">{reservation.tripCode} · RES-{reservation.id}</Text>
                     <Text className="mt-2 text-xl font-bold text-foreground">{reservation.destination}</Text>
-                    <Text className="mt-1 text-sm text-muted">{reservation.plannedStartOn} — {reservation.plannedEndOn} · {t('Condutor')}: {reservation.driverName ?? t('Viajante vinculado')}</Text>
+                    <Text className="mt-1 text-sm text-muted">{formatDateLoose(reservation.plannedStartOn)} — {formatDateLoose(reservation.plannedEndOn)} · {t('Condutor')}: {reservation.driverName ?? t('Viajante vinculado')}</Text>
                   </View>
                   <StatusPill status="Aguardando veículo" />
                 </View>

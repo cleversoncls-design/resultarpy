@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { ReportExportActions } from '@/components/report-export-actions';
 import { useLanguage } from '@/lib/language-provider';
 import { trpc } from '@/lib/trpc';
+import { formatDateLoose } from '@/lib/date-utils';
 
 function dateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -64,7 +65,7 @@ export default function MaintenanceReportScreen() {
     vehicle: vehicleName(order.vehicleId),
     kind: t(order.maintenanceType),
     reason: reasonName(order.reasonId),
-    date: order.maintenanceDate,
+    date: formatDateLoose(order.maintenanceDate),
     km: order.vehicleKm.toLocaleString('pt-BR'),
     observation: order.observation ?? '',
     cost: formatCurrency(Number(order.costAmount)),
@@ -127,7 +128,7 @@ export default function MaintenanceReportScreen() {
                 <View key={order.id} className="border-b border-border p-4 last:border-b-0">
                   <View className="flex-row items-start justify-between">
                     <View className="flex-1">
-                      <Text className="text-xs font-bold tracking-wider text-muted">OS-{order.id} · {order.maintenanceDate}</Text>
+                      <Text className="text-xs font-bold tracking-wider text-muted">OS-{order.id} · {formatDateLoose(order.maintenanceDate)}</Text>
                       <Text className="mt-1 font-bold text-foreground">{vehicleName(order.vehicleId)}</Text>
                       <Text className="mt-1 text-sm text-muted">{t(order.maintenanceType)} · {reasonName(order.reasonId)}</Text>
                     </View>

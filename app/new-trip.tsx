@@ -148,7 +148,7 @@ export default function NewTripScreen() {
       return;
     }
     if (!isIsoDate(draft.startsOn) || !isIsoDate(draft.endsOn) || draft.startsOn > draft.endsOn) {
-      failValidation(t('Data inválida'), t('Use o formato AAAA-MM-DD para início e fim da viagem.'));
+      failValidation(t('Data inválida'), t('Informe as datas de início e fim da viagem (DD/MM/AAAA), com o fim igual ou posterior ao início.'));
       return;
     }
     const selectedTraveler = travelersQuery.data?.items.find((item) => item.id === draft.travelerId);

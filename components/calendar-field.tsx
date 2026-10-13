@@ -3,6 +3,7 @@ import { Modal, Pressable, Text, View } from 'react-native';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useColors } from '@/hooks/use-colors';
 import { useLanguage } from '@/lib/language-provider';
+import { formatDateLoose } from '@/lib/date-utils';
 
 // Componente único de calendário usado em todos os campos de data do app
 // (Nova viagem, Ordem de serviço, Despesas, Filtros de aprovação etc.).
@@ -162,7 +163,7 @@ export function CalendarField({ value, onChange, placeholder }: CalendarFieldPro
         style={({ pressed }) => ({ borderColor: colors.border, backgroundColor: colors.background, opacity: pressed ? 0.7 : 1 })}
         className="mb-4 flex-row items-center justify-between rounded-xl border px-4 py-3"
       >
-        <Text className={value ? 'text-foreground' : 'text-muted'}>{value || t(placeholder ?? 'Selecionar data')}</Text>
+        <Text className={value ? 'text-foreground' : 'text-muted'}>{value ? formatDateLoose(value) : t(placeholder ?? 'Selecionar data')}</Text>
         <IconSymbol name="calendar" size={20} color={colors.primary} />
       </Pressable>
       <CalendarModal visible={open} onClose={() => setOpen(false)} onSelect={(date) => { onChange(date); setOpen(false); }} title={t(placeholder ?? 'Selecionar data')} value={value} />

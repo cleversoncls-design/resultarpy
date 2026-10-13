@@ -7,6 +7,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useAuth } from '@/hooks/use-auth';
 import { useLanguage } from '@/lib/language-provider';
 import { trpc } from '@/lib/trpc';
+import { formatDateLoose } from '@/lib/date-utils';
 
 export default function VehicleDetailScreen() {
   const colors = useColors();
@@ -56,7 +57,7 @@ export default function VehicleDetailScreen() {
               <InfoRow label={t('KM atuais')} value={`${vehicle.currentKm.toLocaleString('pt-BR')} km`} />
               <InfoRow label={t('Última manutenção')} value={`${vehicle.lastMaintenanceKm.toLocaleString('pt-BR')} km`} />
               <InfoRow label={t('Intervalo de manutenção')} value={`${vehicle.maintenanceIntervalKm.toLocaleString('pt-BR')} km`} />
-              <InfoRow label={t('Vencimento do extintor')} value={vehicle.fireExtinguisherExpiresOn ?? t('Não informado')} />
+              <InfoRow label={t('Vencimento do extintor')} value={vehicle.fireExtinguisherExpiresOn ? formatDateLoose(vehicle.fireExtinguisherExpiresOn) : t('Não informado')} />
               {vehicle.notes ? <InfoRow label={t('Observações')} value={vehicle.notes} /> : null}
             </View>
           </View>
@@ -93,7 +94,7 @@ export default function VehicleDetailScreen() {
                   <View className="flex-row items-start justify-between">
                     <View className="flex-1 pr-3">
                       <Text className="text-xs font-bold tracking-wider text-muted">{item.tripCode ?? `#${item.tripId}`}{item.destination ? ` · ${item.destination}` : ''}</Text>
-                      <Text className="mt-1 text-sm font-semibold text-foreground">{item.plannedStartOn} — {item.plannedEndOn}</Text>
+                      <Text className="mt-1 text-sm font-semibold text-foreground">{formatDateLoose(item.plannedStartOn)} — {formatDateLoose(item.plannedEndOn)}</Text>
                       {item.driverName ? <Text className="mt-1 text-xs text-muted">{t('Solicitado por')}: {item.driverName}</Text> : null}
                       {item.departureKm ? (
                         <Text className="mt-1 text-xs text-muted">

@@ -37,3 +37,14 @@ export function parseBrazilianDate(value: string): string | null {
   if (date.getUTCFullYear() !== Number(year) || date.getUTCMonth() !== Number(month) - 1 || date.getUTCDate() !== Number(day)) return null;
   return `${year}-${month}-${day}`;
 }
+
+/** Formata uma data (AAAA-MM-DD, timestamp ISO ou Date) como DD/MM/AAAA; devolve o valor original se não reconhecer. */
+export function formatDateLoose(value: string | Date | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '';
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return '';
+    return `${String(value.getUTCDate()).padStart(2, '0')}/${String(value.getUTCMonth() + 1).padStart(2, '0')}/${value.getUTCFullYear()}`;
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value;
+}
