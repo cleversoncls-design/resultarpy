@@ -18,6 +18,7 @@ export default function NewVehicleScreen() {
   const isEditing = editId !== undefined;
   const unitsQuery = trpc.catalogs.units.list.useQuery({ page: 1, pageSize: 100, includeInactive: false, direction: 'asc' }, { enabled: isAuthenticated });
   const vehicleQuery = trpc.operations.fleet.vehicles.get.useQuery({ id: editId as number }, { enabled: isAuthenticated && isEditing });
+  const utils = trpc.useUtils();
   const createVehicle = trpc.operations.fleet.vehicles.create.useMutation();
   const updateVehicle = trpc.operations.fleet.vehicles.update.useMutation();
   const units = useMemo(() => unitsQuery.data?.items ?? [], [unitsQuery.data?.items]);
@@ -57,9 +58,11 @@ export default function NewVehicleScreen() {
     try {
       if (isEditing) {
         await updateVehicle.mutateAsync({ id: editId, ...payload });
+        await utils.operations.fleet.vehicles.invalidate();
         setFeedback(t('Veículo atualizado com sucesso.'));
       } else {
         await createVehicle.mutateAsync({ ...payload, status: 'Disponível' });
+        await utils.operations.fleet.vehicles.invalidate();
         setFeedback(t('Veículo cadastrado com sucesso.'));
       }
       router.replace('/fleet-cadastros');
