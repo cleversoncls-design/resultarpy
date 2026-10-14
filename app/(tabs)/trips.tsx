@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import type { DimensionValue } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { ActionButton, ActionButtonFace, ChoiceCheckboxes, KpiCard, PrimaryButton, SectionHeader, StatusPill, statusTone } from '@/components/app-ui';
@@ -44,7 +45,7 @@ const COL = { code: '11%', destination: '17%', status: '14%', period: '14%', cli
 
 // Cabeçalho de coluna clicável: alterna crescente/decrescente e mostra a seta
 // só na coluna ordenada.
-function Th({ label, width, active, dir, onPress }: { label: string; width: string; active?: boolean; dir?: 'asc' | 'desc'; onPress?: () => void }) {
+function Th({ label, width, active, dir, onPress }: { label: string; width: DimensionValue; active?: boolean; dir?: 'asc' | 'desc'; onPress?: () => void }) {
   const colors = useColors();
   const text = <Text style={{ color: active ? colors.foreground : colors.muted }} className="text-[10.5px] font-extrabold uppercase tracking-wide" numberOfLines={1}>{label}{active ? (dir === 'asc' ? ' ▲' : ' ▼') : ''}</Text>;
   return <View style={{ width, paddingRight: 8 }}>{onPress ? <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}>{text}</Pressable> : text}</View>;
