@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
 import type { TripStatus } from '@/lib/demo-data';
@@ -49,6 +50,31 @@ export function ChoiceCheckboxes<T extends string>({ options, value, onChange }:
         <Text className="ml-3 text-sm text-foreground">{option.label}</Text>
       </Pressable>;
     })}
+  </View>;
+}
+
+// Lista suspensa de escolha única: um só campo que abre a lista de opções logo
+// abaixo (sem modal). Usada nos filtros com muitas opções, onde uma fileira de
+// checkboxes poluiria a tela. Layout via style (className em Pressable não é
+// confiável nesta versão do app).
+export function SelectField<T extends string>({ value, options, onChange, placeholder }: { value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; placeholder?: string }) {
+  const colors = useColors();
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value);
+  return <View>
+    <Pressable onPress={() => setOpen((current) => !current)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: open ? colors.primary : colors.border, backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 })}>
+      <Text style={{ flex: 1, color: selected ? colors.foreground : colors.muted }} className="text-sm">{selected?.label ?? placeholder ?? ''}</Text>
+      <Text style={{ color: colors.muted }} className="text-xs">{open ? '▲' : '▼'}</Text>
+    </Pressable>
+    {open ? <View style={{ marginTop: 6, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 12, overflow: 'hidden' }}>
+      {options.map((option, index) => {
+        const isSelected = option.value === value;
+        return <Pressable key={option.value} onPress={() => { onChange(option.value); setOpen(false); }} accessibilityRole="button" style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: index === 0 ? 0 : 1, borderTopColor: colors.border, backgroundColor: isSelected ? `${colors.primary}14` : pressed ? colors.background : 'transparent' })}>
+          <Text style={{ flex: 1, color: isSelected ? colors.primary : colors.foreground }} className={isSelected ? 'text-sm font-bold' : 'text-sm'}>{option.label}</Text>
+          {isSelected ? <IconSymbol name="checkmark" size={14} color={colors.primary} /> : null}
+        </Pressable>;
+      })}
+    </View> : null}
   </View>;
 }
 
