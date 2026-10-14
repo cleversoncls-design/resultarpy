@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } fro
 import type { DimensionValue } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
-import { ActionButton, ActionButtonFace, ChoiceCheckboxes, KpiCard, PrimaryButton, SectionHeader, StatusPill, statusTone } from '@/components/app-ui';
+import { ActionButton, ActionButtonFace, KpiCard, PrimaryButton, SectionHeader, SelectField, StatusPill, statusTone } from '@/components/app-ui';
 import { CalendarModal } from '@/components/calendar-field';
 import { formatCurrency } from '@/lib/currency';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -152,14 +152,14 @@ export default function TripsScreen() {
       <Text style={{ color: colors.muted }} className="mb-3 text-xs font-bold uppercase tracking-widest">{t('Filtros')}</Text>
       <TextInput value={search} onChangeText={setSearch} placeholder={t('Buscar por código, destino, cliente ou responsável...')} placeholderTextColor={colors.muted} style={{ borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }} className="rounded-xl border px-4 py-3 text-sm" />
       <Text className="mb-2 mt-4 text-xs font-semibold text-muted">{t('Status')}</Text>
-      <ChoiceCheckboxes value={statusFilter ?? ''} onChange={(value) => setStatusFilter(value || null)} options={[{ value: '', label: t('Todos os status') }, ...TRIP_STATUSES.map((status) => ({ value: status as string, label: t(status) }))]} />
+      <SelectField value={statusFilter ?? ''} onChange={(value) => setStatusFilter(value || null)} options={[{ value: '', label: t('Todos os status') }, ...TRIP_STATUSES.map((status) => ({ value: status as string, label: t(status) }))]} />
       <Text className="mb-2 mt-4 text-xs font-semibold text-muted">{t('Cliente')}</Text>
       <CatalogSearch value={clientFilter} options={clientOptions} placeholder={t('Pesquisar cliente (vazio = todos)')} emptyLabel={t('Nenhum cliente encontrado nas viagens listadas')} onChange={setClientFilter} />
       <Text className="mb-2 mt-4 text-xs font-semibold text-muted">{t('Período')}</Text>
       <View className="flex-row gap-2"><DateFilterField value={periodStart} placeholder={t('Início (DD/MM/AAAA)')} onOpen={() => setShowStartCalendar(true)} onClear={() => setPeriodStart('')} /><DateFilterField value={periodEnd} placeholder={t('Fim (DD/MM/AAAA)')} onOpen={() => setShowEndCalendar(true)} onClear={() => setPeriodEnd('')} /></View>
       {!isDesktop ? <>
         <Text className="mb-2 mt-4 text-xs font-semibold text-muted">{t('Ordenar por')}</Text>
-        <ChoiceCheckboxes value={sortKey ?? ''} onChange={(value) => { setSortKey(value ? (value as SortKey) : null); setSortDir('asc'); }} options={[{ value: '', label: t('Padrão') }, { value: 'code', label: t('Código') }, { value: 'destination', label: t('Destino') }, { value: 'status', label: t('Status') }, { value: 'startDate', label: t('Período') }, { value: 'clientName', label: t('Cliente') }, { value: 'travelerName', label: t('Responsável') }]} />
+        <SelectField value={sortKey ?? ''} onChange={(value) => { setSortKey(value ? (value as SortKey) : null); setSortDir('asc'); }} options={[{ value: '', label: t('Padrão') }, { value: 'code', label: t('Código') }, { value: 'destination', label: t('Destino') }, { value: 'status', label: t('Status') }, { value: 'startDate', label: t('Período') }, { value: 'clientName', label: t('Cliente') }, { value: 'travelerName', label: t('Responsável') }]} />
         {sortKey ? <View className="mt-3"><ActionButton label={sortDir === 'asc' ? `▲ ${t('Crescente')}` : `▼ ${t('Decrescente')}`} onPress={() => setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'))} /></View> : null}
       </> : null}
     </View>
