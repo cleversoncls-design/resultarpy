@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
 import type { TripStatus } from '@/lib/demo-data';
 import { useLanguage } from '@/lib/language-provider';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 
 // Extraído do StatusPill para poder ser reaproveitado onde só a cor (sem o
 // componente inteiro do "pill") é necessária — ex.: a faixa colorida na
@@ -19,12 +20,33 @@ export function StatusPill({ status }: { status: TripStatus | string }) {
   return <View style={{ backgroundColor: tone.backgroundColor, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' }}><Text style={{ color: tone.color }} className="text-xs font-semibold">{t(status)}</Text></View>;
 }
 
-// Botão compacto para ações dentro de cards (Gerenciar, Editar...). Usa a mesma
-// altura do StatusPill (texto xs + 5px de padding vertical) para ficar alinhado
-// ao status, com o estilo sólido dos botões "+ Nova O.S." / "+ Novo veículo".
-export function ActionButton({ label, onPress, tone = 'primary' }: { label: string; onPress?: () => void; tone?: 'primary' | 'warning' }) {
+// Aparência do botão compacto, sem comportamento: para quando o card inteiro já
+// é um Pressable (evita Pressable dentro de Pressable). Usa a mesma altura do
+// StatusPill (texto xs + 5px de padding vertical).
+export function ActionButtonFace({ label, tone = 'primary' }: { label: string; tone?: 'primary' | 'warning' }) {
   const colors = useColors();
-  return <Pressable onPress={onPress} style={({ pressed }) => [{ backgroundColor: tone === 'warning' ? colors.warning : colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start', opacity: pressed ? 0.75 : 1 }]}><Text className="text-xs font-bold text-white">{label}</Text></Pressable>;
+  return <View style={{ backgroundColor: tone === 'warning' ? colors.warning : colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' }}><Text className="text-xs font-bold text-white">{label}</Text></View>;
+}
+
+// Botão compacto para ações dentro de cards e tabelas (Abrir, Editar,
+// Gerenciar...), no estilo sólido de "+ Nova O.S." / "+ Novo veículo".
+export function ActionButton({ label, onPress, tone = 'primary' }: { label: string; onPress?: () => void; tone?: 'primary' | 'warning' }) {
+  return <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, alignSelf: 'flex-start' })}><ActionButtonFace label={label} tone={tone} /></Pressable>;
+}
+
+// Filtro de escolha única apresentado como checkboxes (mesmo visual do
+// checklist da tela de Operação): marcar uma opção desmarca as outras.
+export function ChoiceCheckboxes<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (value: T) => void }) {
+  const colors = useColors();
+  return <View className="flex-row flex-wrap" style={{ columnGap: 20, rowGap: 10 }}>
+    {options.map((option) => {
+      const checked = option.value === value;
+      return <Pressable key={option.value} onPress={() => onChange(option.value)} accessibilityRole="checkbox" accessibilityState={{ checked }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })} className="flex-row items-center">
+        <View style={{ backgroundColor: checked ? colors.success : colors.background, borderColor: checked ? colors.success : colors.border }} className="h-5 w-5 items-center justify-center rounded-md border">{checked ? <IconSymbol name="checkmark" size={14} color="white" /> : null}</View>
+        <Text className="ml-3 text-sm text-foreground">{option.label}</Text>
+      </Pressable>;
+    })}
+  </View>;
 }
 
 export function PrimaryButton({ label, onPress, compact = false }: { label: string; onPress?: () => void; compact?: boolean }) {
