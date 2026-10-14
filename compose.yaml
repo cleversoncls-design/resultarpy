@@ -27,7 +27,8 @@ services:
       network: host
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-controle}:${POSTGRES_PASSWORD:-controle_dev_only}@postgres:5432/${POSTGRES_DB:-controle_viagens}
+      # Para usar um PostgreSQL externo, defina APP_DATABASE_URL no .env (ver docs/MIGRAR-BANCO-EXTERNO.md).
+      DATABASE_URL: ${APP_DATABASE_URL:-postgresql://${POSTGRES_USER:-controle}:${POSTGRES_PASSWORD:-controle_dev_only}@postgres:5432/${POSTGRES_DB:-controle_viagens}}
     # NÃO rodar "pnpm db:seed" aqui: esse script injeta dados fixos de
     # teste automatizado (veículo/unidades/viajante fictícios usados pelo
     # CI) e não deve tocar o banco de produção. Rodar só quando quiser
@@ -48,8 +49,9 @@ services:
       network: host
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-controle}:${POSTGRES_PASSWORD:-controle_dev_only}@postgres:5432/${POSTGRES_DB:-controle_viagens}
-      DATABASE_SSL: "false"
+      # Para usar um PostgreSQL externo, defina APP_DATABASE_URL no .env (ver docs/MIGRAR-BANCO-EXTERNO.md).
+      DATABASE_URL: ${APP_DATABASE_URL:-postgresql://${POSTGRES_USER:-controle}:${POSTGRES_PASSWORD:-controle_dev_only}@postgres:5432/${POSTGRES_DB:-controle_viagens}}
+      DATABASE_SSL: ${APP_DATABASE_SSL:-false}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set before starting the API}
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
