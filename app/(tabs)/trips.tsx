@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import type { DimensionValue } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { ActionButton, ActionButtonFace, ChoiceCheckboxes, KpiCard, PrimaryButton, SectionHeader, StatusPill, statusTone } from '@/components/app-ui';
@@ -31,28 +32,32 @@ function CatalogSearch({ value, options, placeholder, emptyLabel, onChange }: { 
       <TextInput value={query} onChangeText={setQuery} placeholder={selected && !query ? selected.label : placeholder} placeholderTextColor={colors.muted} className="flex-1 py-2.5 text-sm text-foreground" />
       <Text className="text-base text-muted">⌕</Text>
     </View>
-    {query.trim() ? (filtered.length ? <View className="gap-1">{filtered.map((option) => <Pressable key={option.id} onPress={() => { onChange(option.id); setQuery(''); }} style={({ pressed }) => ({ borderColor: value === option.id ? colors.primary : colors.border, backgroundColor: value === option.id ? `${colors.primary}14` : colors.surface, opacity: pressed ? 0.72 : 1 })} className="rounded-lg border px-3 py-2"><Text style={{ color: value === option.id ? colors.primary : colors.foreground }} className="text-xs font-semibold">{option.label}</Text></Pressable>)}</View> : <Text className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">{emptyLabel}</Text>) : selected ? <View className="flex-row items-center rounded-lg border border-primary/40 bg-primary/5 px-3 py-2"><Text className="flex-1 text-xs font-semibold text-primary">{selected.label}</Text><Pressable onPress={() => { onChange(null); setQuery(''); }}><Text className="text-sm font-bold text-primary">×</Text></Pressable></View> : null}
+    {query.trim() ? (filtered.length ? <View className="gap-1">{filtered.map((option) => <Pressable key={option.id} onPress={() => { onChange(option.id); setQuery(''); }} style={({ pressed }) => ({ borderColor: value === option.id ? colors.primary : colors.border, backgroundColor: value === option.id ? `${colors.primary}14` : colors.surface, opacity: pressed ? 0.72 : 1, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 })}><Text style={{ color: value === option.id ? colors.primary : colors.foreground }} className="text-xs font-semibold">{option.label}</Text></Pressable>)}</View> : <Text className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">{emptyLabel}</Text>) : selected ? <View className="flex-row items-center rounded-lg border border-primary/40 bg-primary/5 px-3 py-2"><Text className="flex-1 text-xs font-semibold text-primary">{selected.label}</Text><Pressable onPress={() => { onChange(null); setQuery(''); }}><Text className="text-sm font-bold text-primary">×</Text></Pressable></View> : null}
   </View>;
 }
 
 type SortKey = 'code' | 'destination' | 'status' | 'startDate' | 'clientName' | 'travelerName';
 
+// Larguras das colunas da tabela (cabeçalho e linhas usam as mesmas). Aplicadas
+// via style em <View>: className em <Pressable> não aplica largura de forma
+// confiável, o que desalinhava as colunas.
+const COL = { code: '11%', destination: '17%', status: '14%', period: '14%', client: '15%', traveler: '15%', actions: '14%' } as const;
+
 // Cabeçalho de coluna clicável: alterna crescente/decrescente e mostra a seta
 // só na coluna ordenada.
-function Th({ label, width, active, dir, onPress }: { label: string; width: string; active?: boolean; dir?: 'asc' | 'desc'; onPress?: () => void }) {
+function Th({ label, width, active, dir, onPress }: { label: string; width: DimensionValue; active?: boolean; dir?: 'asc' | 'desc'; onPress?: () => void }) {
   const colors = useColors();
-  const text = <Text style={{ color: active ? colors.foreground : colors.muted }} className="text-[10.5px] font-extrabold uppercase tracking-wide">{label}{active ? (dir === 'asc' ? ' ▲' : ' ▼') : ''}</Text>;
-  if (!onPress) return <View className={width}>{text}</View>;
-  return <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className={width}>{text}</Pressable>;
+  const text = <Text style={{ color: active ? colors.foreground : colors.muted }} className="text-[10.5px] font-extrabold uppercase tracking-wide" numberOfLines={1}>{label}{active ? (dir === 'asc' ? ' ▲' : ' ▼') : ''}</Text>;
+  return <View style={{ width, paddingRight: 8 }}>{onPress ? <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}>{text}</Pressable> : text}</View>;
 }
 
 // Campo de data que abre o calendário de apoio (mesmo CalendarModal usado nas
 // outras telas); o valor é ISO (AAAA-MM-DD) e o ✕ limpa o filtro.
 function DateFilterField({ value, placeholder, onOpen, onClear }: { value: string; placeholder: string; onOpen: () => void; onClear: () => void }) {
   const colors = useColors();
-  return <View className="flex-1 flex-row items-center rounded-xl border border-border bg-background px-3 py-2.5">
-    <Pressable onPress={onOpen} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })} className="flex-1 flex-row items-center"><Text style={{ color: value ? colors.foreground : colors.muted }} className="flex-1 text-sm">{value ? formatDateLoose(value) : placeholder}</Text><Text className="text-lg text-primary">▣</Text></Pressable>
-    {value ? <Pressable onPress={onClear} accessibilityLabel="Limpar" style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })} className="ml-3"><Text style={{ color: colors.muted }} className="text-sm font-bold">✕</Text></Pressable> : null}
+  return <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }}>
+    <Pressable onPress={onOpen} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1, flex: 1, flexDirection: 'row', alignItems: 'center' })}><Text style={{ color: value ? colors.foreground : colors.muted, flex: 1 }} className="text-sm">{value ? formatDateLoose(value) : placeholder}</Text><Text className="text-lg text-primary">▣</Text></Pressable>
+    {value ? <Pressable onPress={onClear} accessibilityLabel="Limpar" style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginLeft: 12 })}><Text style={{ color: colors.muted }} className="text-sm font-bold">✕</Text></Pressable> : null}
   </View>;
 }
 
@@ -152,31 +157,36 @@ export default function TripsScreen() {
       <CatalogSearch value={clientFilter} options={clientOptions} placeholder={t('Pesquisar cliente (vazio = todos)')} emptyLabel={t('Nenhum cliente encontrado nas viagens listadas')} onChange={setClientFilter} />
       <Text className="mb-2 mt-4 text-xs font-semibold text-muted">{t('Período')}</Text>
       <View className="flex-row gap-2"><DateFilterField value={periodStart} placeholder={t('Início (DD/MM/AAAA)')} onOpen={() => setShowStartCalendar(true)} onClear={() => setPeriodStart('')} /><DateFilterField value={periodEnd} placeholder={t('Fim (DD/MM/AAAA)')} onOpen={() => setShowEndCalendar(true)} onClear={() => setPeriodEnd('')} /></View>
+      {!isDesktop ? <>
+        <Text className="mb-2 mt-4 text-xs font-semibold text-muted">{t('Ordenar por')}</Text>
+        <ChoiceCheckboxes value={sortKey ?? ''} onChange={(value) => { setSortKey(value ? (value as SortKey) : null); setSortDir('asc'); }} options={[{ value: '', label: t('Padrão') }, { value: 'code', label: t('Código') }, { value: 'destination', label: t('Destino') }, { value: 'status', label: t('Status') }, { value: 'startDate', label: t('Período') }, { value: 'clientName', label: t('Cliente') }, { value: 'travelerName', label: t('Responsável') }]} />
+        {sortKey ? <View className="mt-3"><ActionButton label={sortDir === 'asc' ? `▲ ${t('Crescente')}` : `▼ ${t('Decrescente')}`} onPress={() => setSortDir((current) => (current === 'asc' ? 'desc' : 'asc'))} /></View> : null}
+      </> : null}
     </View>
 
     {isDesktop ? (
       <View className="mt-4 overflow-hidden rounded-2xl border border-border bg-surface">
-        <View className="flex-row bg-background px-4 py-3">
-          <Th label={t('Código')} width="w-[11%]" active={sortKey === 'code'} dir={sortDir} onPress={() => toggleSort('code')} />
-          <Th label={t('Destino')} width="w-[17%]" active={sortKey === 'destination'} dir={sortDir} onPress={() => toggleSort('destination')} />
-          <Th label={t('Status')} width="w-[14%]" active={sortKey === 'status'} dir={sortDir} onPress={() => toggleSort('status')} />
-          <Th label={t('Período')} width="w-[14%]" active={sortKey === 'startDate'} dir={sortDir} onPress={() => toggleSort('startDate')} />
-          <Th label={t('Cliente')} width="w-[15%]" active={sortKey === 'clientName'} dir={sortDir} onPress={() => toggleSort('clientName')} />
-          <Th label={t('Responsável')} width="w-[15%]" active={sortKey === 'travelerName'} dir={sortDir} onPress={() => toggleSort('travelerName')} />
-          <Th label="" width="w-[14%]" />
+        <View className="flex-row bg-background px-4 py-3" style={{ borderLeftWidth: 3, borderLeftColor: 'transparent' }}>
+          <Th label={t('Código')} width={COL.code} active={sortKey === 'code'} dir={sortDir} onPress={() => toggleSort('code')} />
+          <Th label={t('Destino')} width={COL.destination} active={sortKey === 'destination'} dir={sortDir} onPress={() => toggleSort('destination')} />
+          <Th label={t('Status')} width={COL.status} active={sortKey === 'status'} dir={sortDir} onPress={() => toggleSort('status')} />
+          <Th label={t('Período')} width={COL.period} active={sortKey === 'startDate'} dir={sortDir} onPress={() => toggleSort('startDate')} />
+          <Th label={t('Cliente')} width={COL.client} active={sortKey === 'clientName'} dir={sortDir} onPress={() => toggleSort('clientName')} />
+          <Th label={t('Responsável')} width={COL.traveler} active={sortKey === 'travelerName'} dir={sortDir} onPress={() => toggleSort('travelerName')} />
+          <Th label="" width={COL.actions} />
         </View>
         {filteredRows.map((row) => {
           const canEdit = /^\d+$/.test(row.id) && row.status !== 'Cancelada';
           const barColor = statusTone(row.status, colors).color;
           return <View key={row.id} className="flex-row items-center border-t border-border px-4 py-3.5" style={{ borderLeftWidth: 3, borderLeftColor: barColor }}>
-            <Pressable onPress={() => openDetails(row.id)} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="w-[11%]"><Text className="text-xs font-bold text-foreground" numberOfLines={1}>{row.code}</Text></Pressable>
-            <Pressable onPress={() => openDetails(row.id)} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })} className="w-[17%] pr-2"><Text className="text-xs text-foreground" numberOfLines={1}>{row.destination}</Text></Pressable>
-            <View className="w-[14%]"><StatusPill status={row.status} /></View>
-            <View className="w-[14%]"><Text className="text-xs text-foreground">{formatDateLoose(row.startDate)}</Text><Text className="mt-0.5 text-[11px] text-muted">{t('até')} {formatDateLoose(row.endDate)}</Text></View>
-            <Text className="w-[15%] pr-2 text-xs text-foreground" numberOfLines={1}>{row.clientName ?? t('Sem cliente')}</Text>
-            <Text className="w-[15%] pr-2 text-xs text-foreground" numberOfLines={1}>{row.travelerName ?? t('Não informado')}</Text>
-            <View className="w-[14%] flex-row items-center justify-end" style={{ columnGap: 8 }}>
-              <ActionButton label={t('Abrir')} onPress={() => openDetails(row.id)} />
+            <View style={{ width: COL.code, paddingRight: 8 }}><Pressable onPress={() => openDetails(row.id)} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}><Text className="text-xs font-bold text-foreground" numberOfLines={1}>{row.code}</Text></Pressable></View>
+            <View style={{ width: COL.destination, paddingRight: 8 }}><Pressable onPress={() => openDetails(row.id)} style={({ pressed }) => ({ opacity: pressed ? 0.65 : 1 })}><Text className="text-xs text-foreground" numberOfLines={1}>{row.destination}</Text></Pressable></View>
+            <View style={{ width: COL.status, paddingRight: 8 }}><StatusPill status={row.status} /></View>
+            <View style={{ width: COL.period, paddingRight: 8 }}><Text className="text-xs text-foreground">{formatDateLoose(row.startDate)}</Text><Text className="mt-0.5 text-[11px] text-muted">{t('até')} {formatDateLoose(row.endDate)}</Text></View>
+            <View style={{ width: COL.client, paddingRight: 8 }}><Text className="text-xs text-foreground" numberOfLines={1}>{row.clientName ?? t('Sem cliente')}</Text></View>
+            <View style={{ width: COL.traveler, paddingRight: 8 }}><Text className="text-xs text-foreground" numberOfLines={1}>{row.travelerName ?? t('Não informado')}</Text></View>
+            <View style={{ width: COL.actions, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', columnGap: 8 }}>
+              <ActionButton tone="neutral" label={t('Abrir')} onPress={() => openDetails(row.id)} />
               {canEdit ? <ActionButton label={t('Editar')} onPress={() => router.push({ pathname: '/new-trip', params: { tripId: row.id } })} /> : null}
             </View>
           </View>;
@@ -188,7 +198,7 @@ export default function TripsScreen() {
         {filteredRows.map((item) => {
           const canEdit = /^\d+$/.test(item.id) && item.status !== 'Cancelada';
           const openItem = () => openDetails(item.id);
-          return <View key={item.id} className="rounded-3xl border border-border bg-surface p-5"><View className="flex-row items-start justify-between"><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })} className="flex-1"><Text className="text-xs font-bold tracking-wider text-muted">{item.code}</Text><Text className="mt-2 text-xl font-bold text-foreground">{item.destination}</Text><Text className="mt-1 text-sm text-muted">{formatDateLoose(item.startDate)} — {formatDateLoose(item.endDate)}</Text></Pressable><View className="items-end"><StatusPill status={item.status} />{canEdit ? <View className="mt-3"><ActionButton label={t('Editar')} onPress={() => router.push({ pathname: '/new-trip', params: { tripId: item.id } })} /></View> : null}</View></View><View className="mt-5 flex-row border-t border-border pt-4"><View className="flex-1"><Text className="text-xs text-muted">{t('Cliente')}</Text><Text className="mt-1 text-sm font-semibold text-foreground">{item.clientName ?? t('Sem cliente')}</Text></View><View className="items-end"><Text className="text-xs text-muted">{t('Adiantamento')}</Text><Text className="mt-1 text-sm font-bold text-foreground">{item.hasAdvance ? formatCurrency(item.amount, currency) : t('Não solicitado')}</Text></View></View><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })} className="mt-4 flex-row items-center"><IconSymbol name="airplane" size={16} color={colors.primary} /><Text className="ml-2 text-xs font-medium text-muted">{t(item.transport)}</Text><View className="ml-auto"><ActionButtonFace label={t('Abrir detalhes ›')} /></View></Pressable></View>;
+          return <View key={item.id} className="rounded-3xl border border-border bg-surface p-5"><View className="flex-row items-start justify-between"><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1, flex: 1 })}><Text className="text-xs font-bold tracking-wider text-muted">{item.code}</Text><Text className="mt-2 text-xl font-bold text-foreground">{item.destination}</Text><Text className="mt-1 text-sm text-muted">{formatDateLoose(item.startDate)} — {formatDateLoose(item.endDate)}</Text></Pressable><View className="items-end"><StatusPill status={item.status} />{canEdit ? <View className="mt-3"><ActionButton label={t('Editar')} onPress={() => router.push({ pathname: '/new-trip', params: { tripId: item.id } })} /></View> : null}</View></View><View className="mt-5 flex-row border-t border-border pt-4"><View className="flex-1"><Text className="text-xs text-muted">{t('Cliente')}</Text><Text className="mt-1 text-sm font-semibold text-foreground">{item.clientName ?? t('Sem cliente')}</Text></View><View className="items-end"><Text className="text-xs text-muted">{t('Adiantamento')}</Text><Text className="mt-1 text-sm font-bold text-foreground">{item.hasAdvance ? formatCurrency(item.amount, currency) : t('Não solicitado')}</Text></View></View><Pressable onPress={openItem} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginTop: 16, flexDirection: 'row', alignItems: 'center' })}><IconSymbol name="airplane" size={16} color={colors.primary} /><Text className="ml-2 text-xs font-medium text-muted">{t(item.transport)}</Text><View className="ml-auto"><ActionButtonFace tone="neutral" label={t('Abrir detalhes ›')} /></View></Pressable></View>;
         })}
         {filteredRows.length === 0 ? <View><SectionHeader title={t('Nenhuma viagem')} /><PrimaryButton label={t('Criar solicitação')} onPress={() => router.push('/new-trip')} /></View> : null}
       </View>

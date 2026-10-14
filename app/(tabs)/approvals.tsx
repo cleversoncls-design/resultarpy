@@ -133,11 +133,11 @@ export default function ApprovalsScreen() {
           <View className="mt-3 flex-row gap-3">
             <View className="flex-1">
               <Text className="mb-1 text-xs font-bold text-muted">{t('De')}</Text>
-              <Pressable onPress={() => setShowFromCalendar(true)} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })} className="flex-row items-center rounded-xl border border-border bg-background px-3 py-2"><Text className={historyFrom ? 'flex-1 text-foreground' : 'flex-1 text-muted'}>{formatDateDisplay(historyFrom) || 'dd/mm/aaaa'}</Text><Text className="text-lg text-primary">▣</Text></Pressable>
+              <Pressable onPress={() => setShowFromCalendar(true)} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 })}><Text className={historyFrom ? 'flex-1 text-foreground' : 'flex-1 text-muted'}>{formatDateDisplay(historyFrom) || 'dd/mm/aaaa'}</Text><Text className="text-lg text-primary">▣</Text></Pressable>
             </View>
             <View className="flex-1">
               <Text className="mb-1 text-xs font-bold text-muted">{t('Até')}</Text>
-              <Pressable onPress={() => setShowToCalendar(true)} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1 })} className="flex-row items-center rounded-xl border border-border bg-background px-3 py-2"><Text className={historyTo ? 'flex-1 text-foreground' : 'flex-1 text-muted'}>{formatDateDisplay(historyTo) || 'dd/mm/aaaa'}</Text><Text className="text-lg text-primary">▣</Text></Pressable>
+              <Pressable onPress={() => setShowToCalendar(true)} style={({ pressed }) => ({ opacity: pressed ? 0.72 : 1, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 })}><Text className={historyTo ? 'flex-1 text-foreground' : 'flex-1 text-muted'}>{formatDateDisplay(historyTo) || 'dd/mm/aaaa'}</Text><Text className="text-lg text-primary">▣</Text></Pressable>
             </View>
           </View>
           {!rangeValid ? <Text className="mt-2 text-sm font-medium text-error">{t('Informe datas válidas e um período final igual ou posterior ao inicial.')}</Text> : null}

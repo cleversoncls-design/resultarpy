@@ -60,6 +60,7 @@ const translations: Record<TranslationKey, string> = {
   'Reinicia o ciclo de revisão': 'Reinicia el ciclo de revisión', 'Ao concluir uma OS com este motivo, o KM da última manutenção do veículo é atualizado (ex.: revisão periódica, troca de óleo). Deixe desmarcado para avarias, pneus e outros reparos.': 'Al concluir una OS con este motivo, se actualiza el KM del último mantenimiento del vehículo (ej.: revisión periódica, cambio de aceite). Déjelo sin marcar para averías, neumáticos y otras reparaciones.',
   'EXTINTOR VENCIDO': 'EXTINTOR VENCIDO', 'EXTINTOR POR VENCER': 'EXTINTOR POR VENCER',
   'Em viagem': 'En viaje',
+  'Ordenar por': 'Ordenar por', 'Padrão': 'Predeterminado', 'Crescente': 'Ascendente', 'Decrescente': 'Descendente',
   'Disponível': 'Disponible',
 
   'Condutor definido': 'Conductor definido', 'KM da manutenção': 'KM del mantenimiento', 'KM de saída': 'KM de salida', 'do intervalo': 'del intervalo', 'km atuais': 'km actuales',
