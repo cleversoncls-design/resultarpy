@@ -23,14 +23,17 @@ export function StatusPill({ status }: { status: TripStatus | string }) {
 // Aparência do botão compacto, sem comportamento: para quando o card inteiro já
 // é um Pressable (evita Pressable dentro de Pressable). Usa a mesma altura do
 // StatusPill (texto xs + 5px de padding vertical).
-export function ActionButtonFace({ label, tone = 'primary' }: { label: string; tone?: 'primary' | 'warning' }) {
+// Tom 'neutral' = cinza grafite, para ações de "Abrir" (menos peso que Editar).
+const NEUTRAL_BUTTON_COLOR = '#4B5563';
+
+export function ActionButtonFace({ label, tone = 'primary' }: { label: string; tone?: 'primary' | 'warning' | 'neutral' }) {
   const colors = useColors();
-  return <View style={{ backgroundColor: tone === 'warning' ? colors.warning : colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' }}><Text className="text-xs font-bold text-white">{label}</Text></View>;
+  return <View style={{ backgroundColor: tone === 'warning' ? colors.warning : tone === 'neutral' ? NEUTRAL_BUTTON_COLOR : colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' }}><Text className="text-xs font-bold text-white">{label}</Text></View>;
 }
 
 // Botão compacto para ações dentro de cards e tabelas (Abrir, Editar,
 // Gerenciar...), no estilo sólido de "+ Nova O.S." / "+ Novo veículo".
-export function ActionButton({ label, onPress, tone = 'primary' }: { label: string; onPress?: () => void; tone?: 'primary' | 'warning' }) {
+export function ActionButton({ label, onPress, tone = 'primary' }: { label: string; onPress?: () => void; tone?: 'primary' | 'warning' | 'neutral' }) {
   return <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, alignSelf: 'flex-start' })}><ActionButtonFace label={label} tone={tone} /></Pressable>;
 }
 
@@ -41,7 +44,7 @@ export function ChoiceCheckboxes<T extends string>({ options, value, onChange }:
   return <View className="flex-row flex-wrap" style={{ columnGap: 20, rowGap: 10 }}>
     {options.map((option) => {
       const checked = option.value === value;
-      return <Pressable key={option.value} onPress={() => onChange(option.value)} accessibilityRole="checkbox" accessibilityState={{ checked }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })} className="flex-row items-center">
+      return <Pressable key={option.value} onPress={() => onChange(option.value)} accessibilityRole="checkbox" accessibilityState={{ checked }} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, flexDirection: 'row', alignItems: 'center' })}>
         <View style={{ backgroundColor: checked ? colors.success : colors.background, borderColor: checked ? colors.success : colors.border }} className="h-5 w-5 items-center justify-center rounded-md border">{checked ? <IconSymbol name="checkmark" size={14} color="white" /> : null}</View>
         <Text className="ml-3 text-sm text-foreground">{option.label}</Text>
       </Pressable>;
