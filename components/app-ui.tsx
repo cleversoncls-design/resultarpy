@@ -19,6 +19,14 @@ export function StatusPill({ status }: { status: TripStatus | string }) {
   return <View style={{ backgroundColor: tone.backgroundColor, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start' }}><Text style={{ color: tone.color }} className="text-xs font-semibold">{t(status)}</Text></View>;
 }
 
+// Botão compacto para ações dentro de cards (Gerenciar, Editar...). Usa a mesma
+// altura do StatusPill (texto xs + 5px de padding vertical) para ficar alinhado
+// ao status, com o estilo sólido dos botões "+ Nova O.S." / "+ Novo veículo".
+export function ActionButton({ label, onPress, tone = 'primary' }: { label: string; onPress?: () => void; tone?: 'primary' | 'warning' }) {
+  const colors = useColors();
+  return <Pressable onPress={onPress} style={({ pressed }) => [{ backgroundColor: tone === 'warning' ? colors.warning : colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, alignSelf: 'flex-start', opacity: pressed ? 0.75 : 1 }]}><Text className="text-xs font-bold text-white">{label}</Text></Pressable>;
+}
+
 export function PrimaryButton({ label, onPress, compact = false }: { label: string; onPress?: () => void; compact?: boolean }) {
   const colors = useColors();
   return <Pressable onPress={onPress} style={({ pressed }) => [{ backgroundColor: colors.primary, minHeight: compact ? 40 : 50, paddingHorizontal: compact ? 16 : 20, paddingVertical: compact ? 10 : 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] }]}><Text className="font-bold text-white">{label}</Text></Pressable>;
