@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { formatDateDisplay, normalizeDateValue } from '@/lib/date-utils';
 import { Alert, FlatList, Modal, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
-import { KpiCard, StatusPill } from '@/components/app-ui';
+import { ChoiceCheckboxes, KpiCard, StatusPill } from '@/components/app-ui';
 import { CalendarModal } from '@/components/calendar-field';
 import { formatCurrency } from '@/lib/currency';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -127,17 +127,8 @@ export default function ApprovalsScreen() {
 
         <View className="mt-5 rounded-3xl border border-border bg-surface p-4">
           <Text className="text-sm font-bold text-foreground">{t('Filtros')}</Text>
-          <View className="mt-3 flex-row flex-wrap gap-2">
-            {decisionOptions.map((option) => (
-              <Pressable
-                key={option}
-                onPress={() => { setActiveTab(option); setHistoryPage(1); }}
-                style={({ pressed }) => [{ backgroundColor: activeTab === option ? colors.primary : colors.background, borderColor: activeTab === option ? colors.primary : colors.border, opacity: pressed ? 0.7 : 1 }]}
-                className="rounded-xl border px-3 py-2"
-              >
-                <Text style={{ color: activeTab === option ? colors.background : colors.foreground }} className="text-sm font-bold">{t(option)}</Text>
-              </Pressable>
-            ))}
+          <View className="mt-3">
+            <ChoiceCheckboxes value={activeTab} onChange={(option) => { setActiveTab(option); setHistoryPage(1); }} options={decisionOptions.map((option) => ({ value: option, label: t(option) }))} />
           </View>
           <View className="mt-3 flex-row gap-3">
             <View className="flex-1">
